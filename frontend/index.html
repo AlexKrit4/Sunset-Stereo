@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sunset Stereo</title>
+    <link rel="stylesheet" href="./css/game.css" />
+  </head>
+  <body>
+    <div class="sky"></div>
+    <main class="app">
+      <header class="masthead">
+        <div class="title-block">
+          <h1>Sunset Stereo</h1>
+          <p>Golden Hour · Stereo Mix · 20 lines</p>
+        </div>
+        <div class="meta">
+          <div class="chip">RTP 96%</div>
+          <div class="chip">Max 5000×</div>
+          <div class="chip">Stake Engine books</div>
+        </div>
+      </header>
+
+      <section class="stage">
+        <div id="fsCounter" class="fs-counter" hidden>FS <span id="fsCurrent">0</span>/<span id="fsTotal">0</span></div>
+        <div id="board" class="board" aria-label="Sunset Stereo reels"></div>
+        <div id="featureBanner" class="feature-banner"><strong>GOLDEN HOUR</strong></div>
+        <div id="toast" class="toast"></div>
+
+        <div class="mix-panel" id="mixPanel">
+          <div class="mix-head">
+            <span>Stereo Mix</span>
+            <strong id="mixValue">1×</strong>
+          </div>
+          <div class="mix-bar"><div id="mixFill" class="mix-fill"></div></div>
+        </div>
+
+        <div class="controls">
+          <div class="meters">
+            <div class="meter">
+              <span>Balance</span>
+              <strong id="balanceValue">0.00</strong>
+            </div>
+            <div class="meter" id="winMeter">
+              <span>Win</span>
+              <strong id="winValue">0.00</strong>
+            </div>
+          </div>
+
+          <div class="spin-wrap">
+            <button id="spinBtn" type="button">SPIN</button>
+            <div class="bet-row">
+              <button id="betDown" class="ghost" type="button">−</button>
+              <div class="meter">
+                <span>Bet</span>
+                <strong id="betValue">1.00</strong>
+              </div>
+              <button id="betUp" class="ghost" type="button">+</button>
+            </div>
+          </div>
+
+          <div class="side-actions">
+            <button id="bonusBtn" type="button">Buy Golden Hour <span id="bonusCost">80×</span></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="paytable" aria-label="Paytable">
+        <div class="pay-card"><b>H1 Vinyl</b>5×80 · 4×25 · 3×12</div>
+        <div class="pay-card"><b>H2 Cans</b>5×25 · 4×8 · 3×4</div>
+        <div class="pay-card"><b>H3 Tape</b>5×15 · 4×5 · 3×2.5</div>
+        <div class="pay-card"><b>H4 Mic</b>5×10 · 4×3 · 3×1.5</div>
+        <div class="pay-card"><b>Wild Mixer</b>substitutes · FS multipliers</div>
+        <div class="pay-card"><b>Sun Scatter</b>3/4/5 → 10/14/18 FS</div>
+      </section>
+
+      <footer>
+        Local demo player for Stake Engine book events. Space to spin. Math files live in
+        <code>games/sunset_stereo</code>.
+      </footer>
+    </main>
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>
