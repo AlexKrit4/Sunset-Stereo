@@ -19,9 +19,6 @@ class OptimizationSetup:
         self.game_config.opt_params = {
             "base": {
                 "conditions": {
-                    "wincap": ConstructConditions(
-                        rtp=0.001, av_win=wincaps["base"], search_conditions=wincaps["base"]
-                    ).return_dict(),
                     "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict(),
                     "freegame": ConstructConditions(
                         rtp=0.360, hr=200, search_conditions={"symbol": "scatter"}

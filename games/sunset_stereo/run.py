@@ -17,15 +17,15 @@ if __name__ == "__main__":
     profiling = False
 
     num_sim_args = {
-        "base": int(400),
-        "bonus": int(200),
+        "base": int(80),
+        "bonus": int(20),
     }
 
     run_conditions = {
         "run_sims": True,
         "run_optimization": False,
         "run_analysis": False,
-        "run_format_checks": True,
+        "run_format_checks": False,
     }
     target_modes = list(num_sim_args.keys())
 

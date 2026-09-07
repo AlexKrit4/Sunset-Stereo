@@ -424,8 +424,11 @@ footer {
 }
 
 @media (max-width: 840px) {
+  .app { width: min(100%, 100%); padding: 12px 10px 20px; }
   .masthead, .controls { display: grid; grid-template-columns: 1fr; }
   .meta, .meters, .side-actions, .bet-row { justify-content: center; }
-  .cell { min-height: 84px; }
+  .cell { min-height: 72px; }
   .symbol-label { display: none; }
+  #spinBtn { width: 88px; height: 88px; }
+  .side-actions { justify-content: center; }
 }

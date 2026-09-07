@@ -31,10 +31,10 @@ const bookEventHandlerMap = {
     await showWins(bookEvent);
   },
   setWin: async (bookEvent) => {
-    setWinAmount(bookEvent.amount);
+    setWinAmount(scaled(bookEvent.amount));
   },
   setTotalWin: async (bookEvent) => {
-    setWinAmount(bookEvent.amount);
+    setWinAmount(scaled(bookEvent.amount));
   },
   freeSpinTrigger: async (bookEvent) => {
     markScatters(bookEvent.positions || []);
@@ -53,13 +53,17 @@ const bookEventHandlerMap = {
     await wait(180);
   },
   freeSpinEnd: async (bookEvent) => {
-    await exitGoldenHour(bookEvent.amount);
+    await exitGoldenHour(scaled(bookEvent.amount));
   },
   finalWin: async (bookEvent) => {
-    setWinAmount(bookEvent.amount);
-    if (bookEvent.amount > 0) setBalanceDelta(bookEvent.amount);
+    setWinAmount(scaled(bookEvent.amount));
+    if (bookEvent.amount > 0) setBalanceDelta(scaled(bookEvent.amount));
   },
 };
+
+function scaled(cents) {
+  return Math.round(cents * getState().bet);
+}
 
 const { playBookEvents } = createPlayBookUtils(bookEventHandlerMap, emitter);
 

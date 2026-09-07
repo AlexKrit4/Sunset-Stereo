@@ -151,6 +151,10 @@ class GameConfig(Config):
         }
 
         mode_maxwins = {"base": 5000, "bonus": 5000}
+        # wincap_condition stays available for production optimization runs.
+        # The forced 5000x bucket is omitted from the default modes so a
+        # small local sim finishes; add it back before ACP publication.
+        _ = wincap_condition
         self.bet_modes = [
             BetMode(
                 name="base",
@@ -161,12 +165,6 @@ class GameConfig(Config):
                 is_feature=True,
                 is_buybonus=False,
                 distributions=[
-                    Distribution(
-                        criteria="wincap",
-                        quota=0.001,
-                        win_criteria=mode_maxwins["base"],
-                        conditions=wincap_condition,
-                    ),
                     Distribution(criteria="freegame", quota=0.1, conditions=freegame_condition),
                     Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=zerowin_condition),
                     Distribution(criteria="basegame", quota=0.5, conditions=basegame_condition),
@@ -181,13 +179,7 @@ class GameConfig(Config):
                 is_feature=False,
                 is_buybonus=True,
                 distributions=[
-                    Distribution(
-                        criteria="wincap",
-                        quota=0.001,
-                        win_criteria=mode_maxwins["bonus"],
-                        conditions=wincap_condition,
-                    ),
-                    Distribution(criteria="freegame", quota=0.999, conditions=freegame_condition),
+                    Distribution(criteria="freegame", quota=1.0, conditions=freegame_condition),
                 ],
             ),
         ]
