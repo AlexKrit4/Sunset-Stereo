@@ -30,10 +30,16 @@
       host.appendChild(pixi.canvas);
       runtime.board = createBoard(pixi);
       app = pixi;
-      const layout = () => runtime.board?.resize(host.clientWidth, host.clientHeight);
+      const layout = () => runtime.board?.resize(pixi.screen.width, pixi.screen.height);
+      pixi.resize();
       layout();
-      window.addEventListener("resize", layout);
-      stopLayout = () => window.removeEventListener("resize", layout);
+      pixi.renderer.on("resize", layout);
+      const ro = new ResizeObserver(() => pixi.resize());
+      ro.observe(host);
+      stopLayout = () => {
+        ro.disconnect();
+        pixi.renderer.off("resize", layout);
+      };
     };
 
     void boot();
@@ -60,6 +66,8 @@
   }
   .viewport :global(canvas) {
     display: block;
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     background: transparent;

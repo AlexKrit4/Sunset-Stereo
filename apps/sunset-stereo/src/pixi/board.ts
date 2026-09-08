@@ -555,9 +555,9 @@ export class BoardController {
   layout(viewWidth: number, viewHeight = 0) {
     const w = COLS * CELL + (COLS + 1) * GAP;
     const h = MAX_ROWS * CELL + 2 * GAP;
-    const padX = 10;
-    const padTop = 26;
-    const padBottom = 10;
+    const padX = 6;
+    const padTop = 22;
+    const padBottom = 6;
     const scaleX = Math.max(0.35, (viewWidth - padX * 2) / w);
     const scaleY =
       viewHeight > 0 ? Math.max(0.35, (viewHeight - padTop - padBottom) / h) : scaleX;
