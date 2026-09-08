@@ -2,6 +2,8 @@
 
 Read **[ENGINE_DOCUMENTATION.md](./ENGINE_DOCUMENTATION.md)** first.
 
+Publication gap analysis vs that dump: **[STAKE_PUBLICATION_REVIEW.md](./STAKE_PUBLICATION_REVIEW.md)**. The live 6×4 player is not Stake-ready.
+
 It contains every public technical section from https://engine.io/docs:
 
 - Math SDK (setup, quick start, game format, gamestate, source files, optimization, samples)
