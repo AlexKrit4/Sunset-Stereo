@@ -23,6 +23,9 @@ const SPIN_WINDUP_PX = 30;
 const SPIN_WINDUP_MS = 160;
 const SPIN_GRAVITY_MS = 110;
 const BLUR_MAX = 12;
+const LAND_BOUNCE_PX = 9;
+const LAND_BOUNCE_DOWN_MS = 52;
+const LAND_BOUNCE_UP_MS = 150;
 const NUDGE_WINDUP_MS = 100;
 const NUDGE_PUSH_MS = 340;
 const NUDGE_WINDUP_FRAC = 0.12;
@@ -52,6 +55,9 @@ type SpinJob = {
   windupMs: number;
   gravityMs: number;
   velocity: number;
+  bouncePx: number;
+  bounceAt: number;
+  landed: boolean;
   finals: string[];
   rows: number;
   done: boolean;
@@ -254,7 +260,10 @@ export class BoardController {
         windupPx: SPIN_WINDUP_PX,
         windupMs: SPIN_WINDUP_MS,
         gravityMs: SPIN_GRAVITY_MS,
-        velocity: plan.velocity,
+        velocity: plan.velocity * (0.97 + col * 0.012),
+        bouncePx: LAND_BOUNCE_PX + (col % 3) - 1,
+        bounceAt: 0,
+        landed: false,
         finals,
         rows,
         done: false,
@@ -342,7 +351,12 @@ export class BoardController {
     this.teaseOverlay.alpha = 0.42 + 0.58 * (0.5 + 0.5 * Math.sin(now / 120));
     this.scatterOverlay.alpha = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(now / 160));
     for (const job of this.jobs) {
-      if (job.done || now < job.startAt) continue;
+      if (job.done) continue;
+      if (job.landed) {
+        this.tickLandBounce(job, now);
+        continue;
+      }
+      if (now < job.startAt) continue;
       const elapsed = now - job.startAt;
       if (elapsed < job.windupMs) {
         const tossed = job.windupPx * easeOutQuad(elapsed / job.windupMs);
@@ -353,20 +367,39 @@ export class BoardController {
       const fallMs = elapsed - job.windupMs;
       const offset = this.fallOffset(job, fallMs);
       if (offset <= 0) {
-        this.landReel(job);
+        this.landReel(job, now);
         continue;
       }
       job.strip.y = -offset;
-      job.blur.strengthY = BLUR_MAX * Math.min(1, this.fallSpeed(job, fallMs) / job.velocity);
+      const spinBlur = BLUR_MAX * Math.min(1, this.fallSpeed(job, fallMs) / job.velocity);
+      job.blur.strengthY = offset < CELL ? spinBlur * (offset / CELL) : spinBlur;
     }
   }
 
-  private landReel(job: SpinJob) {
-    job.done = true;
-    job.blur.strengthY = 0;
+  private tickLandBounce(job: SpinJob, now: number) {
+    const elapsed = now - job.bounceAt;
+    const down = LAND_BOUNCE_DOWN_MS;
+    const up = LAND_BOUNCE_UP_MS;
+    if (elapsed < down) {
+      job.strip.y = job.bouncePx * easeOutQuad(elapsed / down);
+      return;
+    }
+    const back = elapsed - down;
+    if (back < up) {
+      job.strip.y = job.bouncePx * (1 - easeOutCubic(back / up));
+      return;
+    }
     job.strip.y = 0;
+    job.done = true;
+  }
+
+  private landReel(job: SpinJob, now: number) {
+    job.landed = true;
+    job.bounceAt = now;
+    job.blur.strengthY = 0;
     job.strip.filters = [];
     this.landStatic(job.col, job.finals);
+    job.strip.y = 0;
     if (!job.settled) {
       job.settled = true;
       this.onSettled?.(job.col);
