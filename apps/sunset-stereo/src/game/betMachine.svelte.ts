@@ -1,7 +1,7 @@
 import { createActor, createMachine } from "xstate";
 import { playBookEvents } from "./playBook";
 import { runtime } from "./context";
-import { moneyPlain, ui } from "../lib/ui.svelte";
+import { hideSpinWin, moneyPlain, ui } from "../lib/ui.svelte";
 import { createEngineHandle, fetchReplayBook, type EngineHandle, type BookState } from "../rgs/session";
 import type { Round } from "stake-engine";
 
@@ -90,6 +90,7 @@ async function playEngineRound(round: Round) {
   const book = engine!.bookFromRound(round);
   ui.winMicro = 0;
   ui.banner = "";
+  hideSpinWin();
   await playBookEvents(book.events);
 }
 
@@ -113,6 +114,7 @@ export async function playBet() {
   ui.fsCurrent = 0;
   ui.fsTotal = 0;
   ui.winMicro = 0;
+  hideSpinWin();
   betActor.send({ type: "PLAY" });
 
   try {
@@ -141,6 +143,7 @@ export async function playReplay() {
   ui.busy = true;
   ui.winMicro = 0;
   ui.banner = "";
+  hideSpinWin();
   betActor.send({ type: "PLAY" });
   try {
     await playBookEvents(replayBook.events);

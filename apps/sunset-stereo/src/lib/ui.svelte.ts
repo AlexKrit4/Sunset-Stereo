@@ -11,6 +11,9 @@ export const ui = $state({
   balanceMicro: 1000 * API_MULTIPLIER,
   betMicro: API_MULTIPLIER,
   winMicro: 0,
+  spinWinMicro: 0,
+  spinWinVisible: false,
+  spinWinKey: 0,
   betLevels: [0.1, 0.2, 0.5, 1, 2, 5, 10, 25].map((value) => value * API_MULTIPLIER),
   busy: false,
   mix: 1,
@@ -21,6 +24,21 @@ export const ui = $state({
   rulesOpen: false,
   disableSpacebar: false,
 });
+
+export function showSpinWin(micro: number) {
+  if (micro <= 0) {
+    hideSpinWin();
+    return;
+  }
+  ui.spinWinMicro = micro;
+  ui.spinWinVisible = true;
+  ui.spinWinKey += 1;
+}
+
+export function hideSpinWin() {
+  ui.spinWinVisible = false;
+  ui.spinWinMicro = 0;
+}
 
 export function money(value: number) {
   return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

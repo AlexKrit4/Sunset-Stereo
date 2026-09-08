@@ -1,4 +1,4 @@
-import { ui } from "../lib/ui.svelte";
+import { hideSpinWin, showSpinWin, ui } from "../lib/ui.svelte";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { runtime } from "./context";
 import { formatMoneyPlain, multiplierCentsToMicro } from "../rgs/money";
@@ -9,6 +9,7 @@ let pendingHolds: Position[] = [];
 
 export const bookEventHandlerMap: BookEventHandlerMap = {
   reveal: async (bookEvent) => {
+    hideSpinWin();
     const board = runtime.board;
     if (!board) return;
     lastBoard = bookEvent.board;
@@ -41,8 +42,10 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   },
 
   setWin: async (bookEvent) => {
-    ui.winMicro = multiplierCentsToMicro(bookEvent.amount);
-    await waitForTimeout(60);
+    const micro = multiplierCentsToMicro(bookEvent.amount);
+    ui.winMicro = micro;
+    showSpinWin(micro);
+    await waitForTimeout(micro > 0 ? 720 : 60);
   },
 
   setTotalWin: async (bookEvent) => {
@@ -66,6 +69,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   },
 
   updateFreeSpin: async (bookEvent) => {
+    hideSpinWin();
     pendingHolds = [];
     runtime.board?.clearBookVisuals();
     ui.fsCurrent = bookEvent.amount + 1;

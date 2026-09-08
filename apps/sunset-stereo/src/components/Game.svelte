@@ -4,6 +4,7 @@
   import { createBoard } from "../pixi/board";
   import { loadSymbolArt } from "../pixi/symbols";
   import { setContext, runtime } from "../game/context";
+  import { moneyHud, ui } from "../lib/ui.svelte";
 
   setContext();
 
@@ -56,7 +57,15 @@
   });
 </script>
 
-<div class="viewport" bind:this={host}></div>
+<div class="viewport" bind:this={host}>
+  {#if ui.spinWinVisible && ui.spinWinMicro > 0}
+    {#key ui.spinWinKey}
+      <p id="spinWinOverlay" class="spin-win" class:feature={ui.feature}>
+        {moneyHud(ui.spinWinMicro)}
+      </p>
+    {/key}
+  {/if}
+</div>
 
 <style>
   .viewport {
@@ -74,5 +83,44 @@
     width: 100%;
     height: 100%;
     background: transparent;
+  }
+  .spin-win {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    pointer-events: none;
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-weight: 800;
+    font-size: clamp(52px, 11vw, 96px);
+    letter-spacing: 0.03em;
+    line-height: 1;
+    color: #ffd060;
+    text-shadow:
+      0 0 10px #ff9a28,
+      0 0 28px rgba(255, 140, 32, 0.75),
+      0 3px 0 #7a2a08,
+      0 8px 22px rgba(8, 2, 16, 0.9);
+    animation: spin-win-pop 0.38s cubic-bezier(0.18, 0.9, 0.28, 1.15);
+  }
+  .spin-win.feature {
+    color: #ffc070;
+    text-shadow:
+      0 0 12px #ff6a20,
+      0 0 32px rgba(255, 90, 40, 0.8),
+      0 3px 0 #6a1808,
+      0 8px 22px rgba(8, 2, 16, 0.9);
+  }
+  @keyframes spin-win-pop {
+    from {
+      transform: scale(0.62);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 </style>
