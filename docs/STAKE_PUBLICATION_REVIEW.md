@@ -37,6 +37,8 @@ Demo subset: `apps/sunset-stereo/src/rgs/demoBooks.json` (20 books: 8 losses, 8 
 
 You need a Stake Engine team login (ACP). Nothing in this repo can log in for you.
 
+Ready-to-upload zip: [`publish/Sunset-Stereo-Stake.zip`](../publish/Sunset-Stereo-Stake.zip). Unpack it to `Z:\` so you get `Z:\Sunset Stereo\math` and `Z:\Sunset Stereo\frontend`. Then pick those two folders in ACP.
+
 ### 1. Create the game in ACP
 
 1. Open the Admin Control Panel for your Engine team.

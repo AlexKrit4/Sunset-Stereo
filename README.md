@@ -78,7 +78,8 @@ make frontend
 
 Сборка для Engine CDN: `make frontend-build` → загрузить **содержимое** `apps/sunset-stereo/dist` (`base: "./"`). Не грузить внешние шрифты.
 
-Как выложить первую тестовую версию в ACP — в конце [`docs/STAKE_PUBLICATION_REVIEW.md`](docs/STAKE_PUBLICATION_REVIEW.md).
+Готовый архив для ACP (math + frontend): [`publish/Sunset-Stereo-Stake.zip`](publish/Sunset-Stereo-Stake.zip).  
+Распакуй в `Z:\` — получится `Z:\Sunset Stereo\math` и `Z:\Sunset Stereo\frontend`. Как заливать — файл `КАК_ЗАЛИТЬ.txt` внутри архива и [`docs/STAKE_PUBLICATION_REVIEW.md`](docs/STAKE_PUBLICATION_REVIEW.md).
 
 ## Символы
 
