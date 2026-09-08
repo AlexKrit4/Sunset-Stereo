@@ -14,15 +14,15 @@ export const GAP = 5;
 export const COLS = NUM_REELS;
 export const ROWS = MAX_ROWS;
 
-const START_STAGGER_MS = 100;
+const START_STAGGER_MS = 58;
 const STOP_STAGGER_MS = 300;
 const LINEAR_MS = 900;
 const DECEL_MS = 120;
 const LINEAR_FRAC = 0.86;
 const BASE_FILLERS = 16;
-const SPIN_WINDUP_PX = 18;
-const SPIN_WINDUP_MS = 110;
-const BLUR_IN_MS = 90;
+const SPIN_WINDUP_PX = 22;
+const SPIN_WINDUP_MS = 52;
+const SPIN_GRAVITY_MS = 70;
 const BLUR_MAX = 12;
 const NUDGE_WINDUP_MS = 100;
 const NUDGE_PUSH_MS = 340;
@@ -38,12 +38,20 @@ function easeOutCubic(t: number) {
   return 1 - (1 - x) ** 3;
 }
 
+function easeOutQuad(t: number) {
+  const x = Math.min(Math.max(t, 0), 1);
+  return 1 - (1 - x) * (1 - x);
+}
+
 type SpinJob = {
   col: number;
   strip: Container;
   blur: BlurFilter;
   startAt: number;
-  startOffset: number;
+  restOffset: number;
+  windupPx: number;
+  windupMs: number;
+  gravityMs: number;
   velocity: number;
   tDecel: number;
   decelMs: number;
@@ -217,11 +225,6 @@ export class BoardController {
     this.scatterOverlay.clear();
     this.teaseOverlay.alpha = 1;
     const plans = this.planSpin(waysGaps, scatterGaps);
-
-    await Promise.all(
-      this.reels.map((strip) => this.tweenY(strip, strip.y, -SPIN_WINDUP_PX, SPIN_WINDUP_MS)),
-    );
-
     const now = performance.now();
     this.jobs = [];
     const rng = {
@@ -238,10 +241,9 @@ export class BoardController {
       const fillers = pickStripItems(rng, col, plan.fillers);
       const strip = this.reels[col];
       const blur = this.blurs[col];
-      const travel = (rows + plan.fillers) * CELL;
-      const startOffset = travel + SPIN_WINDUP_PX;
+      const restOffset = (rows + plan.fillers) * CELL;
       this.paintStrip(strip, [...finals, ...fillers, ...this.visible[col]]);
-      strip.y = -startOffset;
+      strip.y = -restOffset;
       blur.strengthY = 0;
       strip.filters = [blur];
       this.jobs.push({
@@ -249,7 +251,10 @@ export class BoardController {
         strip,
         blur,
         startAt: now + plan.delay,
-        startOffset,
+        restOffset,
+        windupPx: SPIN_WINDUP_PX,
+        windupMs: SPIN_WINDUP_MS,
+        gravityMs: SPIN_GRAVITY_MS,
         velocity: plan.velocity,
         tDecel: plan.tDecel,
         decelMs: DECEL_MS,
@@ -320,6 +325,21 @@ export class BoardController {
     }
   }
 
+  private fallOffset(job: SpinJob, fallMs: number) {
+    const apex = job.restOffset + job.windupPx;
+    if (fallMs < job.gravityMs) {
+      const accel = job.velocity / job.gravityMs;
+      return Math.max(0, apex - 0.5 * accel * fallMs * fallMs);
+    }
+    const dist = 0.5 * job.velocity * job.gravityMs + job.velocity * (fallMs - job.gravityMs);
+    return Math.max(0, apex - dist);
+  }
+
+  private fallSpeed(job: SpinJob, fallMs: number) {
+    if (fallMs < job.gravityMs) return (job.velocity / job.gravityMs) * fallMs;
+    return job.velocity;
+  }
+
   private tickSpins() {
     const now = performance.now();
     this.teaseOverlay.alpha = 0.42 + 0.58 * (0.5 + 0.5 * Math.sin(now / 120));
@@ -328,17 +348,24 @@ export class BoardController {
       if (job.done || now < job.startAt) continue;
       const elapsed = now - job.startAt;
       let offset: number;
-      if (elapsed < job.tDecel) {
-        offset = Math.max(0, job.startOffset - job.velocity * elapsed);
-        job.blur.strengthY = BLUR_MAX * Math.min(1, elapsed / BLUR_IN_MS);
+      if (elapsed < job.windupMs) {
+        const tossed = job.windupPx * easeOutQuad(elapsed / job.windupMs);
+        offset = job.restOffset + tossed;
+        job.blur.strengthY = 0;
       } else {
-        const u = Math.min((elapsed - job.tDecel) / job.decelMs, 1);
-        const offAtDecel = Math.max(0, job.startOffset - job.velocity * job.tDecel);
-        offset = offAtDecel * (1 - u);
-        job.blur.strengthY = BLUR_MAX * (1 - u);
-        if (u >= 1) {
-          this.landReel(job);
-          continue;
+        const fallMs = elapsed - job.windupMs;
+        if (fallMs < job.tDecel) {
+          offset = this.fallOffset(job, fallMs);
+          job.blur.strengthY = BLUR_MAX * Math.min(1, this.fallSpeed(job, fallMs) / job.velocity);
+        } else {
+          const u = Math.min((fallMs - job.tDecel) / job.decelMs, 1);
+          const offAtDecel = this.fallOffset(job, job.tDecel);
+          offset = offAtDecel * (1 - u);
+          job.blur.strengthY = BLUR_MAX * (1 - u);
+          if (u >= 1) {
+            this.landReel(job);
+            continue;
+          }
         }
       }
       job.strip.y = -Math.round(offset);
