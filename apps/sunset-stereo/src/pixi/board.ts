@@ -105,8 +105,8 @@ export class BoardController {
     const frame = new Graphics();
     const w = COLS * CELL + (COLS + 1) * GAP;
     const h = MAX_ROWS * CELL + 2 * GAP;
-    frame.roundRect(0, 0, w, h, 8).fill(0x1a140f);
-    frame.roundRect(0, 0, w, h, 8).stroke({ color: 0x8a6a40, width: 2 });
+    frame.roundRect(0, 0, w, h, 8).fill({ color: 0x120c08, alpha: 0.22 });
+    frame.roundRect(0, 0, w, h, 8).stroke({ color: 0xc4a574, width: 2, alpha: 0.85 });
     this.root.addChild(frame);
 
     const window = new Container();
@@ -115,12 +115,14 @@ export class BoardController {
 
     for (let col = 0; col < COLS; col += 1) {
       const rows = getReelRows(col);
+      const glass = new Graphics();
+      glass.roundRect(0, 0, CELL, rows * CELL, 6).fill({ color: 0x140e0a, alpha: 0.42 });
       const mask = new Graphics();
       mask.rect(0, 0, CELL, rows * CELL).fill(0xffffff);
       const host = new Container();
       host.x = col * CELL;
       host.y = (MAX_ROWS - rows) * CELL;
-      host.addChild(mask);
+      host.addChild(glass, mask);
       host.mask = mask;
 
       const strip = new Container();

@@ -17,7 +17,7 @@
       if (!host) return;
       const pixi = new Application();
       await pixi.init({
-        background: 0x1c140c,
+        backgroundAlpha: 0,
         antialias: true,
         autoDensity: true,
         resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -55,12 +55,13 @@
     width: 100%;
     height: min(620px, 78vw);
     min-height: 400px;
-    background: #1c140c;
+    background: transparent;
     overflow: hidden;
   }
   .viewport :global(canvas) {
     display: block;
     width: 100%;
     height: 100%;
+    background: transparent;
   }
 </style>
