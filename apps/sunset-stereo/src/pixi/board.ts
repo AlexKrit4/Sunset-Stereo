@@ -553,9 +553,15 @@ export class BoardController {
     if (upTo < WIN_DIM_FROM_REEL || !positions.length) return;
     const hits = new Set(positions.map((pos) => `${pos.reel}:${pos.row}`));
     for (let reel = 0; reel <= upTo; reel += 1) {
+      const strip = this.reels[reel];
+      if (strip) strip.alpha = 1;
       this.cells[reel]?.forEach((cell, row) => {
         cell.alpha = hits.has(`${reel}:${row}`) ? 1 : WIN_DIM_ALPHA;
       });
+    }
+    for (let reel = upTo + 1; reel < COLS; reel += 1) {
+      const strip = this.reels[reel];
+      if (strip) strip.alpha = WIN_DIM_ALPHA;
     }
   }
 
@@ -641,6 +647,9 @@ export class BoardController {
       .forEach((cell) => cell.destroy());
     this.teaseOverlay.clear();
     this.scatterOverlay.clear();
+    this.reels.forEach((strip) => {
+      strip.alpha = 1;
+    });
     this.cells.forEach((col) => {
       col.forEach((cell) => {
         cell.alpha = 1;
