@@ -1,4 +1,4 @@
-import { getContext as svelteGetContext, setContext as svelteSetContext } from "svelte";
+import { setContext as svelteSetContext } from "svelte";
 import { eventEmitter } from "./eventEmitter";
 import type { BoardController } from "../pixi/board";
 
@@ -19,5 +19,6 @@ export function setContext() {
 }
 
 export function getContext(): GameContext {
-  return (svelteGetContext(KEY) as GameContext | undefined) ?? runtime;
+  // Book-event handlers run outside component init, so never call svelteGetContext there.
+  return runtime;
 }

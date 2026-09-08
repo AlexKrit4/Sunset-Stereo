@@ -1,6 +1,7 @@
 import { createActor, createMachine } from "xstate";
 import { playRound } from "../math/math.js";
 import { playBookEvents } from "./playBook";
+import { runtime } from "./context";
 import { ui, charge, BUY_COST } from "../lib/ui.svelte";
 
 export const betMachine = createMachine({
@@ -20,6 +21,10 @@ export const betActor = createActor(betMachine).start();
 
 export async function playBet(buyBonus = false) {
   if (ui.busy || betActor.getSnapshot().matches("playing")) return false;
+  if (!runtime.board) {
+    ui.banner = "Reels are still loading.";
+    return false;
+  }
   const costMult = buyBonus ? BUY_COST : 1;
   if (!charge(costMult)) {
     ui.banner = "Not enough credit.";
@@ -37,6 +42,10 @@ export async function playBet(buyBonus = false) {
     });
     await playBookEvents(book.events, { bookEvents: book.events });
     return true;
+  } catch (error) {
+    console.error(error);
+    ui.banner = error instanceof Error ? error.message : "Spin failed.";
+    return false;
   } finally {
     ui.busy = false;
     betActor.send({ type: "SETTLE" });

@@ -98,12 +98,13 @@ const readHud = async (id) => {
 };
 
 await click(20, "#spinBtn");
+const spinStarted = Date.now();
 let lastHud;
-for (let i = 0; i < 24; i += 1) {
+for (let i = 0; i < 40; i += 1) {
   await new Promise((r) => setTimeout(r, 400));
   lastHud = await readHud(30 + i);
   if (!lastHud.busy) {
-    log("after spin", lastHud);
+    log("after spin", lastHud, `ms=${Date.now() - spinStarted}`);
     break;
   }
 }
@@ -112,13 +113,19 @@ await click(60, "#betDown");
 await click(61, "#betDown");
 log("after bet-", await readHud(63));
 await click(64, "#bonusBtn");
+const bonusStarted = Date.now();
 let bonusHud = await readHud(65);
-for (let i = 0; i < 90; i += 1) {
-  await new Promise((r) => setTimeout(r, 350));
+for (let i = 0; i < 160; i += 1) {
+  await new Promise((r) => setTimeout(r, 400));
   bonusHud = await readHud(70 + i);
   if (!bonusHud.busy) break;
 }
-log("after bonus", bonusHud);
+log("after bonus", bonusHud, `ms=${Date.now() - bonusStarted}`);
+const banner = await send(89, "Runtime.evaluate", {
+  expression: "document.querySelector('.banner')?.textContent || ''",
+  returnByValue: true,
+});
+log("banner", banner.result.value);
 
 const shot = await send(90, "Page.captureScreenshot", { format: "png" });
 await writeFile("/tmp/sunset-stereo-desktop.png", Buffer.from(shot.data, "base64"));
