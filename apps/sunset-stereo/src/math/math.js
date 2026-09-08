@@ -5,11 +5,15 @@ import {
   PAYABLE,
   PAYOUTS,
   REEL_ROWS,
+  MAX_ROWS,
   SCATTER_REEL_LAND_CHANCE,
   SCATTER_REELS,
   SCATTER_TEASE_TOTAL_MS,
   SCATTER_WEIGHT,
   SYMBOLS,
+  BONUS_SCATTER_COUNT,
+  BONUS_SPINS,
+  MAX_HOLD_RESPINS,
   WAYS_TEASE_INTER_REEL_MS,
   WAYS_TEASE_MIN_REELS,
   XNUDGE_CLUSTER_STRIP_CHANCE,
@@ -83,10 +87,10 @@ function pickRandomSymbol(rng, reelIndex, omitScatter = false) {
   return SYMBOLS[0];
 }
 
-function generateReelColumn(rng, reelIndex) {
+function generateReelColumn(rng, reelIndex, omitScatter = false) {
   const rows = getReelRows(reelIndex);
   const col = Array.from({ length: rows }, () => pickRandomSymbol(rng, reelIndex, true));
-  if (SCATTER_REELS.includes(reelIndex) && rng.random() < SCATTER_REEL_LAND_CHANCE) {
+  if (!omitScatter && SCATTER_REELS.includes(reelIndex) && rng.random() < SCATTER_REEL_LAND_CHANCE) {
     col[rng.randomInt(0, rows - 1)] = "scatter";
   }
   return col;
@@ -104,9 +108,9 @@ function placeXNudgeStacks(rng, b) {
   return stacks;
 }
 
-function generateRawBoard(rng) {
-  const b = REEL_ROWS.map((_, r) => generateReelColumn(rng, r));
-  const stacks = placeXNudgeStacks(rng, b);
+function generateRawBoard(rng, omitScatter = false) {
+  const b = REEL_ROWS.map((_, r) => generateReelColumn(rng, r, omitScatter));
+  const stacks = omitScatter ? [] : placeXNudgeStacks(rng, b);
   return { b, stacks };
 }
 
@@ -288,6 +292,72 @@ export function pickStripItems(rng, reelIndex, count) {
   return items;
 }
 
+function highlightKey(pos) {
+  return `${pos.reel}:${pos.row}`;
+}
+
+function keySet(positions) {
+  return new Set(positions.map(highlightKey));
+}
+
+function emptyMults(board) {
+  return board.map((col) => col.map(() => 1));
+}
+
+function respinUnlocked(rng, board, locked) {
+  const next = cloneGrid(board);
+  for (let r = 0; r < NUM_REELS; r += 1) {
+    for (let row = 0; row < getReelRows(r); row += 1) {
+      if (locked.has(`${r}:${row}`)) continue;
+      next[r][row] = pickRandomSymbol(rng, r, true);
+    }
+  }
+  return next;
+}
+
+function playHoldRespinSpin(rng, bet) {
+  let board = generateRawBoard(rng, true).b;
+  const steps = [];
+  let locked = new Set();
+  const nudge = Array(NUM_REELS).fill(1);
+
+  for (let step = 0; step <= MAX_HOLD_RESPINS; step += 1) {
+    if (step > 0) board = respinUnlocked(rng, board, locked);
+    const winInfo = calculateWaysWin(bet, board, emptyMults(board), nudge);
+    if (winInfo.totalWin <= 0) {
+      if (step === 0) {
+        steps.push({
+          board: cloneGrid(board),
+          isRespin: false,
+          locked: [],
+          ...winInfo,
+        });
+      }
+      break;
+    }
+    const keys = keySet(winInfo.highlights);
+    const grown = [...keys].some((key) => !locked.has(key));
+    steps.push({
+      board: cloneGrid(board),
+      isRespin: step > 0,
+      locked: winInfo.highlights.map((pos) => ({ ...pos })),
+      ...winInfo,
+    });
+    if (step > 0 && !grown) break;
+    locked = keys;
+    if (locked.size >= NUM_REELS * MAX_ROWS) break;
+  }
+
+  const last = steps[steps.length - 1];
+  return {
+    steps,
+    paidWin: last.totalWin,
+    totalWays: last.totalWays,
+    wins: last.wins,
+    highlights: last.highlights,
+  };
+}
+
 function countScatters(b) {
   let n = 0;
   for (let r = 0; r < NUM_REELS; r += 1) {
@@ -296,9 +366,19 @@ function countScatters(b) {
   return n;
 }
 
+function scatterPositions(b) {
+  const positions = [];
+  for (let r = 0; r < NUM_REELS; r += 1) {
+    for (let row = 0; row < getReelRows(r); row += 1) {
+      if (b[r][row] === "scatter") positions.push({ reel: r, row });
+    }
+  }
+  return positions;
+}
+
 export function playRound({ seed = Date.now(), bet = 1 } = {}) {
   const rng = mulberry32(seed);
-  const { b: raw, stacks } = generateRawBoard(rng);
+  const { b: raw, stacks } = generateRawBoard(rng, false);
   const resolved = cloneGrid(raw);
   const mults = resolved.map((col) => col.map(() => 1));
   const reelNudgeMult = Array(NUM_REELS).fill(1);
@@ -308,6 +388,22 @@ export function playRound({ seed = Date.now(), bet = 1 } = {}) {
   const waysGaps = buildWaysTeaseGaps(raw);
   const scatter = buildScatterTeaseGaps(raw);
   const extraStopMs = waysGaps.map((ms, i) => ms + scatter.gaps[i]);
+  const scatterCount = countScatters(raw);
+  const bonusAwarded = scatterCount >= BONUS_SCATTER_COUNT ? BONUS_SPINS : 0;
+  const bonusSpins = [];
+  let bonusWin = 0;
+  let bonusWays = 0;
+  if (bonusAwarded) {
+    for (let i = 0; i < bonusAwarded; i += 1) {
+      const spin = playHoldRespinSpin(rng, bet);
+      bonusSpins.push(spin);
+      bonusWin += spin.paidWin;
+      bonusWays += spin.totalWays;
+    }
+  }
+  const cap = bet * GAME.wincap;
+  let totalWin = winInfo.totalWin + bonusWin;
+  if (totalWin > cap) totalWin = cap;
 
   return {
     raw,
@@ -321,10 +417,17 @@ export function playRound({ seed = Date.now(), bet = 1 } = {}) {
     waysGaps,
     scatterGaps: scatter.gaps,
     scatterHit: scatter.hit,
-    scatterCount: countScatters(raw),
+    scatterCount,
+    scatterPositions: scatterPositions(raw),
+    bonusAwarded,
+    bonusSpins,
+    bonusWin,
+    baseWin: winInfo.totalWin,
     bet,
     ...winInfo,
+    totalWin,
+    totalWays: winInfo.totalWays + bonusWays,
   };
 }
 
-export { BETS, getWaysTeaseSymbol, reelMatchesWaysTease, XNUDGE_REELS, XWAYS_REELS, SCATTER_REELS };
+export { BETS, getWaysTeaseSymbol, reelMatchesWaysTease, XNUDGE_REELS, XWAYS_REELS, SCATTER_REELS, BONUS_SPINS };

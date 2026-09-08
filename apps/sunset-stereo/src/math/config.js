@@ -17,7 +17,10 @@ export const XWAYS_REDUCTION = 12;
 export const XNUDGE_STACK_SIZE = 4;
 export const XNUDGE_LAND_CHANCE = 0.14;
 export const SCATTER_WEIGHT = 0.22;
-export const SCATTER_REEL_LAND_CHANCE = 0.11;
+export const SCATTER_REEL_LAND_CHANCE = 0.12;
+export const BONUS_SCATTER_COUNT = 3;
+export const BONUS_SPINS = 10;
+export const MAX_HOLD_RESPINS = 16;
 
 export const WAYS_TEASE_INTER_REEL_MS = 500;
 export const WAYS_TEASE_MIN_REELS = 3;

@@ -20,6 +20,13 @@
     <strong id="winValue">{money(ui.win)}</strong>
   </div>
 
+  {#if ui.fsTotal > 0}
+    <div class="readout extra">
+      <span>Extra plays</span>
+      <strong id="fsValue">{ui.fsCurrent}/{ui.fsTotal}</strong>
+    </div>
+  {/if}
+
   <div class="stake">
     <button id="betDown" type="button" disabled={ui.busy} onclick={() => onBet(-1)}>–</button>
     <div class="readout compact">
@@ -62,6 +69,11 @@
   .compact {
     min-width: 92px;
     text-align: center;
+  }
+  .extra {
+    min-width: 96px;
+    border-color: #c47848;
+    background: #2a1810;
   }
   button {
     border: 1px solid #6a5438;

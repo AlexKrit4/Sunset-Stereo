@@ -77,11 +77,11 @@ class GameConfig(Config):
         self.paylines = {}
 
         self.include_padding = True
-        # Scatter is visual/tease only. Wilds are not in the symbol set.
+        # Scatter is visual/tease in base; 3+ suns start 10 extra plays.
         self.special_symbols = {"wild": [], "scatter": ["S"]}
 
         self.freespin_triggers = {
-            self.basegame_type: {},
+            self.basegame_type: {3: 10, 4: 10},
             self.freegame_type: {},
         }
         # Board anticipation after two suns (player 2-scatter tease).
@@ -90,14 +90,24 @@ class GameConfig(Config):
             self.freegame_type: 2,
         }
 
-        reels = {"BR0": "BR0.csv"}
+        reels = {"BR0": "BR0.csv", "FR0": "FR0.csv"}
         self.reels = {}
         for reel_id, filename in reels.items():
             self.reels[reel_id] = self.read_reels_csv(os.path.join(self.reels_path, filename))
 
         self.padding_reels[self.basegame_type] = self.reels["BR0"]
+        self.padding_reels[self.freegame_type] = self.reels["FR0"]
         self.padding_symbol_values = {}
 
+        freegame_condition = {
+            "reel_weights": {
+                self.basegame_type: {"BR0": 1},
+                self.freegame_type: {"FR0": 1},
+            },
+            "scatter_triggers": {3: 90, 4: 10},
+            "force_wincap": False,
+            "force_freegame": True,
+        }
         basegame_condition = {
             "reel_weights": {self.basegame_type: {"BR0": 1}},
             "force_wincap": False,
@@ -109,9 +119,13 @@ class GameConfig(Config):
             "force_freegame": False,
         }
         wincap_condition = {
-            "reel_weights": {self.basegame_type: {"BR0": 1}},
+            "reel_weights": {
+                self.basegame_type: {"BR0": 1},
+                self.freegame_type: {"FR0": 1},
+            },
+            "scatter_triggers": {3: 80, 4: 20},
             "force_wincap": True,
-            "force_freegame": False,
+            "force_freegame": True,
         }
         # Restore wincap_condition before Stake optimization / ACP upload.
         _ = wincap_condition
@@ -126,8 +140,9 @@ class GameConfig(Config):
                 is_feature=True,
                 is_buybonus=False,
                 distributions=[
+                    Distribution(criteria="freegame", quota=0.1, conditions=freegame_condition),
                     Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=zerowin_condition),
-                    Distribution(criteria="basegame", quota=0.6, conditions=basegame_condition),
+                    Distribution(criteria="basegame", quota=0.5, conditions=basegame_condition),
                 ],
             ),
         ]

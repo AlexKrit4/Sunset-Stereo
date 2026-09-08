@@ -100,7 +100,7 @@ const readHud = async (id) => {
 await click(20, "#spinBtn");
 const spinStarted = Date.now();
 let lastHud;
-for (let i = 0; i < 90; i += 1) {
+for (let i = 0; i < 180; i += 1) {
   await new Promise((r) => setTimeout(r, 400));
   lastHud = await readHud(30 + i);
   if (!lastHud.busy) {
@@ -124,7 +124,7 @@ if (hasBonus.result.value) throw new Error("bonus buy control must not exist");
 await click(66, "#spinBtn");
 const spin2Started = Date.now();
 let spin2Hud;
-for (let i = 0; i < 90; i += 1) {
+for (let i = 0; i < 180; i += 1) {
   await new Promise((r) => setTimeout(r, 400));
   spin2Hud = await readHud(80 + i);
   if (!spin2Hud.busy) break;

@@ -86,6 +86,13 @@ export type BookEventFreeSpinEnd = {
   winLevel: number;
 };
 
+export type BookEventHoldRespin = {
+  index: number;
+  type: "holdRespin";
+  positions: Position[];
+  continuing: boolean;
+};
+
 export type BookEventFinalWin = {
   index: number;
   type: "finalWin";
@@ -101,6 +108,7 @@ export type BookEvent =
   | BookEventFreeSpinRetrigger
   | BookEventUpdateFreeSpin
   | BookEventUpdateGlobalMult
+  | BookEventHoldRespin
   | BookEventFreeSpinEnd
   | BookEventFinalWin;
 

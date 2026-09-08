@@ -18,6 +18,10 @@ declare module "*.js" {
   export const PAYABLE: string[];
   export const SYMBOLS: string[];
   export const BETS: number[];
+  export const BONUS_SPINS: number;
+  export const BONUS_SCATTER_COUNT: number;
+  export const MAX_HOLD_RESPINS: number;
+  export const SCATTER_REEL_LAND_CHANCE: number;
   export function playRound(opts?: { seed?: number; bet?: number }): {
     raw: string[][];
     resolved: string[][];
@@ -34,6 +38,25 @@ declare module "*.js" {
     scatterGaps: number[];
     scatterHit: number[];
     scatterCount: number;
+    scatterPositions: Array<{ reel: number; row: number }>;
+    bonusAwarded: number;
+    bonusSpins: Array<{
+      steps: Array<{
+        board: string[][];
+        isRespin: boolean;
+        locked: Array<{ reel: number; row: number }>;
+        totalWin: number;
+        totalWays: number;
+        wins: Array<{ sym: string; reelsMatched: number; ways: number; nudgeLineMult: number; win: number }>;
+        highlights: Array<{ reel: number; row: number }>;
+      }>;
+      paidWin: number;
+      totalWays: number;
+      wins: Array<{ sym: string; reelsMatched: number; ways: number; nudgeLineMult: number; win: number }>;
+      highlights: Array<{ reel: number; row: number }>;
+    }>;
+    bonusWin: number;
+    baseWin: number;
     bet: number;
     totalWin: number;
     totalWays: number;

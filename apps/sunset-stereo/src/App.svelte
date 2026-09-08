@@ -25,15 +25,15 @@
   });
 </script>
 
-<div class="cabinet">
+<div class="cabinet" class:feature={ui.feature}>
   <header class="masthead">
     <div>
       <p class="kicker">{GAME.name}</p>
       <h1>Sunset Stereo</h1>
     </div>
     <p class="blurb">
-      Six reels, four rows, left-to-right ways. Sunset can tease remaining reels; it does not
-      start extra spins. RTP {(GAME.rtp * 100).toFixed(0)}%.
+      Six reels, four rows, left-to-right ways. Three suns start 10 extra plays. Winning extra
+      plays hold and respin until nothing new is built. RTP {(GAME.rtp * 100).toFixed(0)}%.
     </p>
   </header>
 
@@ -49,7 +49,10 @@
   <section class="paytable" aria-label="Paytable">
     <h2>Ways pays</h2>
     <p>
-      Left to right, three or more reels.
+      Left to right, three or more reels. Three suns on reels 2–5 start 10 extra plays (one book).
+      A winning extra play is not paid yet — it holds and respins unlocked cells. New ways, even
+      of other symbols, can be built. If a respin adds no new winning cells, that extra play ends
+      and then pays.
     </p>
     <ul>
       {#each payRows as [id, pays]}
@@ -62,6 +65,6 @@
   </section>
 
   <footer>
-    Malfunction voids all pays. Space bar spins. Base game only — no free-spin round.
+    Malfunction voids all pays. Space bar spins. Base game plus 10 extra plays is one bet.
   </footer>
 </div>

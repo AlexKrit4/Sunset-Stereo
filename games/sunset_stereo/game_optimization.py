@@ -1,4 +1,4 @@
-"""Optimization fences for the 6x4 ways basegame.
+"""Optimization fences for the 6x4 ways game with hold-respin extra plays.
 
 Stake production sims / wincap bucket are not wired yet.
 """
@@ -19,12 +19,27 @@ class OptimizationSetup:
             "base": {
                 "conditions": {
                     "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict(),
-                    "basegame": ConstructConditions(hr=3.5, rtp=0.960).return_dict(),
+                    "freegame": ConstructConditions(
+                        rtp=0.280, hr=165, search_conditions={"symbol": "scatter"}
+                    ).return_dict(),
+                    "basegame": ConstructConditions(hr=3.5, rtp=0.680).return_dict(),
                 },
                 "scaling": ConstructScaling(
                     [
                         {"criteria": "basegame", "scale_factor": 1.2, "win_range": (1, 2), "probability": 1.0},
                         {"criteria": "basegame", "scale_factor": 1.5, "win_range": (10, 20), "probability": 1.0},
+                        {
+                            "criteria": "freegame",
+                            "scale_factor": 0.8,
+                            "win_range": (20, 50),
+                            "probability": 1.0,
+                        },
+                        {
+                            "criteria": "freegame",
+                            "scale_factor": 1.2,
+                            "win_range": (80, 160),
+                            "probability": 1.0,
+                        },
                     ]
                 ).return_dict(),
                 "parameters": ConstructParameters(

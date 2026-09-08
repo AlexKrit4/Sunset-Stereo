@@ -4,7 +4,7 @@ Reviewed against `docs/ENGINE_DOCUMENTATION.md` (engine.io Math, Frontend, RGS, 
 
 **Verdict: not publishable on Stake yet** (no RGS, no replay, tiny unoptimized sims). Product is no longer forked.
 
-**Production (locked):** 6×4 left-to-right ways. Scatter tease only. No wilds, no xWays/xNudge, no Golden Hour, no buy bonus.
+**Production (locked):** 6×4 left-to-right ways. 3 scatters → 10 hold-respin extra plays. No wilds, no xWays/xNudge, no Golden Hour, no buy bonus.
 
 | Surface | Role |
 | --- | --- |
@@ -64,9 +64,9 @@ Live HUD uses a hardcoded `[0.1 … 25]` ladder and a fake `balance: 1000`. XSS:
 | Requirement | Live 6×4 app |
 | --- | --- |
 | Unique assets (not Web SDK samples) | Custom JPGs + scene photo |
-| Rules: all mechanics | Describes ways, no FS — now matches math |
+| Rules: all mechanics | Describes ways + 10 extra plays with hold-respin |
 | Max win per mode | `wincap: 55200` in player and math |
-| Feature access copy | Scatter does not start extra spins — matches math |
+| Feature access copy | 3 suns start 10 extra plays — matches math |
 
 ### 1.7 Game tiles — **missing**
 
@@ -76,7 +76,7 @@ Need `SunsetStereo-BG.(png|jpg)`, `SunsetStereo-FG.png` (transparent), `Provider
 
 Docs: missing bonus depth and generic AI look → **1★, not published**.
 
-- Live 6×4 with tease-only scatter matches “shallow / missing bonus” — Engine may ask for more depth before 2★.
+- Live 6×4 now has a 10-spin hold-respin bonus. Depth is better; art/fonts still risk 1★.
 - JPG photo tiles + Georgia system fonts will not score 3★.
 
 ---
@@ -118,7 +118,7 @@ CSV rows are `id,weight,payoutMultiplier` with matching integer multipliers (×1
 
 ### 2.5 Game logic vs Math SDK structure
 
-`GameConfig` / `GameState` follow the SDK MRO with **ways** evaluation. No FS, no wilds.
+`GameConfig` / `GameState` follow the SDK MRO with **ways** evaluation. 3 scatters start 10 hold-respin extra plays. No wilds.
 
 Issues:
 
@@ -128,7 +128,7 @@ Issues:
 
 ### 2.6 Events the frontend must handle
 
-From 6×4 ways books (once regenerated): `reveal`, `winInfo`, `setWin`, `setTotalWin`, `finalWin`, and **`wincap`** when the cap hits. No free-spin events.
+From 6×4 ways books (once regenerated): `reveal`, `winInfo`, `setWin`, `setTotalWin`, `finalWin`, `freeSpinTrigger`, `updateFreeSpin`, `holdRespin`, `freeSpinEnd`, and **`wincap`** when the cap hits.
 
 Amounts are **integer cents of the bet multiplier** (`0.20×` → `20`). `frontend/js/main.js` does `cents * bet` **without `/100`** → 100× overstated wins. The Svelte `bookEventHandlerMap` assigns `ui.win = bookEvent.amount` the same way — and is unused.
 
@@ -165,12 +165,12 @@ Pixi board is **6×4 packed cells**, symbol ids `high1`/`low1` aliased to `H1`/`
 
 Do **not** upload until books + RGS exist. Product is already 6×4.
 
-1. **Lock product** to 6×4 ways / scatter tease / no FS / cap 55200× / 96% RTP (now in `game_config.py`).
+1. **Lock product** to 6×4 ways / 3 scatters → 10 hold-respin extra plays / cap 55200× / 96% RTP (now in `game_config.py`).
 2. Restore `wincap` distribution; production sim counts; `compression = True`; `run_optimization = True`.
 3. Confirm optimized RTP in 90–96.7%, hit-rate, std, max-win books. Publish `jsonl.zst` + LUT + `index.json` (base only).
 4. Point `apps/sunset-stereo` at books (Web SDK or current Pixi board). No client RNG.
 5. Wire `@engine.io/ts-client`, replay, currencies, RGS bet levels.
-6. Rules modal: ways, RTP, max win, scatter tease, disclaimer. UI guide + mute.
+6. Rules modal: ways, RTP, max win, 3-sun bonus, hold-respin, disclaimer. UI guide + mute.
 7. Audio, mobile, popout, tile assets. ACP: math then frontend.
 
 ---
@@ -178,7 +178,7 @@ Do **not** upload until books + RGS exist. Product is already 6×4.
 ## 5. What is already in good shape
 
 - Math SDK layout and class split match Engine samples.
-- Production config is 6×4 ways, base-only, no wilds, scatter isolated on reels 2–5.
+- Production config is 6×4 ways, 10 extra plays on 3 scatters, no wilds, scatter isolated on reels 2–5.
 - No external font CDN.
 - Spacebar mapped to spin.
 - Theme is original enough to avoid sample-asset rejection if JPG ownership is clean.

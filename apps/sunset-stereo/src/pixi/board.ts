@@ -100,6 +100,24 @@ type SpinJob = {
   settled: boolean;
 };
 
+export type HoldStep = {
+  board: string[][];
+  isRespin: boolean;
+  locked: Array<{ reel: number; row: number }>;
+  totalWin: number;
+  totalWays: number;
+  wins: SpinRound["wins"];
+  highlights: Array<{ reel: number; row: number }>;
+};
+
+export type BonusSpin = {
+  steps: HoldStep[];
+  paidWin: number;
+  totalWays: number;
+  wins: SpinRound["wins"];
+  highlights: Array<{ reel: number; row: number }>;
+};
+
 export type SpinRound = {
   raw: string[][];
   resolved: string[][];
@@ -111,6 +129,12 @@ export type SpinRound = {
   waysGaps: number[];
   scatterGaps: number[];
   scatterHit: number[];
+  scatterCount: number;
+  scatterPositions: Array<{ reel: number; row: number }>;
+  bonusAwarded: number;
+  bonusSpins: BonusSpin[];
+  bonusWin: number;
+  baseWin: number;
   totalWin: number;
   totalWays: number;
   wins: Array<{ sym: string; reelsMatched: number; ways: number; nudgeLineMult: number; win: number }>;
@@ -118,11 +142,20 @@ export type SpinRound = {
   bet?: number;
 };
 
+export type RoundHooks = {
+  onBaseSettled?: (round: SpinRound) => void | Promise<void>;
+  onBonusStart?: (round: SpinRound) => void | Promise<void>;
+  onBonusSpinStart?: (index: number, total: number) => void | Promise<void>;
+  onBonusSpinPaid?: (index: number, total: number, paidWin: number) => void | Promise<void>;
+  onBonusEnd?: (round: SpinRound) => void | Promise<void>;
+};
+
 export class BoardController {
   app: Application;
   root = new Container();
   reels: Container[] = [];
   cells: Container[][] = [];
+  private holds: Container[] = [];
   private blurs: BlurFilter[] = [];
   private badges: Text[] = [];
   private visible: string[][] = [];
@@ -164,15 +197,18 @@ export class BoardController {
       host.mask = mask;
 
       const strip = new Container();
+      const hold = new Container();
+      hold.eventMode = "none";
       const blur = new BlurFilter({ strength: 0, quality: 3 });
       blur.strengthX = 0;
       blur.strengthY = 0;
       const seed = Array.from({ length: rows }, (_, row) => ["low4", "low5", "high3", "high1"][(col + row) % 4]);
       const below = pickStripItems(spinRng(), col, SPIN_BELOW_ROWS);
       this.paintStrip(strip, [...seed, ...below]);
-      host.addChild(strip);
+      host.addChild(strip, hold);
       window.addChild(host);
       this.reels.push(strip);
+      this.holds.push(hold);
       this.blurs.push(blur);
       this.visible.push(seed);
       this.cellMults.push(Array.from({ length: rows }, () => 1));
@@ -222,26 +258,28 @@ export class BoardController {
     });
   }
 
-  private planSpin(waysGaps: number[], scatterGaps: number[]) {
+  private planSpin(waysGaps: number[], scatterGaps: number[], pace: "base" | "bonus" | "respin" = "base") {
+    const linearMs = pace === "respin" ? 420 : pace === "bonus" ? 640 : LINEAR_MS;
+    const startStagger = pace === "respin" ? 36 : START_STAGGER_MS;
     const s0 = (MAX_ROWS + BASE_FILLERS) * CELL;
-    const velocity = (LINEAR_FRAC * s0) / LINEAR_MS;
+    const velocity = (LINEAR_FRAC * s0) / linearMs;
     const gravityLead = 0.5 * velocity * SPIN_GRAVITY_MS;
     const plans: Array<{ delay: number; fillers: number; velocity: number }> = [];
     let prevStop = 0;
 
     for (let col = 0; col < COLS; col += 1) {
-      const delay = col * START_STAGGER_MS;
-      const waysGap = waysGaps[col] || 0;
-      const scatterGap = scatterGaps[col] || 0;
+      const delay = col * startStagger;
+      const waysGap = pace === "base" ? waysGaps[col] || 0 : 0;
+      const scatterGap = pace === "base" ? scatterGaps[col] || 0 : 0;
       const rows = getReelRows(col);
-      const stopStagger = scatterGap > 0 ? 0 : STOP_STAGGER_MS;
+      const stopStagger = scatterGap > 0 || pace === "respin" ? 0 : STOP_STAGGER_MS;
       const minStop =
-        col === 0 ? delay + SPIN_WINDUP_MS + LINEAR_MS : prevStop + stopStagger + waysGap + scatterGap;
+        col === 0 ? delay + SPIN_WINDUP_MS + linearMs : prevStop + stopStagger + waysGap + scatterGap;
       const tFall = Math.max(80, minStop - delay - SPIN_WINDUP_MS);
       let rest = velocity * tFall - SPIN_WINDUP_PX - gravityLead;
       rest = Math.max((rows + 10) * CELL, rest);
       let needed = Math.ceil(rest / CELL) - rows;
-      needed = Math.max(10, needed);
+      needed = Math.max(pace === "respin" ? 6 : 10, needed);
       const restOffset = (rows + needed) * CELL;
       const actualFall = (restOffset + SPIN_WINDUP_PX + gravityLead) / velocity;
       prevStop = delay + SPIN_WINDUP_MS + actualFall;
@@ -250,19 +288,60 @@ export class BoardController {
     return plans;
   }
 
-  async playRound(round: SpinRound) {
+  async playRound(round: SpinRound, hooks: RoundHooks = {}) {
     this.clearWins();
+    this.clearHolds();
     this.badges.forEach((badge) => {
       badge.visible = false;
       badge.text = "";
     });
-    const highlights = round.totalWin > 0 ? round.highlights : [];
-    await this.spinTo(round.raw, round.waysGaps, round.scatterGaps, highlights);
+    const highlights = round.baseWin > 0 ? round.highlights : [];
+    await this.spinTo(round.raw, round.waysGaps, round.scatterGaps, highlights, "base");
     if (highlights.length) {
       this.dimNonWinners(highlights, COLS - 1);
       await this.playWinSheen(highlights);
-      await wait(round.totalWin >= round.bet * 15 ? 900 : 380);
+      await wait(round.baseWin >= (round.bet ?? 1) * 15 ? 900 : 380);
     }
+    await hooks.onBaseSettled?.(round);
+    if (round.bonusAwarded > 0) {
+      await this.playBonus(round, hooks);
+    }
+  }
+
+  private async playBonus(round: SpinRound, hooks: RoundHooks = {}) {
+    this.drawScatterTease(round.raw, COLS - 1);
+    await hooks.onBonusStart?.(round);
+    await wait(720);
+    this.scatterOverlay.clear();
+    const total = round.bonusSpins.length;
+    for (let i = 0; i < total; i += 1) {
+      const spin = round.bonusSpins[i];
+      await hooks.onBonusSpinStart?.(i, total);
+      this.clearWins();
+      this.clearHolds();
+      for (let s = 0; s < spin.steps.length; s += 1) {
+        const step = spin.steps[s];
+        const pace = step.isRespin ? "respin" : "bonus";
+        const holdDuring = step.isRespin ? spin.steps[s - 1].locked : [];
+        await this.spinTo(step.board, [], [], step.highlights, pace, holdDuring);
+        if (step.totalWin > 0) {
+          this.setHolds(step.board, step.locked);
+          this.dimNonWinners(step.highlights, COLS - 1);
+        }
+        if (s < spin.steps.length - 1) await wait(180);
+      }
+      const last = spin.steps[spin.steps.length - 1];
+      if (spin.paidWin > 0 && last.highlights.length) {
+        await this.playWinSheen(last.highlights);
+        await wait(spin.paidWin >= (round.bet ?? 1) * 8 ? 520 : 220);
+      } else {
+        await wait(160);
+      }
+      await hooks.onBonusSpinPaid?.(i, total, spin.paidWin);
+    }
+    this.clearHolds();
+    this.clearWins();
+    await hooks.onBonusEnd?.(round);
   }
 
   async spinTo(
@@ -270,13 +349,17 @@ export class BoardController {
     waysGaps: number[] = [],
     scatterGaps: number[] = [],
     highlights: Array<{ reel: number; row: number }> = [],
+    pace: "base" | "bonus" | "respin" = "base",
+    holds: Array<{ reel: number; row: number }> = [],
   ) {
     if (this.spinning) return;
     this.spinning = true;
     this.teaseOverlay.clear();
     this.scatterOverlay.clear();
     this.teaseOverlay.alpha = 1;
-    const plans = this.planSpin(waysGaps, scatterGaps);
+    const locked = new Set(holds.map((pos) => `${pos.reel}:${pos.row}`));
+    if (holds.length) this.setHolds(raw, holds);
+    const plans = this.planSpin(waysGaps, scatterGaps, pace);
     const now = performance.now();
     this.jobs = [];
     const rng = spinRng();
@@ -284,10 +367,15 @@ export class BoardController {
     for (let col = 0; col < COLS; col += 1) {
       const rows = getReelRows(col);
       const finals = raw[col];
-      const plan = plans[col];
-      const fillers = pickStripItems(rng, col, plan.fillers);
+      const reelLocked = Array.from({ length: rows }, (_, row) => locked.has(`${col}:${row}`)).every(Boolean);
       const strip = this.reels[col];
       const blur = this.blurs[col];
+      if (reelLocked) {
+        this.landStatic(col, finals);
+        continue;
+      }
+      const plan = plans[col];
+      const fillers = pickStripItems(rng, col, plan.fillers);
       const restOffset = (rows + plan.fillers) * CELL;
       const below = pickStripItems(rng, col, SPIN_BELOW_ROWS);
       this.paintStrip(strip, [...finals, ...fillers, ...this.visible[col], ...below]);
@@ -300,7 +388,7 @@ export class BoardController {
         startAt: now + plan.delay,
         restOffset,
         windupPx: SPIN_WINDUP_PX,
-        windupMs: SPIN_WINDUP_MS,
+        windupMs: pace === "respin" ? 90 : SPIN_WINDUP_MS,
         gravityMs: SPIN_GRAVITY_MS,
         velocity: plan.velocity * (0.97 + col * 0.012),
         bouncePx: LAND_BOUNCE_PX + (col % 3) - 1,
@@ -315,14 +403,22 @@ export class BoardController {
 
     this.onSettled = (col) => {
       const landed = raw.map((c) => c.slice());
-      this.drawScatterTease(landed, col);
+      if (pace === "base") this.drawScatterTease(landed, col);
       if (highlights.length) {
         this.dimNonWinners(highlights, col);
         return;
       }
-      const sym = getWaysTeaseSymbol(landed, col);
-      this.drawTease(landed, sym, col);
+      if (pace === "base") {
+        const sym = getWaysTeaseSymbol(landed, col);
+        this.drawTease(landed, sym, col);
+      }
     };
+
+    if (!this.jobs.length) {
+      this.spinning = false;
+      this.onSettled = null;
+      return;
+    }
 
     await new Promise<void>((resolve) => {
       this.boundTick = () => {
@@ -339,6 +435,25 @@ export class BoardController {
       };
       this.app.ticker.add(this.boundTick);
     });
+  }
+
+  private setHolds(board: string[][], positions: Array<{ reel: number; row: number }>) {
+    this.clearHolds();
+    positions.forEach((pos) => {
+      const layer = this.holds[pos.reel];
+      if (!layer) return;
+      const view = asView(board[pos.reel][pos.row]);
+      view.y = Math.round(pos.row * CELL);
+      view.eventMode = "none";
+      const ring = new Graphics();
+      ring.roundRect(3, 3, CELL - 6, CELL - 6, 8).stroke({ color: 0xf0a050, width: 3, alpha: 0.95 });
+      view.addChild(ring);
+      layer.addChild(view);
+    });
+  }
+
+  private clearHolds() {
+    this.holds.forEach((layer) => layer.removeChildren());
   }
 
   private drawTease(board: string[][], sym: string | null, upTo: number) {

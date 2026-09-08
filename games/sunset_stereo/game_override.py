@@ -2,7 +2,7 @@ from game_executables import GameExecutables
 
 
 class GameStateOverride(GameExecutables):
-    """No wild multipliers or Stereo Mix in the 6x4 production game."""
+    """No wild multipliers. Zero-win extra-play books are valid."""
 
     def assign_special_sym_function(self):
         self.special_symbol_functions = {}
@@ -14,6 +14,6 @@ class GameStateOverride(GameExecutables):
             if win_criteria is not None and self.final_win != win_criteria:
                 self.repeat = True
                 return
-            if win_criteria is None and self.final_win == 0:
+            if win_criteria is None and self.final_win == 0 and self.criteria != "freegame":
                 self.repeat = True
                 return
