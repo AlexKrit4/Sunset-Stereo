@@ -4,10 +4,10 @@ body {
   min-height: 100%;
   color: #ead8c0;
   font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  background-color: #120c08;
-  background-image: url("/sunset-lounge.jpg");
+  background-color: #14081c;
+  background-image: url("/sunset-scene.jpg");
   background-size: cover;
-  background-position: center 42%;
+  background-position: center 48%;
   background-repeat: no-repeat;
   background-attachment: fixed;
 }
@@ -19,8 +19,8 @@ html::before {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(ellipse at 50% 28%, rgba(18, 10, 4, 0.12) 0%, rgba(12, 8, 4, 0.55) 72%, rgba(8, 5, 2, 0.78) 100%),
-    linear-gradient(180deg, rgba(18, 10, 4, 0.28) 0%, transparent 22%, transparent 62%, rgba(10, 6, 3, 0.62) 100%);
+    radial-gradient(ellipse at 50% 42%, rgba(20, 8, 28, 0.08) 0%, rgba(12, 4, 22, 0.28) 70%, rgba(8, 2, 16, 0.55) 100%),
+    linear-gradient(180deg, rgba(16, 6, 24, 0.22) 0%, transparent 18%, transparent 68%, rgba(8, 2, 16, 0.5) 100%);
 }
 
 * {
@@ -40,7 +40,7 @@ html::before {
 }
 
 .cabinet.feature {
-  background: radial-gradient(800px 240px at 50% 0%, rgba(196, 92, 40, 0.18), transparent 70%);
+  background: radial-gradient(800px 240px at 50% 0%, rgba(220, 80, 140, 0.16), transparent 70%);
 }
 
 .masthead {
