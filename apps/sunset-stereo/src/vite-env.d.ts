@@ -16,6 +16,7 @@ declare module "*.js" {
   export const FREESPINS: Record<string, Record<number, number>>;
   export const BETS: number[];
   export const SYMBOLS: Record<string, { label: string; short: string; kind: string }>;
+  export const REELS: Record<string, string[][]>;
   export function getWinLevel(winAmount: number, key?: string): number;
   export function toCents(amount: number): number;
   export function playRound(opts?: { seed?: number; buyBonus?: boolean }): {

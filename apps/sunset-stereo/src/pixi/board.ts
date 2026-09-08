@@ -2,26 +2,71 @@ import { Application, BlurFilter, Container, Graphics } from "pixi.js";
 import type { BookEventReveal, BookEventWinInfo, Position, RawSymbol } from "../game/typesBookEvent";
 import { createSymbolView } from "./symbols";
 import { wait } from "../game/eventEmitter";
+import { REELS } from "../math/reels.js";
 
 export const COLS = 5;
 export const ROWS = 3;
 export const CELL = 118;
 export const GAP = 6;
 
-const FILLER = ["L4", "L2", "H3", "L1", "H1", "L5", "H2", "L3"];
+const START_STAGGER_MS = 100;
+const STOP_STAGGER_MS = 300;
+const LINEAR_MS = 900;
+const DECEL_MS = 120;
+const LINEAR_FRAC = 0.86;
+const BASE_FILLERS = 18;
+const ANTICIPATION_MS = 480;
+const FILLER_NAMES = ["L4", "L2", "H3", "L1", "H1", "L5", "H2", "L3"];
+
+function asSymbol(name: string): RawSymbol {
+  return { name, wild: name === "W", scatter: name === "S" };
+}
+
+function visibleFromReveal(column: RawSymbol[]): RawSymbol[] {
+  return [column[1], column[2], column[3]].map((symbol) => ({
+    name: symbol.name,
+    wild: symbol.wild,
+    scatter: symbol.scatter,
+    multiplier: symbol.multiplier,
+  }));
+}
+
+function fillersFromStrip(col: number, count: number, gameType: "basegame" | "freegame"): RawSymbol[] {
+  const strips = gameType === "freegame" ? REELS.FR0 : REELS.BR0;
+  const strip = strips?.[col] ?? FILLER_NAMES;
+  const start = Math.floor(Math.random() * strip.length);
+  const out: RawSymbol[] = [];
+  for (let i = 0; i < count; i += 1) {
+    out.push(asSymbol(strip[(start + i) % strip.length]));
+  }
+  return out;
+}
+
+type SpinJob = {
+  col: number;
+  strip: Container;
+  blur: BlurFilter;
+  startAt: number;
+  startOffset: number;
+  velocity: number;
+  tDecel: number;
+  decelMs: number;
+  finals: RawSymbol[];
+  done: boolean;
+};
 
 export class BoardController {
   app: Application;
   root = new Container();
   reels: Container[] = [];
-  cells: Container[][] = [];
-  private blur = new BlurFilter({ strength: 0, quality: 2 });
+  private blurs: BlurFilter[] = [];
+  private visible: RawSymbol[][] = [];
   private spinning = false;
+  private jobs: SpinJob[] = [];
+  private boundTick = () => this.tickSpins();
 
   constructor(app: Application) {
     this.app = app;
-    this.blur.strengthX = 0;
-    this.blur.strengthY = 0;
   }
 
   mount() {
@@ -43,27 +88,53 @@ export class BoardController {
     for (let col = 0; col < COLS; col += 1) {
       const reel = new Container();
       reel.x = col * CELL;
-      const colCells: Container[] = [];
-      for (let row = 0; row < ROWS; row += 1) {
-        const cell = new Container();
-        cell.y = row * CELL;
-        cell.addChild(createSymbolView({ name: FILLER[(col + row) % FILLER.length] }, CELL));
-        reel.addChild(cell);
-        colCells.push(cell);
-      }
+      const blur = new BlurFilter({ strength: 0, quality: 3 });
+      blur.strengthX = 0;
+      blur.strengthY = 0;
+      reel.filters = [];
+      const seed = FILLER_NAMES.slice(col, col + ROWS).map(asSymbol);
+      this.paintStrip(reel, seed);
       window.addChild(reel);
       this.reels.push(reel);
-      this.cells.push(colCells);
+      this.blurs.push(blur);
+      this.visible.push(seed);
     }
 
     this.root.addChild(window);
     this.app.stage.addChild(this.root);
   }
 
-  private setCell(col: number, row: number, symbol: RawSymbol) {
-    const cell = this.cells[col][row];
-    cell.removeChildren();
-    cell.addChild(createSymbolView(symbol, CELL));
+  private paintStrip(strip: Container, symbols: RawSymbol[]) {
+    strip.removeChildren();
+    symbols.forEach((symbol, index) => {
+      const view = createSymbolView(symbol, CELL);
+      view.y = index * CELL;
+      strip.addChild(view);
+    });
+    strip.y = 0;
+  }
+
+  private planSpin(anticipation: number[]) {
+    const s0 = (ROWS + BASE_FILLERS) * CELL;
+    const velocity = (LINEAR_FRAC * s0) / LINEAR_MS;
+    const decelDistance = Math.max(0, s0 - velocity * LINEAR_MS);
+    const plans: Array<{ delay: number; tDecel: number; fillers: number; velocity: number }> = [];
+    let prevStop = 0;
+
+    for (let col = 0; col < COLS; col += 1) {
+      const delay = col * START_STAGGER_MS;
+      const extra = anticipation[col] > 0 ? ANTICIPATION_MS : 0;
+      const minStop =
+        col === 0 ? delay + LINEAR_MS + DECEL_MS + extra : prevStop + STOP_STAGGER_MS + extra;
+      let tDecel = Math.max(80, minStop - delay - DECEL_MS);
+      let needed = Math.ceil((velocity * tDecel + decelDistance) / CELL) - ROWS;
+      needed = Math.max(10, needed);
+      const startOffset = (ROWS + needed) * CELL;
+      tDecel = Math.max(tDecel, (startOffset - decelDistance) / velocity);
+      prevStop = delay + tDecel + DECEL_MS;
+      plans.push({ delay, tDecel, fillers: needed, velocity });
+    }
+    return plans;
   }
 
   async spinTo(event: BookEventReveal) {
@@ -71,35 +142,81 @@ export class BoardController {
     this.spinning = true;
     this.clearWins();
 
-    for (let col = 0; col < COLS; col += 1) {
-      this.reels[col].filters = [this.blur];
-    }
-    this.blur.strengthY = 8;
+    const plans = this.planSpin(event.anticipation ?? []);
+    const now = performance.now();
+    this.jobs = [];
 
-    const names = ["H1", "H2", "H3", "H4", "L1", "L2", "L3", "L4", "L5", "W", "S"];
-    const timers: number[] = [];
     for (let col = 0; col < COLS; col += 1) {
-      timers[col] = window.setInterval(() => {
-        for (let row = 0; row < ROWS; row += 1) {
-          const name = names[Math.floor(Math.random() * names.length)];
-          this.setCell(col, row, { name, wild: name === "W", scatter: name === "S" });
+      const finals = visibleFromReveal(event.board[col]);
+      const plan = plans[col];
+      const strip = this.reels[col];
+      const blur = this.blurs[col];
+      const symbols = [...finals, ...fillersFromStrip(col, plan.fillers, event.gameType), ...this.visible[col]];
+      this.paintStrip(strip, symbols);
+      const startOffset = (ROWS + plan.fillers) * CELL;
+      strip.y = -startOffset;
+      blur.strengthX = 0;
+      blur.strengthY = 10;
+      strip.filters = [blur];
+      this.jobs.push({
+        col,
+        strip,
+        blur,
+        startAt: now + plan.delay,
+        startOffset,
+        velocity: plan.velocity,
+        tDecel: plan.tDecel,
+        decelMs: DECEL_MS,
+        finals,
+        done: false,
+      });
+    }
+
+    await new Promise<void>((resolve) => {
+      const finishIfIdle = () => {
+        if (this.jobs.every((job) => job.done)) {
+          this.app.ticker.remove(this.boundTick);
+          this.spinning = false;
+          resolve();
         }
-      }, 48);
-    }
+      };
+      this.boundTick = () => {
+        this.tickSpins();
+        finishIfIdle();
+      };
+      this.app.ticker.add(this.boundTick);
+    });
+  }
 
-    for (let col = 0; col < COLS; col += 1) {
-      const extra = event.anticipation?.[col] ? 180 : 0;
-      await wait(240 + col * 95 + extra);
-      window.clearInterval(timers[col]);
-      const column = event.board[col];
-      for (let row = 0; row < ROWS; row += 1) {
-        this.setCell(col, row, column[row + 1]);
+  private tickSpins() {
+    const now = performance.now();
+    for (const job of this.jobs) {
+      if (job.done || now < job.startAt) continue;
+      const elapsed = now - job.startAt;
+      let offset: number;
+      if (elapsed < job.tDecel) {
+        offset = Math.max(0, job.startOffset - job.velocity * elapsed);
+        job.blur.strengthY = 10;
+      } else {
+        const u = Math.min((elapsed - job.tDecel) / job.decelMs, 1);
+        const offAtDecel = Math.max(0, job.startOffset - job.velocity * job.tDecel);
+        offset = offAtDecel * (1 - u);
+        job.blur.strengthY = 10 * (1 - u);
+        if (u >= 1) {
+          this.landReel(job);
+          continue;
+        }
       }
-      this.reels[col].filters = [];
+      job.strip.y = -offset;
     }
+  }
 
-    this.blur.strengthY = 0;
-    this.spinning = false;
+  private landReel(job: SpinJob) {
+    job.done = true;
+    job.blur.strengthY = 0;
+    job.strip.filters = [];
+    this.paintStrip(job.strip, job.finals);
+    this.visible[job.col] = job.finals;
   }
 
   highlight(positions: Position[]) {
