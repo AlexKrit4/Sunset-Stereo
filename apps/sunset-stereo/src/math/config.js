@@ -25,7 +25,7 @@ export const SCATTER_TEASE_TOTAL_MS = 6000;
 export const SCATTER_TEASE_SLOW_MS = 2000;
 export const SCATTER_TEASE_ENTER_MS = 680;
 export const SCATTER_TEASE_STOP_MS = 920;
-export const SCATTER_TEASE_CELL_MS = 800;
+export const SCATTER_TEASE_CELL_MS = 1000;
 export const XNUDGE_CLUSTER_STRIP_CHANCE = 0.06;
 
 export const PAYOUTS = {

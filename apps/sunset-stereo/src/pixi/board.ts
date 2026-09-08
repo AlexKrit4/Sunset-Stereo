@@ -117,6 +117,7 @@ type SpinJob = {
   scatterTeaseDist: number;
   scatterSlowVel: number;
   scatterTease: ScatterTease | null;
+  held: boolean;
 };
 
 export type SpinRound = {
@@ -359,6 +360,7 @@ export class BoardController {
         scatterTeaseDist: plan.teaseDist,
         scatterSlowVel: plan.slowVel,
         scatterTease: null,
+        held: false,
       });
     }
 
@@ -446,6 +448,7 @@ export class BoardController {
     this.teaseOverlay.alpha = 0.42 + 0.58 * (0.5 + 0.5 * Math.sin(now / 120));
     this.scatterOverlay.alpha = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(now / 160));
     this.nudgeScatterTease(now);
+    const dt = Math.min(this.app.ticker.deltaMS || 16, 34);
     for (const job of this.jobs) {
       if (job.done) continue;
       if (job.landed) {
@@ -454,6 +457,11 @@ export class BoardController {
       }
       if (job.scatterTease) {
         this.tickScatterTease(job, now);
+        continue;
+      }
+      if (job.held) {
+        job.startAt += dt;
+        applySpinBlur(job.strip, job.blur, 0);
         continue;
       }
       if (now < job.startAt) continue;
@@ -514,6 +522,12 @@ export class BoardController {
       stopFrom: 0,
     };
     applySpinBlur(job.strip, job.blur, 0);
+    for (const other of this.jobs) {
+      if (other.col > job.col && !other.landed && !other.done) {
+        other.held = true;
+        applySpinBlur(other.strip, other.blur, 0);
+      }
+    }
   }
 
   private tickScatterTease(job: SpinJob, now: number) {
@@ -586,6 +600,10 @@ export class BoardController {
     if (job.landed) return;
     job.landed = true;
     job.scatterTease = null;
+    job.held = false;
+    this.jobs.forEach((other) => {
+      if (other.held) other.held = false;
+    });
     job.bounceAt = now;
     applySpinBlur(job.strip, job.blur, 0);
     this.landStatic(job.col, job.finals);
