@@ -32,6 +32,8 @@ const NUDGE_WINDUP_FRAC = 0.12;
 const NUDGE_WINDUP_MAX_PX = 12;
 const WIN_DIM_ALPHA = 0.38;
 const WIN_DIM_FROM_REEL = 2;
+const WIN_SHEEN_MS = 520;
+const WIN_SHEEN_STAGGER_MS = 42;
 
 function applySpinBlur(strip: Container, blur: BlurFilter, strength: number) {
   if (strength <= 0.2) {
@@ -55,6 +57,11 @@ function easeOutCubic(t: number) {
 function easeOutQuad(t: number) {
   const x = Math.min(Math.max(t, 0), 1);
   return 1 - (1 - x) * (1 - x);
+}
+
+function easeInOutQuad(t: number) {
+  const x = Math.min(Math.max(t, 0), 1);
+  return x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2;
 }
 
 type SpinJob = {
@@ -109,6 +116,8 @@ export class BoardController {
   private onSettled: ((col: number) => void) | null = null;
   private teaseOverlay = new Graphics();
   private scatterOverlay = new Graphics();
+  private sheenTick: (() => void) | null = null;
+  private sheenResolve: (() => void) | null = null;
 
   constructor(app: Application) {
     this.app = app;
@@ -233,7 +242,8 @@ export class BoardController {
     await this.spinTo(round.raw, round.waysGaps, round.scatterGaps, highlights);
     if (highlights.length) {
       this.dimNonWinners(highlights, COLS - 1);
-      await wait(round.totalWin >= round.bet * 15 ? 1400 : 640);
+      await this.playWinSheen(highlights);
+      await wait(round.totalWin >= round.bet * 15 ? 900 : 380);
     }
   }
 
@@ -549,7 +559,83 @@ export class BoardController {
     }
   }
 
+  private playWinSheen(positions: Array<{ reel: number; row: number }>) {
+    this.clearSheens();
+    const pad = CELL * 0.06;
+    const inner = CELL - pad * 2;
+    const jobs = positions
+      .map((pos) => {
+        const cell = this.cells[pos.reel]?.[pos.row];
+        if (!cell) return null;
+        const wrap = new Container();
+        wrap.label = "sheen";
+        wrap.eventMode = "none";
+        const mask = new Graphics();
+        mask.roundRect(pad, pad, inner, inner, 10).fill(0xffffff);
+        const shine = new Graphics();
+        const len = CELL * 2.35;
+        shine.rect(-len / 2, -14, len, 28).fill({ color: 0xfff4dc, alpha: 0.16 });
+        shine.rect(-len / 2, -7, len, 14).fill({ color: 0xfffaf2, alpha: 0.34 });
+        shine.rect(-len / 2, -2.2, len, 4.4).fill({ color: 0xffffff, alpha: 0.7 });
+        shine.rotation = -Math.PI / 4;
+        shine.blendMode = "add";
+        wrap.addChild(mask, shine);
+        wrap.mask = mask;
+        cell.addChild(wrap);
+        return {
+          shine,
+          delay: pos.reel * WIN_SHEEN_STAGGER_MS + pos.row * 12,
+          fromX: pad - 8,
+          fromY: pad - 8,
+          toX: pad + inner + 8,
+          toY: pad + inner + 8,
+        };
+      })
+      .filter((job): job is NonNullable<typeof job> => Boolean(job));
+
+    if (!jobs.length) return Promise.resolve();
+    for (const job of jobs) {
+      job.shine.x = job.fromX;
+      job.shine.y = job.fromY;
+    }
+
+    const totalMs = WIN_SHEEN_MS + Math.max(...jobs.map((job) => job.delay));
+    return new Promise<void>((resolve) => {
+      this.sheenResolve = resolve;
+      const start = performance.now();
+      const tick = () => {
+        const elapsed = performance.now() - start;
+        for (const job of jobs) {
+          const u = easeInOutQuad(Math.min(Math.max((elapsed - job.delay) / WIN_SHEEN_MS, 0), 1));
+          job.shine.x = job.fromX + (job.toX - job.fromX) * u;
+          job.shine.y = job.fromY + (job.toY - job.fromY) * u;
+        }
+        if (elapsed >= totalMs) this.clearSheens();
+      };
+      this.sheenTick = tick;
+      this.app.ticker.add(tick);
+    });
+  }
+
+  private clearSheens() {
+    if (this.sheenTick) {
+      this.app.ticker.remove(this.sheenTick);
+      this.sheenTick = null;
+    }
+    this.cells.forEach((col) => {
+      col.forEach((cell) => {
+        cell.children
+          .filter((child) => child.label === "sheen")
+          .forEach((child) => child.destroy());
+      });
+    });
+    const resolve = this.sheenResolve;
+    this.sheenResolve = null;
+    resolve?.();
+  }
+
   clearWins() {
+    this.clearSheens();
     this.root.children
       .filter((child) => child.label === "win" || child.label === "scatter")
       .forEach((cell) => cell.destroy());
