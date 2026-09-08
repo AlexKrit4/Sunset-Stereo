@@ -31,8 +31,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     const board = runtime.board;
     if (!board) return;
     lastBoard = bookEvent.board;
-    const pace =
-      bookEvent.gameType === "basegame" ? "base" : pendingHolds.length ? "respin" : "bonus";
+    const pace = bookEvent.gameType === "basegame" ? "base" : "bonus";
     if (bookEvent.gameType === "basegame") {
       ui.feature = false;
       ui.fsCurrent = 0;

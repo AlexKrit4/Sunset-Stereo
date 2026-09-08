@@ -261,8 +261,8 @@ export class BoardController {
   }
 
   private planSpin(waysGaps: number[], scatterGaps: number[], pace: "base" | "bonus" | "respin" = "base") {
-    const linearMs = pace === "respin" ? 420 : pace === "bonus" ? 640 : LINEAR_MS;
-    const startStagger = pace === "respin" ? 36 : START_STAGGER_MS;
+    const linearMs = pace === "base" ? LINEAR_MS : 640;
+    const startStagger = START_STAGGER_MS;
     const s0 = (MAX_ROWS + BASE_FILLERS) * CELL;
     const velocity = (LINEAR_FRAC * s0) / linearMs;
     const gravityLead = 0.5 * velocity * SPIN_GRAVITY_MS;
@@ -274,14 +274,14 @@ export class BoardController {
       const waysGap = pace === "base" ? waysGaps[col] || 0 : 0;
       const scatterGap = pace === "base" ? scatterGaps[col] || 0 : 0;
       const rows = getReelRows(col);
-      const stopStagger = scatterGap > 0 || pace === "respin" ? 0 : STOP_STAGGER_MS;
+      const stopStagger = scatterGap > 0 ? 0 : STOP_STAGGER_MS;
       const minStop =
         col === 0 ? delay + SPIN_WINDUP_MS + linearMs : prevStop + stopStagger + waysGap + scatterGap;
       const tFall = Math.max(80, minStop - delay - SPIN_WINDUP_MS);
       let rest = velocity * tFall - SPIN_WINDUP_PX - gravityLead;
       rest = Math.max((rows + 10) * CELL, rest);
       let needed = Math.ceil(rest / CELL) - rows;
-      needed = Math.max(pace === "respin" ? 6 : 10, needed);
+      needed = Math.max(10, needed);
       const restOffset = (rows + needed) * CELL;
       const actualFall = (restOffset + SPIN_WINDUP_PX + gravityLead) / velocity;
       prevStop = delay + SPIN_WINDUP_MS + actualFall;
@@ -447,7 +447,7 @@ export class BoardController {
         startAt: now + plan.delay,
         restOffset,
         windupPx: SPIN_WINDUP_PX,
-        windupMs: pace === "respin" ? 90 : SPIN_WINDUP_MS,
+        windupMs: SPIN_WINDUP_MS,
         gravityMs: SPIN_GRAVITY_MS,
         velocity: plan.velocity * (0.97 + col * 0.012),
         bouncePx: LAND_BOUNCE_PX + (col % 3) - 1,
