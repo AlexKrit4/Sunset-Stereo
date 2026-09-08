@@ -100,7 +100,7 @@ const readHud = async (id) => {
 await click(20, "#spinBtn");
 const spinStarted = Date.now();
 let lastHud;
-for (let i = 0; i < 40; i += 1) {
+for (let i = 0; i < 90; i += 1) {
   await new Promise((r) => setTimeout(r, 400));
   lastHud = await readHud(30 + i);
   if (!lastHud.busy) {
@@ -108,19 +108,29 @@ for (let i = 0; i < 40; i += 1) {
     break;
   }
 }
+if (lastHud?.busy) throw new Error(`spin still busy after ${Date.now() - spinStarted}ms`);
 
 await click(60, "#betDown");
 await click(61, "#betDown");
 log("after bet-", await readHud(63));
-await click(64, "#bonusBtn");
-const bonusStarted = Date.now();
-let bonusHud = await readHud(65);
-for (let i = 0; i < 160; i += 1) {
+
+const hasBonus = await send(64, "Runtime.evaluate", {
+  expression: "Boolean(document.getElementById('bonusBtn'))",
+  returnByValue: true,
+});
+log("bonusBtn", hasBonus.result.value);
+if (hasBonus.result.value) throw new Error("bonus buy control must not exist");
+
+await click(66, "#spinBtn");
+const spin2Started = Date.now();
+let spin2Hud;
+for (let i = 0; i < 90; i += 1) {
   await new Promise((r) => setTimeout(r, 400));
-  bonusHud = await readHud(70 + i);
-  if (!bonusHud.busy) break;
+  spin2Hud = await readHud(80 + i);
+  if (!spin2Hud.busy) break;
 }
-log("after bonus", bonusHud, `ms=${Date.now() - bonusStarted}`);
+log("after spin2", spin2Hud, `ms=${Date.now() - spin2Started}`);
+if (spin2Hud?.busy) throw new Error("second spin still busy");
 const banner = await send(89, "Runtime.evaluate", {
   expression: "document.querySelector('.banner')?.textContent || ''",
   returnByValue: true,

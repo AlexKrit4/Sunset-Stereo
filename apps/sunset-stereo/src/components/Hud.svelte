@@ -1,13 +1,11 @@
 <script lang="ts">
-  import { BUY_COST, money, ui } from "../lib/ui.svelte";
+  import { money, ui } from "../lib/ui.svelte";
 
   let {
     onSpin,
-    onBonus,
     onBet,
   }: {
     onSpin: () => void;
-    onBonus: () => void;
     onBet: (delta: number) => void;
   } = $props();
 </script>
@@ -32,10 +30,6 @@
   </div>
 
   <button id="spinBtn" class="spin" type="button" disabled={ui.busy} onclick={onSpin}>Spin</button>
-
-  <button id="bonusBtn" class="buy" type="button" disabled={ui.busy} onclick={onBonus}>
-    Extra plays {BUY_COST}×
-  </button>
 </div>
 
 <style>
@@ -99,8 +93,5 @@
   .stake button {
     min-width: 44px;
     padding: 0;
-  }
-  .buy {
-    background: #3a2818;
   }
 </style>

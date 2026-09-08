@@ -4,13 +4,13 @@
   import Hud from "./components/Hud.svelte";
   import { playBet } from "./game/betMachine.svelte";
   import { changeBet, ui } from "./lib/ui.svelte";
-  import { GAME, PAYTABLE } from "./math/config.js";
-  import { SYMBOL_NAMES, SYMBOL_NOTES } from "./lib/names";
+  import { GAME, PAYOUTS } from "./math/config.js";
+  import { SYMBOL_NAMES } from "./lib/names";
 
-  const payRows = Object.entries(PAYTABLE) as Array<[string, Record<string, number>]>;
+  const payRows = Object.entries(PAYOUTS) as Array<[string, Record<string, number>]>;
 
-  async function spin(buyBonus = false) {
-    await playBet(buyBonus);
+  async function spin() {
+    await playBet();
   }
 
   onMount(() => {
@@ -25,15 +25,16 @@
   });
 </script>
 
-<div class="cabinet" class:feature={ui.feature}>
+<div class="cabinet">
   <header class="masthead">
     <div>
       <p class="kicker">{GAME.name}</p>
-      <h1>Golden Hour</h1>
+      <h1>xWays · xNudge</h1>
     </div>
     <p class="blurb">
-      Five reels, three rows, twenty lines. Vinyl, cassette, mixer and sunset scatter. RTP
-      {(GAME.rtp * 100).toFixed(0)}%. Maximum win {GAME.wincap}× stake.
+      Six reels, 2–3–4–4–3–2 ways. xWays on reels 2 and 5 become one payable ×2–×6. xNudge on
+      reels 3 and 4 pushes a wild stack from the top. Sunset can tease remaining reels; it does
+      not start extra spins. RTP {(GAME.rtp * 100).toFixed(0)}%.
     </p>
   </header>
 
@@ -42,29 +43,27 @@
   </div>
 
   <p class="banner" class:show={Boolean(ui.banner)}>{ui.banner}</p>
-  <p id="mixValue" class="sr-only">{ui.mix}×</p>
+  <p id="mixValue" class="sr-only">1×</p>
 
-  <Hud onSpin={() => spin()} onBonus={() => spin(true)} onBet={changeBet} />
+  <Hud onSpin={() => spin()} onBet={changeBet} />
 
   <section class="paytable" aria-label="Paytable">
-    <h2>Pays</h2>
-    <p>Line wins pay left to right on twenty fixed lines. The mixer substitutes for everything except the sunset.</p>
+    <h2>Ways pays</h2>
+    <p>
+      Left to right, three or more reels. Mixer substitutes. xWays counts as extra copies on that
+      cell. xNudge fills the reel with mixers and multiplies the way.
+    </p>
     <ul>
       {#each payRows as [id, pays]}
         <li>
           <strong>{SYMBOL_NAMES[id] ?? id}</strong>
-          <span>5 {pays[5]}× · 4 {pays[4]}× · 3 {pays[3]}×</span>
+          <span>6 {pays[6]}× · 5 {pays[5]}× · 4 {pays[4]}× · 3 {pays[3]}×</span>
         </li>
       {/each}
-      <li>
-        <strong>{SYMBOL_NAMES.S}</strong>
-        <span>{SYMBOL_NOTES.S}</span>
-      </li>
     </ul>
   </section>
 
   <footer>
-    Malfunction voids all pays. This is a local book-event player for the Sunset Stereo math package — not a live
-    Remote Game Server session. Space bar spins.
+    Malfunction voids all pays. Space bar spins. Base game only — no free-spin round.
   </footer>
 </div>

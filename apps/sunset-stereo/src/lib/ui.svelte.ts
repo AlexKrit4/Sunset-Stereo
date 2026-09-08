@@ -8,12 +8,9 @@ export const ui = $state({
   fsCurrent: 0,
   fsTotal: 0,
   banner: "",
-  rulesOpen: false,
-  paytableOpen: false,
 });
 
-export const BETS = [0.2, 0.4, 1, 2, 5, 10, 20, 50];
-export const BUY_COST = 80;
+export const BETS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 25];
 
 export function money(value: number) {
   return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -31,8 +28,4 @@ export function charge(mult: number) {
   ui.balance -= cost;
   ui.win = 0;
   return true;
-}
-
-export function scaled(cents: number) {
-  return (cents / 100) * ui.bet;
 }

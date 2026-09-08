@@ -1,311 +1,330 @@
-import { FREESPINS, GAME, PAYLINES, PAYTABLE, getWinLevel, toCents } from "./config.js";
-import { REELS } from "./reels.js";
+import {
+  BETS,
+  GAME,
+  NUM_REELS,
+  PAYABLE,
+  PAYOUTS,
+  REEL_ROWS,
+  SCATTER_REEL_LAND_CHANCE,
+  SCATTER_REELS,
+  SCATTER_TEASE_TOTAL_MS,
+  SCATTER_WEIGHT,
+  SYMBOLS,
+  WAYS_TEASE_INTER_REEL_MS,
+  WAYS_TEASE_MIN_REELS,
+  XNUDGE_CLUSTER_STRIP_CHANCE,
+  XNUDGE_LAND_CHANCE,
+  XNUDGE_REELS,
+  XNUDGE_STACK_SIZE,
+  XWAYS_REDUCTION,
+  XWAYS_REELS,
+} from "./config.js";
 
 function mulberry32(seed) {
   let t = seed >>> 0;
-  return () => {
-    t += 0x6d2b79f5;
-    let r = Math.imul(t ^ (t >>> 15), 1 | t);
-    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  return {
+    random() {
+      t += 0x6d2b79f5;
+      let r = Math.imul(t ^ (t >>> 15), 1 | t);
+      r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    },
+    randomInt(min, max) {
+      const lo = Math.ceil(min);
+      const hi = Math.floor(max);
+      if (hi <= lo) return lo;
+      return lo + Math.floor(this.random() * (hi - lo + 1));
+    },
   };
 }
 
-function pickStop(length, rng) {
-  return Math.floor(rng() * length);
+export function cloneGrid(grid) {
+  return grid.map((col) => [...col]);
 }
 
-function wrap(index, length) {
-  return ((index % length) + length) % length;
+export function getReelRows(reel) {
+  return REEL_ROWS[reel];
 }
 
-function drawBoard(reelset, rng) {
-  const strips = REELS[reelset];
-  const paddingPositions = [];
-  const board = [];
-  for (let reel = 0; reel < GAME.reels; reel += 1) {
-    const strip = strips[reel];
-    const stop = pickStop(strip.length, rng);
-    paddingPositions.push(stop);
-    const column = [];
-    for (let offset = -1; offset <= GAME.rows; offset += 1) {
-      const name = strip[wrap(stop + offset, strip.length)];
-      column.push({ name, wild: name === "W", scatter: name === "S" });
-    }
-    board.push(column);
+export function getXNudgeVisibleCount(symbols) {
+  if (!symbols?.length) return 0;
+  let n = 0;
+  for (let row = 0; row < symbols.length; row += 1) {
+    if (symbols[row] !== "xNudge") break;
+    n += 1;
   }
-  return { board, paddingPositions };
+  return n;
 }
 
-function visibleBoard(board) {
-  return board.map((column) => column.slice(1, 1 + GAME.rows));
+export function cellMatches(sym, cell) {
+  return cell === sym || cell === "wild";
 }
 
-function countScatters(board) {
+function getSymbolWeight(name, reelIndex, omitScatter) {
+  if (name === "xWays") {
+    return reelIndex >= 0 && XWAYS_REELS.includes(reelIndex) ? 1 / XWAYS_REDUCTION : 0;
+  }
+  if (name === "xNudge" || name === "wild") return 0;
+  if (name === "scatter") {
+    if (omitScatter) return 0;
+    return reelIndex >= 0 && SCATTER_REELS.includes(reelIndex) ? SCATTER_WEIGHT : 0;
+  }
+  return 1;
+}
+
+function pickRandomSymbol(rng, reelIndex, omitScatter = false) {
+  const weights = SYMBOLS.map((name) => getSymbolWeight(name, reelIndex, omitScatter));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = rng.random() * total;
+  for (let i = 0; i < weights.length; i += 1) {
+    r -= weights[i];
+    if (r <= 0) return SYMBOLS[i];
+  }
+  return SYMBOLS[0];
+}
+
+function generateReelColumn(rng, reelIndex) {
+  const rows = getReelRows(reelIndex);
+  const col = Array.from({ length: rows }, () => pickRandomSymbol(rng, reelIndex, true));
+  if (SCATTER_REELS.includes(reelIndex) && rng.random() < SCATTER_REEL_LAND_CHANCE) {
+    col[rng.randomInt(0, rows - 1)] = "scatter";
+  }
+  return col;
+}
+
+function placeXNudgeStacks(rng, b) {
+  const stacks = [];
+  for (const reel of XNUDGE_REELS) {
+    if (rng.random() > XNUDGE_LAND_CHANCE) continue;
+    const rows = getReelRows(reel);
+    const visible = rng.randomInt(1, Math.min(XNUDGE_STACK_SIZE, rows));
+    for (let row = 0; row < visible; row += 1) b[reel][row] = "xNudge";
+    stacks.push({ reel, visible });
+  }
+  return stacks;
+}
+
+function generateRawBoard(rng) {
+  const b = REEL_ROWS.map((_, r) => generateReelColumn(rng, r));
+  const stacks = placeXNudgeStacks(rng, b);
+  return { b, stacks };
+}
+
+function resolveXWays(rng, b, m) {
+  const replacement = PAYABLE[Math.floor(rng.random() * PAYABLE.length)];
   const positions = [];
-  visibleBoard(board).forEach((column, reel) => {
-    column.forEach((symbol, row) => {
-      if (symbol.scatter) positions.push({ reel, row });
-    });
-  });
-  return positions;
-}
-
-function applyWildMult(board, positions, baseWin, globalMult) {
-  let lineMult = 1;
-  positions.forEach(({ reel, row }) => {
-    const symbol = board[reel][row + 1];
-    if (symbol.wild && symbol.multiplier && symbol.multiplier > 1) {
-      lineMult += symbol.multiplier;
+  for (let r = 0; r < NUM_REELS; r += 1) {
+    for (let row = 0; row < getReelRows(r); row += 1) {
+      if (b[r][row] === "xWays") {
+        const mult = rng.randomInt(2, 6);
+        positions.push({ reel: r, row, replacement, mult });
+        b[r][row] = replacement;
+        m[r][row] = mult;
+      }
     }
-  });
-  if (lineMult > 1) lineMult -= 1;
-  const applied = Math.max(1, lineMult) * globalMult;
-  return { win: baseWin * applied, applied, lineMult: Math.max(1, lineMult) };
+  }
+  return { positions, replacement };
 }
 
-function evaluateLines(board, globalMult) {
-  const active = visibleBoard(board);
-  const wins = [];
+function resolveXNudge(b, m, reelNudgeMult) {
+  const steps = [];
+  for (const reel of XNUDGE_REELS) {
+    let visible = getXNudgeVisibleCount(b[reel]);
+    if (visible === 0) continue;
+    const rows = getReelRows(reel);
+    const target = Math.min(XNUDGE_STACK_SIZE, rows);
+    const landVisible = visible;
+    let nudges = 0;
+    let mult = 1;
+    if (visible >= target) {
+      mult = target;
+    } else {
+      nudges = target - visible;
+      for (let step = 0; step < nudges; step += 1) {
+        mult += 1;
+        b[reel][visible] = "xNudge";
+        visible += 1;
+      }
+    }
+    reelNudgeMult[reel] = mult;
+    for (let row = 0; row < rows; row += 1) {
+      b[reel][row] = "wild";
+      m[reel][row] = 1;
+    }
+    steps.push({ reel, landVisible, nudges, mult });
+  }
+  return steps;
+}
+
+function countWaysOnReel(sym, b, m, reel) {
+  let count = 0;
+  for (let row = 0; row < getReelRows(reel); row += 1) {
+    if (cellMatches(sym, b[reel][row])) count += m[reel][row] || 1;
+  }
+  return count;
+}
+
+function calculateWaysWin(bet, b, m, reelNudgeMult) {
   let totalWin = 0;
+  let totalWays = 0;
+  const wins = [];
+  const highlights = [];
+  const highlightKeys = new Set();
 
-  Object.entries(PAYLINES).forEach(([lineIndex, rows]) => {
-    const first = active[0][rows[0]];
-    let wildMatches = first.wild ? 1 : 0;
-    let matches = first.wild ? 0 : 1;
-    let firstNonWild = first.wild ? null : first;
-    let finishedWild = !first.wild;
-    const potential = [first];
+  for (const sym of PAYABLE) {
+    let reelsMatched = 0;
+    let ways = 1;
+    let nudgeLineMult = 1;
+    for (let r = 0; r < NUM_REELS; r += 1) {
+      const countOnReel = countWaysOnReel(sym, b, m, r);
+      if (countOnReel === 0) break;
+      reelsMatched += 1;
+      ways *= countOnReel;
+      nudgeLineMult *= reelNudgeMult[r] || 1;
+    }
+    if (reelsMatched < 3) continue;
+    const payMult = PAYOUTS[sym][reelsMatched] ?? PAYOUTS[sym][6] ?? 0;
+    const win = bet * payMult * ways * nudgeLineMult;
+    if (win <= 0) continue;
+    wins.push({ sym, reelsMatched, ways, nudgeLineMult, win });
+    totalWin += win;
+    totalWays += ways;
+    for (let r = 0; r < reelsMatched; r += 1) {
+      for (let row = 0; row < getReelRows(r); row += 1) {
+        if (!cellMatches(sym, b[r][row])) continue;
+        const key = `${r}:${row}`;
+        if (highlightKeys.has(key)) continue;
+        highlightKeys.add(key);
+        highlights.push({ reel: r, row });
+      }
+    }
+  }
+  const cap = bet * GAME.wincap;
+  if (totalWin > cap) totalWin = cap;
+  return { totalWin, totalWays, wins, highlights };
+}
 
-    for (let reel = 1; reel < rows.length; reel += 1) {
-      const symbol = active[reel][rows[reel]];
-      if (finishedWild) {
-        if (symbol.name === firstNonWild.name || symbol.wild) matches += 1;
-        else break;
-      } else if (symbol.wild && firstNonWild === null) {
-        wildMatches += 1;
-      } else if (firstNonWild === null) {
-        firstNonWild = symbol;
-        matches += 1;
-        finishedWild = true;
-      } else {
+function reelHasScatter(b, reel) {
+  return b[reel].some((cell) => cell === "scatter");
+}
+
+function reelHasPayable(b, reel, sym) {
+  return b[reel].some((cell) => cellMatches(sym, cell));
+}
+
+function reelMatchesWaysTease(b, reel, sym) {
+  if (reelHasPayable(b, reel, sym)) return true;
+  return XNUDGE_REELS.includes(reel) && getXNudgeVisibleCount(b[reel]) > 0;
+}
+
+function getWaysTeaseSymbol(b, upToReelInclusive) {
+  const reelsMatched = upToReelInclusive + 1;
+  if (reelsMatched < WAYS_TEASE_MIN_REELS) return null;
+  let bestSym = null;
+  let bestPay = 0;
+  for (const sym of PAYABLE) {
+    let ok = true;
+    for (let r = 0; r <= upToReelInclusive; r += 1) {
+      if (!reelMatchesWaysTease(b, r, sym)) {
+        ok = false;
         break;
       }
-      potential.push(symbol);
     }
-
-    const wildWin = PAYTABLE.W?.[wildMatches] || 0;
-    const baseWin = firstNonWild ? PAYTABLE[firstNonWild.name]?.[wildMatches + matches] || 0 : 0;
-
-    if (wildWin > 0 || baseWin > 0) {
-      if (wildWin > baseWin) {
-        const positions = Array.from({ length: wildMatches }, (_, reel) => ({
-          reel,
-          row: rows[reel],
-        }));
-        const { win, applied, lineMult } = applyWildMult(board, positions, wildWin, globalMult);
-        wins.push({
-          symbol: potential[0].name,
-          kind: wildMatches,
-          win,
-          positions,
-          meta: {
-            lineIndex: Number(lineIndex),
-            multiplier: applied,
-            winWithoutMult: wildWin,
-            globalMult,
-            lineMultiplier: lineMult,
-          },
-        });
-        totalWin += win;
-      } else {
-        const kind = matches + wildMatches;
-        const positions = Array.from({ length: kind }, (_, reel) => ({
-          reel,
-          row: rows[reel],
-        }));
-        const { win, applied, lineMult } = applyWildMult(board, positions, baseWin, globalMult);
-        wins.push({
-          symbol: firstNonWild.name,
-          kind,
-          win,
-          positions,
-          meta: {
-            lineIndex: Number(lineIndex),
-            multiplier: applied,
-            winWithoutMult: baseWin,
-            globalMult,
-            lineMultiplier: lineMult,
-          },
-        });
-        totalWin += win;
-      }
+    if (!ok) continue;
+    const pay = PAYOUTS[sym][reelsMatched] ?? PAYOUTS[sym][6] ?? 0;
+    if (pay > bestPay) {
+      bestPay = pay;
+      bestSym = sym;
     }
-  });
-
-  return { totalWin, wins };
-}
-
-function attachWildMults(board, rng, freegame) {
-  const weights = [
-    [2, 70],
-    [3, 75],
-    [4, 40],
-    [5, 18],
-    [8, 12],
-    [10, 8],
-    [20, 5],
-    [50, 2],
-  ];
-  const total = weights.reduce((sum, [, w]) => sum + w, 0);
-  board.forEach((column) => {
-    column.forEach((symbol) => {
-      if (!symbol.wild) return;
-      if (!freegame) {
-        symbol.multiplier = 1;
-        return;
-      }
-      let roll = rng() * total;
-      for (const [value, weight] of weights) {
-        roll -= weight;
-        if (roll <= 0) {
-          symbol.multiplier = value;
-          return;
-        }
-      }
-      symbol.multiplier = 2;
-    });
-  });
-}
-
-function addEvent(events, type, extra) {
-  events.push({ index: events.length, type, ...extra });
-}
-
-function serializeBoard(board) {
-  return board.map((column) =>
-    column.map((symbol) => {
-      const out = { name: symbol.name };
-      if (symbol.wild) out.wild = true;
-      if (symbol.scatter) out.scatter = true;
-      if (symbol.multiplier) out.multiplier = symbol.multiplier;
-      return out;
-    }),
-  );
-}
-
-function padPositions(positions) {
-  return positions.map((pos) => ({ reel: pos.reel, row: pos.row + 1 }));
-}
-
-function emitWinEvents(events, winData, spinWin, runningWin) {
-  if (spinWin > 0) {
-    addEvent(events, "winInfo", {
-      totalWin: toCents(winData.totalWin),
-      wins: winData.wins.map((win) => ({
-        ...win,
-        win: toCents(win.win),
-        positions: padPositions(win.positions),
-        meta: {
-          ...win.meta,
-          winWithoutMult: toCents(win.meta.winWithoutMult),
-        },
-      })),
-    });
-    addEvent(events, "setWin", {
-      amount: toCents(spinWin),
-      winLevel: getWinLevel(spinWin),
-    });
   }
-  addEvent(events, "setTotalWin", { amount: toCents(runningWin) });
+  return bestSym;
 }
 
-function spinOnce(reelset, rng, freegame) {
-  const drawn = drawBoard(reelset, rng);
-  attachWildMults(drawn.board, rng, freegame);
-  return drawn;
+function buildWaysTeaseGaps(b) {
+  const gaps = Array(NUM_REELS).fill(0);
+  for (let nextReel = WAYS_TEASE_MIN_REELS; nextReel < NUM_REELS; nextReel += 1) {
+    if (getWaysTeaseSymbol(b, nextReel - 1)) gaps[nextReel] += WAYS_TEASE_INTER_REEL_MS;
+  }
+  return gaps;
 }
 
-export function playRound({ seed = Date.now(), buyBonus = false } = {}) {
+function buildScatterTeaseGaps(b) {
+  const gaps = Array(NUM_REELS).fill(0);
+  const hit = SCATTER_REELS.filter((r) => reelHasScatter(b, r)).sort((a, c) => a - c);
+  const addGap = (fromReel, toReel) => {
+    const count = Math.max(0, toReel - fromReel + 1);
+    if (!count) return;
+    let assigned = 0;
+    for (let r = fromReel; r <= toReel; r += 1) {
+      const isLast = r === toReel;
+      const add = isLast ? SCATTER_TEASE_TOTAL_MS - assigned : Math.floor(SCATTER_TEASE_TOTAL_MS / count);
+      gaps[r] += add;
+      assigned += add;
+    }
+  };
+  if (hit.length >= 3) addGap(hit[1] + 1, hit[hit.length - 1]);
+  else if (hit.length === 2) addGap(Math.max(...hit) + 1, SCATTER_REELS[SCATTER_REELS.length - 1]);
+  return { gaps, hit };
+}
+
+export function pickStripSymbol(rng, reelIndex) {
+  return pickRandomSymbol(rng, reelIndex, true);
+}
+
+export function pickStripItems(rng, reelIndex, count) {
+  const items = [];
+  let len = 0;
+  const canCluster = XNUDGE_REELS.includes(reelIndex);
+  while (len < count) {
+    const remaining = count - len;
+    if (canCluster && remaining >= XNUDGE_STACK_SIZE && rng.random() < XNUDGE_CLUSTER_STRIP_CHANCE) {
+      for (let i = 0; i < XNUDGE_STACK_SIZE; i += 1) items.push("xNudge");
+      len += XNUDGE_STACK_SIZE;
+      continue;
+    }
+    items.push(pickRandomSymbol(rng, reelIndex, true));
+    len += 1;
+  }
+  return items;
+}
+
+function countScatters(b) {
+  let n = 0;
+  for (let r = 0; r < NUM_REELS; r += 1) {
+    if (reelHasScatter(b, r)) n += 1;
+  }
+  return n;
+}
+
+export function playRound({ seed = Date.now(), bet = 1 } = {}) {
   const rng = mulberry32(seed);
-  const events = [];
-  let runningWin = 0;
-  let freeGameWins = 0;
-  let baseGameWins = 0;
-  let globalMult = 1;
-
-  const baseDraw = spinOnce("BR0", rng, false);
-  addEvent(events, "reveal", {
-    board: serializeBoard(baseDraw.board),
-    paddingPositions: baseDraw.paddingPositions,
-    gameType: "basegame",
-    anticipation: [0, 0, 0, 0, 0],
-  });
-
-  const baseWin = evaluateLines(baseDraw.board, 1);
-  runningWin += baseWin.totalWin;
-  baseGameWins = baseWin.totalWin;
-  emitWinEvents(events, baseWin, baseWin.totalWin, runningWin);
-
-  const scatters = countScatters(baseDraw.board);
-  const shouldBonus = buyBonus || scatters.length >= 3;
-  if (shouldBonus) {
-    const scatterCount = buyBonus ? Math.max(3, scatters.length) : scatters.length;
-    let totalFs = FREESPINS.basegame[scatterCount] || FREESPINS.basegame[3];
-    const triggerPositions =
-      scatters.length >= 3
-        ? padPositions(scatters)
-        : [
-            { reel: 0, row: 2 },
-            { reel: 2, row: 2 },
-            { reel: 4, row: 2 },
-          ];
-    addEvent(events, "freeSpinTrigger", { totalFs, positions: triggerPositions });
-    addEvent(events, "updateGlobalMult", { globalMult: 1 });
-
-    let fs = 0;
-    while (fs < totalFs) {
-      addEvent(events, "updateFreeSpin", { amount: fs, total: totalFs });
-      fs += 1;
-      const freeDraw = spinOnce("FR0", rng, true);
-      addEvent(events, "reveal", {
-        board: serializeBoard(freeDraw.board),
-        paddingPositions: freeDraw.paddingPositions,
-        gameType: "freegame",
-        anticipation: [0, 0, 0, 0, 0],
-      });
-      const freeWin = evaluateLines(freeDraw.board, globalMult);
-      runningWin = Math.min(runningWin + freeWin.totalWin, GAME.wincap);
-      freeGameWins += freeWin.totalWin;
-      emitWinEvents(events, freeWin, freeWin.totalWin, runningWin);
-      if (freeWin.totalWin > 0 && runningWin < GAME.wincap) {
-        globalMult += 1;
-        addEvent(events, "updateGlobalMult", { globalMult });
-      }
-      const freeScatters = countScatters(freeDraw.board);
-      if (freeScatters.length >= 3) {
-        totalFs += FREESPINS.freegame[freeScatters.length] || 0;
-        addEvent(events, "freeSpinRetrigger", {
-          totalFs,
-          positions: padPositions(freeScatters),
-        });
-      }
-    }
-    addEvent(events, "freeSpinEnd", {
-      amount: toCents(freeGameWins),
-      winLevel: getWinLevel(freeGameWins, "endFeature"),
-    });
-  }
-
-  const finalWin = Math.min(runningWin, GAME.wincap);
-  addEvent(events, "finalWin", { amount: toCents(finalWin) });
+  const { b: raw, stacks } = generateRawBoard(rng);
+  const resolved = cloneGrid(raw);
+  const mults = resolved.map((col) => col.map(() => 1));
+  const reelNudgeMult = Array(NUM_REELS).fill(1);
+  const xWays = resolveXWays(rng, resolved, mults);
+  const nudge = resolveXNudge(resolved, mults, reelNudgeMult);
+  const winInfo = calculateWaysWin(bet, resolved, mults, reelNudgeMult);
+  const waysGaps = buildWaysTeaseGaps(raw);
+  const scatter = buildScatterTeaseGaps(raw);
+  const extraStopMs = waysGaps.map((ms, i) => ms + scatter.gaps[i]);
 
   return {
-    id: seed,
-    payoutMultiplier: toCents(finalWin),
-    events,
-    criteria: shouldBonus ? "freegame" : finalWin > 0 ? "basegame" : "0",
-    baseGameWins,
-    freeGameWins,
+    raw,
+    resolved,
+    mults,
+    reelNudgeMult,
+    stacks,
+    xWays,
+    nudge,
+    extraStopMs,
+    waysGaps,
+    scatterGaps: scatter.gaps,
+    scatterHit: scatter.hit,
+    scatterCount: countScatters(raw),
+    bet,
+    ...winInfo,
   };
 }
+
+export { BETS, getWaysTeaseSymbol, reelMatchesWaysTease, XNUDGE_REELS, XWAYS_REELS, SCATTER_REELS };

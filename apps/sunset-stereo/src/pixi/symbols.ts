@@ -1,11 +1,27 @@
 import { Container, Graphics, Text } from "pixi.js";
 import type { RawSymbol } from "../game/typesBookEvent";
 
+const ALIAS: Record<string, string> = {
+  high1: "H1",
+  high2: "H2",
+  high3: "H3",
+  high4: "H4",
+  high5: "H5",
+  low1: "L1",
+  low2: "L2",
+  low3: "L3",
+  low4: "L4",
+  low5: "L5",
+  wild: "W",
+  scatter: "S",
+};
+
 const PALETTE: Record<string, { wood: number; ink: number; accent: number }> = {
   H1: { wood: 0x1a1410, ink: 0x0c0a08, accent: 0xb5522a },
   H2: { wood: 0x241c16, ink: 0x3a2a20, accent: 0xc9a06a },
   H3: { wood: 0x2a2218, ink: 0x4a3828, accent: 0xd8c4a0 },
   H4: { wood: 0x1e1614, ink: 0x5a3030, accent: 0xc07058 },
+  H5: { wood: 0x201810, ink: 0x2a2418, accent: 0xc09050 },
   L1: { wood: 0x161410, ink: 0x2a2820, accent: 0x8a7a68 },
   L2: { wood: 0x1c1812, ink: 0x3a3020, accent: 0xd0a060 },
   L3: { wood: 0x141816, ink: 0x243028, accent: 0x6a8a70 },
@@ -13,6 +29,8 @@ const PALETTE: Record<string, { wood: number; ink: number; accent: number }> = {
   L5: { wood: 0x1c1412, ink: 0x402820, accent: 0xc07850 },
   W: { wood: 0x2a2418, ink: 0x1a160e, accent: 0xd4b06a },
   S: { wood: 0x2a1c12, ink: 0xc45c28, accent: 0xf0c878 },
+  xWays: { wood: 0x241810, ink: 0x3a2818, accent: 0xe8c070 },
+  xNudge: { wood: 0x1a1610, ink: 0x2a2218, accent: 0xd8b070 },
 };
 
 function fillRound(g: Graphics, x: number, y: number, w: number, h: number, r: number, color: number, alpha = 1) {
@@ -22,8 +40,9 @@ function fillRound(g: Graphics, x: number, y: number, w: number, h: number, r: n
 export function createSymbolView(symbol: RawSymbol, size: number): Container {
   const root = new Container();
   const g = new Graphics();
+  const name = ALIAS[symbol.name] ?? symbol.name;
   const pad = size * 0.06;
-  const colors = PALETTE[symbol.name] ?? PALETTE.L1;
+  const colors = PALETTE[name] ?? PALETTE[symbol.name] ?? PALETTE.L1;
   fillRound(g, pad, pad, size - pad * 2, size - pad * 2, 10, colors.wood);
   g.roundRect(pad, pad, size - pad * 2, size - pad * 2, 10).stroke({ color: 0x000000, width: 1, alpha: 0.45 });
 
@@ -31,7 +50,7 @@ export function createSymbolView(symbol: RawSymbol, size: number): Container {
   const cy = size / 2 - 4;
   const s = size * 0.32;
 
-  switch (symbol.name) {
+  switch (name) {
     case "H1": {
       g.circle(cx, cy, s + 6).fill(colors.ink);
       g.circle(cx, cy, s + 2).stroke({ color: 0x3a342c, width: 2 });
@@ -110,6 +129,30 @@ export function createSymbolView(symbol: RawSymbol, size: number): Container {
       g.rect(cx - 1, cy + 16, 2, 8).fill(0xd8c8b0);
       break;
     }
+    case "H5": {
+      g.roundRect(cx - 18, cy - 14, 36, 28, 3).fill(colors.ink);
+      [0, 1, 2].forEach((i) => {
+        g.roundRect(cx - 12 + i * 10, cy + 2, 6, 8 + i * 3, 1).fill(colors.accent);
+      });
+      break;
+    }
+    case "xWays": {
+      g.roundRect(cx - 16, cy - 10, 18, 22, 4).fill(colors.accent);
+      g.roundRect(cx - 2, cy - 14, 18, 22, 4).fill({ color: colors.accent, alpha: 0.7 });
+      g.roundRect(cx - 2, cy - 14, 18, 22, 4).stroke({ color: 0xf0e0c0, width: 1 });
+      break;
+    }
+    case "xNudge": {
+      for (let i = 0; i < 3; i += 1) {
+        const y = cy + 10 - i * 10;
+        g.moveTo(cx, y - 8);
+        g.lineTo(cx + 14, y + 4);
+        g.lineTo(cx - 14, y + 4);
+        g.closePath();
+        g.fill({ color: colors.accent, alpha: 0.55 + i * 0.15 });
+      }
+      break;
+    }
     case "W": {
       [-16, 0, 16].forEach((dx, i) => {
         g.roundRect(cx + dx - 4, cy - 16, 8, 32, 2).fill(0x3a342c);
@@ -134,6 +177,17 @@ export function createSymbolView(symbol: RawSymbol, size: number): Container {
   }
 
   root.addChild(g);
+
+  if (name === "xWays" || name === "xNudge") {
+    const tag = new Text({
+      text: name === "xWays" ? "xW" : "xN",
+      style: { fontSize: Math.max(11, size * 0.16), fill: 0xf8ecd8, fontWeight: "700", fontFamily: "Georgia, serif" },
+    });
+    tag.anchor.set(0.5);
+    tag.x = cx;
+    tag.y = size - pad * 2 - 8;
+    root.addChild(tag);
+  }
 
   if (symbol.multiplier && symbol.multiplier > 1) {
     const badge = new Graphics();
