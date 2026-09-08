@@ -60,9 +60,14 @@
 <div class="viewport" bind:this={host}>
   {#if ui.spinWinVisible && ui.spinWinMicro > 0}
     {#key ui.spinWinKey}
-      <p id="spinWinOverlay" class="spin-win" class:feature={ui.feature}>
-        {moneyHud(ui.spinWinMicro)}
-      </p>
+      <div class="spin-win" class:feature={ui.feature}>
+        <p id="spinWinOverlay" class="amount">{moneyHud(ui.spinWinMicro)}</p>
+        {#if ui.spinWinLines > 0}
+          <p id="spinWinWays" class="ways">
+            {ui.spinWinLines} {ui.spinWinLines === 1 ? "LINE" : "LINES"}
+          </p>
+        {/if}
+      </div>
     {/key}
   {/if}
 </div>
@@ -88,16 +93,21 @@
     position: absolute;
     inset: 0;
     z-index: 4;
-    display: grid;
-    place-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     margin: 0;
     pointer-events: none;
     font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    color: #ffd060;
+  }
+  .amount {
+    margin: 0;
     font-weight: 800;
     font-size: clamp(52px, 11vw, 96px);
     letter-spacing: 0.03em;
     line-height: 1;
-    color: #ffd060;
     text-shadow:
       0 0 10px #ff9a28,
       0 0 28px rgba(255, 140, 32, 0.75),
@@ -105,7 +115,20 @@
       0 8px 22px rgba(8, 2, 16, 0.9);
     animation: spin-win-pop 0.38s cubic-bezier(0.18, 0.9, 0.28, 1.15);
   }
-  .spin-win.feature {
+  .ways {
+    margin: 12px 0 0;
+    font-weight: 800;
+    font-size: clamp(18px, 3.4vw, 28px);
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-shadow:
+      0 0 8px #ff9a28,
+      0 2px 0 #7a2a08,
+      0 6px 16px rgba(8, 2, 16, 0.85);
+    animation: ways-drop 0.48s cubic-bezier(0.18, 0.82, 0.22, 1) 0.34s both;
+  }
+  .spin-win.feature .amount,
+  .spin-win.feature .ways {
     color: #ffc070;
     text-shadow:
       0 0 12px #ff6a20,
@@ -120,6 +143,16 @@
     }
     to {
       transform: scale(1);
+      opacity: 1;
+    }
+  }
+  @keyframes ways-drop {
+    from {
+      transform: translateY(-40px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
       opacity: 1;
     }
   }

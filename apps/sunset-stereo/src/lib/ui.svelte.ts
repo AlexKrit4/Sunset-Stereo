@@ -14,6 +14,7 @@ export const ui = $state({
   spinWinMicro: 0,
   spinWinVisible: false,
   spinWinKey: 0,
+  spinWinLines: 0,
   betLevels: [0.1, 0.2, 0.5, 1, 2, 5, 10, 25].map((value) => value * API_MULTIPLIER),
   busy: false,
   mix: 1,
@@ -52,12 +53,13 @@ export function cancelBonusIntro() {
   resolve?.();
 }
 
-export function showSpinWin(micro: number) {
+export function showSpinWin(micro: number, lines = 0) {
   if (micro <= 0) {
     hideSpinWin();
     return;
   }
   ui.spinWinMicro = micro;
+  ui.spinWinLines = lines;
   ui.spinWinVisible = true;
   ui.spinWinKey += 1;
 }
@@ -65,6 +67,7 @@ export function showSpinWin(micro: number) {
 export function hideSpinWin() {
   ui.spinWinVisible = false;
   ui.spinWinMicro = 0;
+  ui.spinWinLines = 0;
 }
 
 export function money(value: number) {

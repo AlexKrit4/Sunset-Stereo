@@ -6,6 +6,7 @@ import type { BookEvent, BookEventHandlerMap, Position, RawSymbol } from "./type
 
 let lastBoard: RawSymbol[][] = [];
 let pendingHolds: Position[] = [];
+let pendingWinLines = 0;
 
 function nextBonusWinPositions(events: BookEvent[], current: BookEvent): Position[] {
   const start = events.indexOf(current);
@@ -28,6 +29,7 @@ function nextBonusWinPositions(events: BookEvent[], current: BookEvent): Positio
 export const bookEventHandlerMap: BookEventHandlerMap = {
   reveal: async (bookEvent, context) => {
     hideSpinWin();
+    pendingWinLines = 0;
     const board = runtime.board;
     if (!board) return;
     lastBoard = bookEvent.board;
@@ -59,6 +61,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   },
 
   winInfo: async (bookEvent) => {
+    pendingWinLines = bookEvent.wins.length;
     const positions = bookEvent.wins.flatMap((win) => win.positions);
     await runtime.board?.showBookWins(positions);
     await waitForTimeout(120);
@@ -67,8 +70,14 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   setWin: async (bookEvent) => {
     const micro = multiplierCentsToMicro(bookEvent.amount);
     ui.winMicro = micro;
-    showSpinWin(micro);
-    await waitForTimeout(micro > 0 ? 720 : 60);
+    if (micro <= 0) {
+      hideSpinWin();
+      await waitForTimeout(60);
+      return;
+    }
+    await waitForTimeout(640);
+    showSpinWin(micro, pendingWinLines);
+    await waitForTimeout(1100);
   },
 
   setTotalWin: async (bookEvent) => {
