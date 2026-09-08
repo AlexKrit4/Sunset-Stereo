@@ -8,7 +8,7 @@ Reviewed against `docs/ENGINE_DOCUMENTATION.md` (engine.io Math, Frontend, RGS, 
 
 | Surface | Role |
 | --- | --- |
-| Math SDK `games/sunset_stereo/` | 6×4 ways — production rules, **1000-book test sims** |
+| Math SDK `games/sunset_stereo/` | 6×4 ways — **1,000,000 books**, ~95% RTP, 15000× cap |
 | Player `apps/sunset-stereo/` | 6×4 Pixi client — RGS via `stake-engine`, mock books without a session |
 | `publish/sunset_stereo/` | ACP math upload folder |
 | `games/_inactive_sunset_stereo_5x3/` | Archived 5×3 |
@@ -37,7 +37,11 @@ Demo subset: `apps/sunset-stereo/src/rgs/demoBooks.json` (20 books: 8 losses, 8 
 
 You need a Stake Engine team login (ACP). Nothing in this repo can log in for you.
 
-Ready-to-upload zip: [`publish/Sunset-Stereo-Stake.zip`](../publish/Sunset-Stereo-Stake.zip). Unpack it to `Z:\` so you get `Z:\Sunset Stereo\math` and `Z:\Sunset Stereo\frontend`. Then pick those two folders in ACP.
+Ready-to-upload math zip (~193 MB, 1,000,000 books):
+
+http://13.143.132.112:1337/Sunset-Stereo-math.zip
+
+Unpack to `Z:\` so you get `Z:\Sunset Stereo\math`. Upload that folder in ACP. RTP 95%, high volatility, hard 15000× ceiling.
 
 ### 1. Create the game in ACP
 
@@ -64,7 +68,9 @@ PYTHONPATH=. python3 games/sunset_stereo/run.py
 make publish-math
 ```
 
-Expect ACP to report a low RTP (~31%) and failed volatility fences. That is expected: the test mix forces ~2% bonus books, which over-represents extra plays. This pack is for wiring RGS, replay, and the player — not for a 96% cert.
+ACP should report ~95% RTP and max win 15000×. Books that would pay more are cut off and pay exactly 15000×. Max-win samples are natural bonus snowballs, not a fake full-vinyl grid.
+
+This pack is for wiring RGS, replay, and the player — not for a 96% cert.
 
 ### 3. Upload frontend
 

@@ -78,8 +78,11 @@ make frontend
 
 Сборка для Engine CDN: `make frontend-build` → загрузить **содержимое** `apps/sunset-stereo/dist` (`base: "./"`). Не грузить внешние шрифты.
 
-Готовый архив для ACP (math + frontend): [`publish/Sunset-Stereo-Stake.zip`](publish/Sunset-Stereo-Stake.zip).  
-Распакуй в `Z:\` — получится `Z:\Sunset Stereo\math` и `Z:\Sunset Stereo\frontend`. Как заливать — файл `КАК_ЗАЛИТЬ.txt` внутри архива и [`docs/STAKE_PUBLICATION_REVIEW.md`](docs/STAKE_PUBLICATION_REVIEW.md).
+Готовый архив MATH для ACP (1 000 000 книг, ~193 МБ):
+
+http://13.143.132.112:1337/Sunset-Stereo-math.zip
+
+Распакуй в `Z:\` — получится `Z:\Sunset Stereo\math`. Как заливать — `КАК_ЗАЛИТЬ.txt` внутри архива.
 
 ## Символы
 
