@@ -26,6 +26,7 @@ const BLUR_MAX = 12;
 const LAND_BOUNCE_PX = 9;
 const LAND_BOUNCE_DOWN_MS = 52;
 const LAND_BOUNCE_UP_MS = 150;
+const SPIN_BELOW_ROWS = 4;
 const NUDGE_WINDUP_MS = 100;
 const NUDGE_PUSH_MS = 340;
 const NUDGE_WINDUP_FRAC = 0.12;
@@ -34,6 +35,15 @@ const WIN_DIM_ALPHA = 0.38;
 const WIN_DIM_FROM_REEL = 2;
 const WIN_SHEEN_MS = 520;
 const WIN_SHEEN_STAGGER_MS = 42;
+
+function spinRng() {
+  return {
+    random: Math.random.bind(Math),
+    randomInt(min: number, max: number) {
+      return min + Math.floor(Math.random() * (max - min + 1));
+    },
+  };
+}
 
 function applySpinBlur(strip: Container, blur: BlurFilter, strength: number) {
   if (strength <= 0.2) {
@@ -152,14 +162,15 @@ export class BoardController {
       blur.strengthX = 0;
       blur.strengthY = 0;
       const seed = Array.from({ length: rows }, (_, row) => ["low4", "low5", "high3", "high1"][(col + row) % 4]);
-      this.paintStrip(strip, seed);
+      const below = pickStripItems(spinRng(), col, SPIN_BELOW_ROWS);
+      this.paintStrip(strip, [...seed, ...below]);
       host.addChild(strip);
       window.addChild(host);
       this.reels.push(strip);
       this.blurs.push(blur);
       this.visible.push(seed);
       this.cellMults.push(Array.from({ length: rows }, () => 1));
-      this.cells.push([]);
+      this.cells.push((strip.children as Container[]).slice(0, rows));
 
       const badge = new Text({
         text: "",
@@ -195,10 +206,11 @@ export class BoardController {
   private landStatic(col: number, names: string[], mults?: number[]) {
     const strip = this.reels[col];
     const resolvedMults = mults ?? Array.from({ length: names.length }, () => 1);
-    this.paintStrip(strip, names, resolvedMults);
+    const below = pickStripItems(spinRng(), col, SPIN_BELOW_ROWS);
+    this.paintStrip(strip, [...names, ...below], [...resolvedMults, ...Array.from({ length: below.length }, () => 1)]);
     this.visible[col] = names.slice();
     this.cellMults[col] = resolvedMults.slice();
-    this.cells[col] = strip.children as Container[];
+    this.cells[col] = (strip.children as Container[]).slice(0, names.length);
     this.cells[col].forEach((cell) => {
       cell.alpha = 1;
     });
@@ -261,12 +273,7 @@ export class BoardController {
     const plans = this.planSpin(waysGaps, scatterGaps);
     const now = performance.now();
     this.jobs = [];
-    const rng = {
-      random: Math.random.bind(Math),
-      randomInt(min: number, max: number) {
-        return min + Math.floor(Math.random() * (max - min + 1));
-      },
-    };
+    const rng = spinRng();
 
     for (let col = 0; col < COLS; col += 1) {
       const rows = getReelRows(col);
@@ -276,7 +283,8 @@ export class BoardController {
       const strip = this.reels[col];
       const blur = this.blurs[col];
       const restOffset = (rows + plan.fillers) * CELL;
-      this.paintStrip(strip, [...finals, ...fillers, ...this.visible[col]]);
+      const below = pickStripItems(rng, col, SPIN_BELOW_ROWS);
+      this.paintStrip(strip, [...finals, ...fillers, ...this.visible[col], ...below]);
       strip.y = -restOffset;
       applySpinBlur(strip, blur, 0);
       this.jobs.push({
