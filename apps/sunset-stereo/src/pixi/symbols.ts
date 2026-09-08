@@ -1,4 +1,4 @@
-import { Assets, Container, Graphics, Sprite, Texture, Text } from "pixi.js";
+import { Assets, Container, Graphics, Texture, Text } from "pixi.js";
 import type { RawSymbol } from "../game/typesBookEvent";
 import vinylUrl from "../assets/symbols/vinyl.jpg";
 import headphonesUrl from "../assets/symbols/headphones.jpg";
@@ -87,16 +87,9 @@ export function createSymbolView(symbol: RawSymbol, size: number): Container {
   const art = ART[name];
 
   if (art) {
-    const sprite = new Sprite(art);
-    sprite.width = inner;
-    sprite.height = inner;
-    sprite.x = pad;
-    sprite.y = pad;
-    const mask = new Graphics();
-    mask.roundRect(pad, pad, inner, inner, 10).fill(0xffffff);
-    g.roundRect(pad, pad, inner, inner, 10).stroke({ color: 0x000000, width: 1, alpha: 0.4 });
-    root.addChild(mask, sprite, g);
-    sprite.mask = mask;
+    g.roundRect(pad, pad, inner, inner, 10).fill({ texture: art, textureSpace: "local" });
+    g.roundRect(pad, pad, inner, inner, 10).stroke({ color: 0x000000, width: 1, alpha: 0.28 });
+    root.addChild(g);
   } else {
   fillRound(g, pad, pad, inner, inner, 10, colors.wood);
   g.roundRect(pad, pad, inner, inner, 10).stroke({ color: 0x000000, width: 1, alpha: 0.45 });

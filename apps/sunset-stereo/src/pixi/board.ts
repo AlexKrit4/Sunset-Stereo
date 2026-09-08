@@ -31,6 +31,16 @@ const NUDGE_PUSH_MS = 340;
 const NUDGE_WINDUP_FRAC = 0.12;
 const NUDGE_WINDUP_MAX_PX = 12;
 
+function applySpinBlur(strip: Container, blur: BlurFilter, strength: number) {
+  if (strength <= 0.2) {
+    blur.strengthY = 0;
+    if (strip.filters?.length) strip.filters = [];
+    return;
+  }
+  blur.strengthY = strength;
+  if (strip.filters?.[0] !== blur) strip.filters = [blur];
+}
+
 function asView(name: string, multiplier = 1) {
   return createSymbolView({ name, multiplier: multiplier > 1 ? multiplier : undefined }, CELL);
 }
@@ -251,8 +261,7 @@ export class BoardController {
       const restOffset = (rows + plan.fillers) * CELL;
       this.paintStrip(strip, [...finals, ...fillers, ...this.visible[col]]);
       strip.y = -restOffset;
-      blur.strengthY = 0;
-      strip.filters = [blur];
+      applySpinBlur(strip, blur, 0);
       this.jobs.push({
         col,
         strip,
@@ -363,7 +372,7 @@ export class BoardController {
       if (elapsed < job.windupMs) {
         const tossed = job.windupPx * easeOutQuad(elapsed / job.windupMs);
         job.strip.y = -(job.restOffset + tossed);
-        job.blur.strengthY = 0;
+        applySpinBlur(job.strip, job.blur, 0);
         continue;
       }
       const fallMs = elapsed - job.windupMs;
@@ -374,7 +383,7 @@ export class BoardController {
       }
       job.strip.y = -offset;
       const spinBlur = BLUR_MAX * Math.min(1, this.fallSpeed(job, fallMs) / job.velocity);
-      job.blur.strengthY = offset < CELL ? spinBlur * (offset / CELL) : spinBlur;
+      applySpinBlur(job.strip, job.blur, offset < CELL ? spinBlur * (offset / CELL) : spinBlur);
     }
   }
 
@@ -398,8 +407,7 @@ export class BoardController {
   private landReel(job: SpinJob, now: number) {
     job.landed = true;
     job.bounceAt = now;
-    job.blur.strengthY = 0;
-    job.strip.filters = [];
+    applySpinBlur(job.strip, job.blur, 0);
     this.landStatic(job.col, job.finals);
     job.strip.y = 0;
     if (!job.settled) {
