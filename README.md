@@ -27,13 +27,9 @@ frontend/              Локальный плеер book-событий
 src/                   Движок Stake Engine Math SDK (MIT)
 ```
 
-Документация, по которой собрана игра:
+Полный дамп документации Engine для нейросети: [`docs/ENGINE_DOCUMENTATION.md`](docs/ENGINE_DOCUMENTATION.md).
 
-- [Engine docs](https://engine.io/docs)
-- [Math: game structure](https://engine.io/docs/math/game-state-structure)
-- [Math: events](https://engine.io/docs/math/source-files/events)
-- [Frontend: getting started](https://engine.io/docs/front-end/getting-started)
-- [RGS](https://engine.io/docs/rgs)
+Оригинал: [engine.io/docs](https://engine.io/docs) (Math, Frontend, RGS, Approval guidelines).
 
 ## Математика
 
