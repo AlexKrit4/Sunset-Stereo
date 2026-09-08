@@ -1,4 +1,4 @@
-"""Generate Stake Engine books and configs for Sunset Stereo 6x4 ways."""
+"""Generate Stake Engine books and configs for Sunset Stereo."""
 
 from gamestate import GameState
 from game_config import GameConfig
@@ -18,6 +18,7 @@ if __name__ == "__main__":
 
     num_sim_args = {
         "base": int(80),
+        "bonus": int(20),
     }
 
     run_conditions = {
@@ -51,7 +52,8 @@ if __name__ == "__main__":
         generate_configs(gamestate)
 
     if run_conditions["run_analysis"]:
-        create_stat_sheet(gamestate, custom_keys=[])
+        custom_keys = [{"symbol": "scatter"}]
+        create_stat_sheet(gamestate, custom_keys=custom_keys)
 
     if run_conditions["run_format_checks"]:
         execute_all_tests(config)

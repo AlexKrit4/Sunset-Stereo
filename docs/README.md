@@ -2,7 +2,9 @@
 
 Read **[ENGINE_DOCUMENTATION.md](./ENGINE_DOCUMENTATION.md)** first.
 
-Publication gap analysis vs that dump: **[STAKE_PUBLICATION_REVIEW.md](./STAKE_PUBLICATION_REVIEW.md)**. The live 6×4 player is not Stake-ready.
+Publication gap analysis vs that dump: **[STAKE_PUBLICATION_REVIEW.md](./STAKE_PUBLICATION_REVIEW.md)**.
+
+Production game is **6×4 ways** (`games/sunset_stereo/`, `apps/sunset-stereo/`). The 5×3 lines + Golden Hour package is inactive.
 
 It contains every public technical section from https://engine.io/docs:
 

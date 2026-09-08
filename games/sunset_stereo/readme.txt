@@ -1,38 +1,30 @@
 Sunset Stereo
 =============
 
-5-reel, 3-row, 20-payline slot for Stake Engine.
+PRODUCTION math package for Stake Engine.
+
+6-reel, 4-row, left-to-right ways. No free spins, no wilds,
+no xWays / xNudge, no bonus buy.
+
+The previous 5x3 20-line + Golden Hour package is archived at
+games/_inactive_sunset_stereo_5x3/ and must not be uploaded.
 
 Theme
 -----
 Sunset / vinyl / stereo. Paying symbols are music-night objects
-(vinyl, headphones, cassette, mic, speaker, note, EQ, palm, cocktail).
-Wild is the mixer. Scatter is the sunset sun.
+(vinyl, headphones, cassette, mic, amp, speaker, note, EQ, palm, cocktail).
+Scatter is the sunset sun: tease only, does not start extra spins.
+Scatter lands on reels 2-5 only (max one per reel on a 4-row window).
 
 Basegame
 --------
-Standard left-to-right 20-line evaluation.
-Wild (W) substitutes for all paying symbols.
-Scatter (S) lands on all five reels.
-3 / 4 / 5 scatters trigger Golden Hour with 10 / 14 / 18 free spins.
-
-Golden Hour (freegame)
-----------------------
-Uses a richer reelset (FR0) with more wilds and high symbols.
-Wilds carry additive line multipliers (minimum 2x).
-Stereo Mix: a persistent global multiplier starts at 1x and ticks +1
-after every winning free spin. It is published as the standard
-updateGlobalMult book event.
-Retrigger requires 3+ scatters (4 / 6 / 10 extra spins).
-
-Buy bonus
----------
-80x stake, forces Golden Hour entry.
+Left-to-right ways. Three or more consecutive reels.
+Wilds do not land.
 
 Win cap
 -------
-5000x.
+55200x (matches the live player; tune before Stake upload).
 
 Target RTP
 ----------
-96.00%
+96.00% (optimization / production sim counts come later).
