@@ -28,7 +28,9 @@ def test_config_loads_six_by_four_ways():
     assert len(config.reels["FR0"]) == 6
     assert len(config.reels["BR0"][0]) >= 100
     assert (6, "H1") in config.paytable
+    assert config.paytable[(3, "H1")] == 0.9
     assert (3, "H5") in config.paytable
+    assert all(round(value, 1) == value for value in config.paytable.values())
 
 
 def test_only_base_mode():

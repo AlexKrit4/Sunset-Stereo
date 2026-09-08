@@ -5,7 +5,7 @@ body {
   color: #ead8c0;
   font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   background-color: #14081c;
-  background-image: url("/sunset-scene.jpg");
+  background-image: url("../public/sunset-scene.jpg");
   background-size: cover;
   background-position: center 48%;
   background-repeat: no-repeat;
@@ -79,6 +79,7 @@ h1 {
 }
 
 .frame {
+  position: relative;
   border: 14px solid #3d2a1a;
   outline: 3px solid #c4a574;
   outline-offset: -6px;
@@ -101,6 +102,17 @@ h1 {
 
 .banner.show {
   opacity: 1;
+}
+
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  background: rgba(12, 6, 18, 0.55);
+  color: #f0d8a0;
+  font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
 .paytable {

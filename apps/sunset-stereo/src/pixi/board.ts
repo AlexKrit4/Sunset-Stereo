@@ -8,6 +8,8 @@ import {
   reelMatchesWaysTease,
 } from "../math/math.js";
 import { MAX_ROWS, NUM_REELS, SCATTER_REELS } from "../math/config.js";
+import type { RawSymbol, Position } from "../game/typesBookEvent";
+import { unpadPosition, visibleNames } from "../rgs/bookView";
 
 export const CELL = 90;
 export const GAP = 5;
@@ -342,6 +344,41 @@ export class BoardController {
     this.clearHolds();
     this.clearWins();
     await hooks.onBonusEnd?.(round);
+  }
+
+  async playBookReveal(
+    board: RawSymbol[][],
+    opts: {
+      pace: "base" | "bonus" | "respin";
+      anticipation?: number[];
+      holds?: Position[];
+    },
+  ) {
+    const names = visibleNames(board);
+    const extra = Array.from({ length: COLS }, (_, col) => (opts.anticipation?.[col] || 0) * 480);
+    const holds = (opts.holds ?? []).map(unpadPosition);
+    this.clearWins();
+    await this.spinTo(names, [], extra, [], opts.pace, holds);
+  }
+
+  applyBookHolds(board: RawSymbol[][], positions: Position[]) {
+    this.setHolds(visibleNames(board), positions.map(unpadPosition));
+  }
+
+  async showBookWins(positions: Position[]) {
+    const cells = positions.map(unpadPosition);
+    if (!cells.length) return;
+    this.dimNonWinners(cells, COLS - 1);
+    await this.playWinSheen(cells);
+  }
+
+  showBookScatters(board: RawSymbol[][]) {
+    this.drawScatterTease(visibleNames(board), COLS - 1);
+  }
+
+  clearBookVisuals() {
+    this.clearHolds();
+    this.clearWins();
   }
 
   async spinTo(

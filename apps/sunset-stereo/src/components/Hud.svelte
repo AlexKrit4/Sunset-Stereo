@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { money, ui } from "../lib/ui.svelte";
+  import { moneyHud, labels, ui } from "../lib/ui.svelte";
 
   let {
     onSpin,
@@ -8,16 +8,20 @@
     onSpin: () => void;
     onBet: (delta: number) => void;
   } = $props();
+
+  const locked = $derived(ui.busy || !ui.ready);
 </script>
 
 <div class="bar">
+  {#if !ui.replay}
+    <div class="readout">
+      <span>{labels.credit()}</span>
+      <strong id="balanceValue">{moneyHud(ui.balanceMicro)}</strong>
+    </div>
+  {/if}
   <div class="readout">
-    <span>Credit</span>
-    <strong id="balanceValue">{money(ui.balance)}</strong>
-  </div>
-  <div class="readout">
-    <span>Paid</span>
-    <strong id="winValue">{money(ui.win)}</strong>
+    <span>{labels.paid()}</span>
+    <strong id="winValue">{moneyHud(ui.winMicro)}</strong>
   </div>
 
   {#if ui.fsTotal > 0}
@@ -27,16 +31,21 @@
     </div>
   {/if}
 
-  <div class="stake">
-    <button id="betDown" type="button" disabled={ui.busy} onclick={() => onBet(-1)}>–</button>
-    <div class="readout compact">
-      <span>Stake</span>
-      <strong id="betValue">{money(ui.bet)}</strong>
+  {#if !ui.replay}
+    <div class="stake">
+      <button id="betDown" type="button" disabled={locked} onclick={() => onBet(-1)}>–</button>
+      <div class="readout compact">
+        <span>{labels.stake()}</span>
+        <strong id="betValue">{moneyHud(ui.betMicro)}</strong>
+      </div>
+      <button id="betUp" type="button" disabled={locked} onclick={() => onBet(1)}>+</button>
     </div>
-    <button id="betUp" type="button" disabled={ui.busy} onclick={() => onBet(1)}>+</button>
-  </div>
+  {/if}
 
-  <button id="spinBtn" class="spin" type="button" disabled={ui.busy} onclick={onSpin}>Spin</button>
+  <button id="spinBtn" class="spin" type="button" disabled={locked} onclick={onSpin}>
+    {ui.replay && ui.winMicro ? "Play again" : labels.spin()}
+  </button>
+  <button class="ghost" type="button" onclick={() => (ui.rulesOpen = true)}>Rules</button>
 </div>
 
 <style>
@@ -96,6 +105,11 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
     font-weight: 700;
+  }
+  .ghost {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 12px;
   }
   .stake {
     display: flex;

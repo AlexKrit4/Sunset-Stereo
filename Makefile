@@ -50,5 +50,8 @@ frontend:
 frontend-build:
 	cd apps/sunset-stereo && npm install && npm run build
 
+publish-math:
+	$(PYTHON) games/sunset_stereo/copy_publish.py
+
 clean:
 	rm -rf env __pycache__ *.pyc

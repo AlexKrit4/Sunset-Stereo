@@ -39,3 +39,6 @@ Target RTP
 ----------
 96.00% (optimization / production sim counts come later).
 Basegame fence 0.680 + freegame fence 0.280, bonus hit-rate target 165.
+
+Current `run.py` emits a 1000-book *test* pack for ACP wiring.
+Do not treat that LUT RTP as the published game RTP.

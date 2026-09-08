@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "pixi.js": "^8.8.1",
+    "stake-engine": "^0.1.32",
     "svelte": "^5.20.0",
     "xstate": "^5.19.2"
   },

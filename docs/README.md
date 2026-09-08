@@ -2,7 +2,7 @@
 
 Read **[ENGINE_DOCUMENTATION.md](./ENGINE_DOCUMENTATION.md)** first.
 
-Publication gap analysis vs that dump: **[STAKE_PUBLICATION_REVIEW.md](./STAKE_PUBLICATION_REVIEW.md)**.
+Publication gap analysis vs that dump: **[STAKE_PUBLICATION_REVIEW.md](./STAKE_PUBLICATION_REVIEW.md)** (includes ACP steps for the 1000-book test upload).
 
 Production game is **6×4 ways** (`games/sunset_stereo/`, `apps/sunset-stereo/`). The 5×3 lines + Golden Hour package is inactive.
 

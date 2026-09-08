@@ -99,6 +99,12 @@ export type BookEventFinalWin = {
   amount: number;
 };
 
+export type BookEventWincap = {
+  index: number;
+  type: "wincap";
+  amount: number;
+};
+
 export type BookEvent =
   | BookEventReveal
   | BookEventWinInfo
@@ -110,6 +116,7 @@ export type BookEvent =
   | BookEventUpdateGlobalMult
   | BookEventHoldRespin
   | BookEventFreeSpinEnd
+  | BookEventWincap
   | BookEventFinalWin;
 
 export type BookEventOfType<T extends BookEvent["type"]> = Extract<BookEvent, { type: T }>;

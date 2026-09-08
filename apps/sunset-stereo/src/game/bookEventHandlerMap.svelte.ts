@@ -1,89 +1,100 @@
-import { eventEmitter } from "./eventEmitter";
 import { ui } from "../lib/ui.svelte";
 import { waitForTimeout } from "../utils/waitForTimeout";
-import type { BookEventHandlerMap } from "./typesBookEvent";
+import { runtime } from "./context";
+import { formatMoneyPlain, multiplierCentsToMicro } from "../rgs/money";
+import type { BookEventHandlerMap, Position, RawSymbol } from "./typesBookEvent";
+
+let lastBoard: RawSymbol[][] = [];
+let pendingHolds: Position[] = [];
 
 export const bookEventHandlerMap: BookEventHandlerMap = {
   reveal: async (bookEvent) => {
+    const board = runtime.board;
+    if (!board) return;
+    lastBoard = bookEvent.board;
+    const pace =
+      bookEvent.gameType === "basegame" ? "base" : pendingHolds.length ? "respin" : "bonus";
     if (bookEvent.gameType === "basegame") {
       ui.feature = false;
-      ui.mix = 1;
       ui.fsCurrent = 0;
       ui.fsTotal = 0;
+      pendingHolds = [];
     }
-    await eventEmitter.broadcast({
-      type: "revealBoard",
-      board: bookEvent.board,
-      gameType: bookEvent.gameType,
+    await board.playBookReveal(bookEvent.board, {
+      pace,
       anticipation: bookEvent.anticipation,
+      holds: pendingHolds,
     });
-    await eventEmitter.broadcast({ type: "boardLand", gameType: bookEvent.gameType });
+    if (pendingHolds.length) board.applyBookHolds(bookEvent.board, pendingHolds);
+  },
+
+  holdRespin: async (bookEvent) => {
+    pendingHolds = bookEvent.positions;
+    runtime.board?.applyBookHolds(lastBoard, pendingHolds);
+    await waitForTimeout(180);
   },
 
   winInfo: async (bookEvent) => {
-    await eventEmitter.broadcast({
-      type: "winShow",
-      positions: bookEvent.wins.flatMap((win) => win.positions),
-    });
+    const positions = bookEvent.wins.flatMap((win) => win.positions);
+    await runtime.board?.showBookWins(positions);
+    await waitForTimeout(120);
   },
 
   setWin: async (bookEvent) => {
-    ui.win = bookEvent.amount;
-    await waitForTimeout(80);
+    ui.winMicro = multiplierCentsToMicro(bookEvent.amount);
+    await waitForTimeout(60);
   },
 
   setTotalWin: async (bookEvent) => {
-    ui.win = bookEvent.amount;
+    ui.winMicro = multiplierCentsToMicro(bookEvent.amount);
   },
 
   freeSpinTrigger: async (bookEvent) => {
     ui.feature = true;
     ui.fsCurrent = 0;
     ui.fsTotal = bookEvent.totalFs;
-    ui.banner = `${bookEvent.totalFs} extra plays`;
-    await eventEmitter.broadcast({ type: "featureStart", total: bookEvent.totalFs });
-    await eventEmitter.broadcast({ type: "scatterShow", positions: bookEvent.positions });
-    await waitForTimeout(280);
+    ui.banner = "3 suns — 10 extra plays";
+    runtime.board?.showBookScatters(lastBoard);
+    await waitForTimeout(720);
+    runtime.board?.clearBookVisuals();
   },
 
   freeSpinRetrigger: async (bookEvent) => {
     ui.fsTotal = bookEvent.totalFs;
     ui.banner = `Retrigger — ${bookEvent.totalFs} extra plays`;
-    await eventEmitter.broadcast({ type: "scatterShow", positions: bookEvent.positions });
-    await waitForTimeout(360);
+    await waitForTimeout(280);
   },
 
   updateFreeSpin: async (bookEvent) => {
+    pendingHolds = [];
+    runtime.board?.clearBookVisuals();
     ui.fsCurrent = bookEvent.amount + 1;
     ui.fsTotal = bookEvent.total;
-    ui.banner = `${bookEvent.amount + 1} / ${bookEvent.total}`;
-    await eventEmitter.broadcast({
-      type: "fsUpdate",
-      current: bookEvent.amount + 1,
-      total: bookEvent.total,
-    });
-    await waitForTimeout(80);
+    ui.banner = `Extra play ${bookEvent.amount + 1} / ${bookEvent.total}`;
+    await waitForTimeout(40);
   },
 
   updateGlobalMult: async (bookEvent) => {
     ui.mix = bookEvent.globalMult;
-    ui.banner = `Stereo Mix ×${bookEvent.globalMult}`;
-    await eventEmitter.broadcast({ type: "mixUpdate", value: bookEvent.globalMult });
-    await waitForTimeout(220);
   },
 
-  freeSpinEnd: async (bookEvent) => {
-    ui.banner = bookEvent.amount ? `Paid ${bookEvent.amount.toFixed(2)}` : "";
-    await eventEmitter.broadcast({ type: "featureEnd", amount: bookEvent.amount });
-    await waitForTimeout(320);
+  wincap: async () => {
+    ui.banner = "Max win";
+    await waitForTimeout(400);
+  },
+
+  freeSpinEnd: async () => {
+    pendingHolds = [];
+    runtime.board?.clearBookVisuals();
     ui.feature = false;
+    ui.fsCurrent = 0;
+    ui.fsTotal = 0;
+    await waitForTimeout(200);
   },
 
   finalWin: async (bookEvent) => {
-    const paid = bookEvent.amount;
-    ui.win = paid;
-    if (paid > 0) ui.balance += paid;
-    ui.banner = paid ? `Paid ${paid.toFixed(2)}` : "";
-    await waitForTimeout(160);
+    ui.winMicro = multiplierCentsToMicro(bookEvent.amount);
+    ui.banner = bookEvent.amount ? `Paid ${formatMoneyPlain(ui.winMicro)}` : "";
+    await waitForTimeout(120);
   },
 };

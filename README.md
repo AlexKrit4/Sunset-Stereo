@@ -45,7 +45,20 @@ make setup
 make run GAME=sunset_stereo
 ```
 
-`run.py` пишет books в `games/sunset_stereo/library/`. Для Stake позже: больше симов и `run_optimization`.
+`run.py` сейчас собирает **тестовый** пакет на 1000 книг (`compression = True`). Готовые файлы для ACP лежат в [`publish/sunset_stereo/`](publish/sunset_stereo/):
+
+- `index.json`
+- `books_base.jsonl.zst`
+- `lookUpTable_base_0.csv`
+
+Скопировать их после нового прогона:
+
+```bash
+PYTHONPATH=. python3 games/sunset_stereo/run.py
+make publish-math
+```
+
+Это не прод-математика: бонус специально перепредставлен (~20 книг из 1000), RTP LUT сейчас около 31%, оптимизация выключена. Для ревью Stake нужны 100k+ симов и `run_optimization = True`.
 
 Пересобрать барабаны:
 
@@ -53,17 +66,19 @@ make run GAME=sunset_stereo
 make reels
 ```
 
-## Фронтенд
+## Фронтенд / RGS
 
-Прод-плеер: Svelte 5 + PixiJS 8.
+Прод-плеер: Svelte 5 + PixiJS 8. Ставки идут через `stake-engine` (`Authenticate` → `Play` → book events → `EndRound`). Без `sessionID` + `rgs_url` плеер крутит 20 демо-книг (мок).
 
 ```bash
 make frontend
 ```
 
-Открой `http://localhost:4173`. Space — спин.
+Открой `http://localhost:4173`. Space — спин. Replay без RGS: `?replay=true&event=23`.
 
-Сборка: `make frontend-build` → `apps/sunset-stereo/dist`.
+Сборка для Engine CDN: `make frontend-build` → загрузить **содержимое** `apps/sunset-stereo/dist` (`base: "./"`). Не грузить внешние шрифты.
+
+Как выложить первую тестовую версию в ACP — в конце [`docs/STAKE_PUBLICATION_REVIEW.md`](docs/STAKE_PUBLICATION_REVIEW.md).
 
 ## Символы
 

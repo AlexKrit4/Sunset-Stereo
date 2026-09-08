@@ -1,5 +1,7 @@
 """Generate Stake Engine books and configs for Sunset Stereo 6x4 ways."""
 
+import os
+
 from gamestate import GameState
 from game_config import GameConfig
 from game_optimization import OptimizationSetup
@@ -10,28 +12,32 @@ from src.state.run_sims import create_books
 from src.write_data.write_configs import generate_configs
 
 if __name__ == "__main__":
-    num_threads = 4
-    rust_threads = 8
-    batching_size = 500
-    compression = False
+    num_threads = 1
+    rust_threads = 1
+    batching_size = 1000
+    compression = True
     profiling = False
 
+    # 1000 books is a Stake Engine *test* pack, not the production volume.
     num_sim_args = {
-        "base": int(80),
+        "base": int(1000),
     }
 
     run_conditions = {
         "run_sims": True,
         "run_optimization": False,
         "run_analysis": False,
-        "run_format_checks": False,
+        "run_format_checks": True,
     }
     target_modes = list(num_sim_args.keys())
 
     config = GameConfig()
     gamestate = GameState(config)
-    if run_conditions["run_optimization"] or run_conditions["run_analysis"]:
-        optimization_setup_class = OptimizationSetup(config)
+    OptimizationSetup(config)
+
+    lut_zero = os.path.join(config.publish_path, "lookUpTable_base_0.csv")
+    if os.path.exists(lut_zero):
+        os.remove(lut_zero)
 
     if run_conditions["run_sims"]:
         create_books(

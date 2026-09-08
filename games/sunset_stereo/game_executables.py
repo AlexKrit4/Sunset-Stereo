@@ -8,10 +8,20 @@ from src.calculations.ways import Ways
 from src.events.events import reveal_event
 
 
+def quantize_win(value: float) -> float:
+    """RGS payouts are integer cents of 0.10x (multiples of 10)."""
+    return round(round(value * 10.0) / 10.0, 2)
+
+
 class GameExecutables(GameCalculations):
     def evaluate_ways_board(self, emit_events: bool = True):
         """Populate win-data, optionally record wins and transmit events."""
         self.win_data = Ways.get_ways_data(self.config, self.board)
+        self.win_data["totalWin"] = quantize_win(self.win_data.get("totalWin", 0))
+        for win in self.win_data.get("wins", []):
+            win["win"] = quantize_win(win.get("win", 0))
+            if "meta" in win and "winWithoutMult" in win["meta"]:
+                win["meta"]["winWithoutMult"] = quantize_win(win["meta"]["winWithoutMult"])
         if not emit_events:
             return
         Ways.record_ways_wins(self)
