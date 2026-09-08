@@ -7,7 +7,15 @@ import {
   pickStripItems,
   reelMatchesWaysTease,
 } from "../math/math.js";
-import { MAX_ROWS, NUM_REELS, SCATTER_REELS } from "../math/config.js";
+import {
+  MAX_ROWS,
+  NUM_REELS,
+  SCATTER_REELS,
+  SCATTER_TEASE_ENTER_MS,
+  SCATTER_TEASE_SLOW_FRAC,
+  SCATTER_TEASE_SLOW_MS,
+  SCATTER_TEASE_STOP_MS,
+} from "../math/config.js";
 
 export const CELL = 90;
 export const GAP = 5;
@@ -74,6 +82,20 @@ function easeInOutQuad(t: number) {
   return x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2;
 }
 
+type ScatterTease = {
+  phase: "enter" | "cruise" | "stop";
+  phaseAt: number;
+  lastAt: number;
+  offset: number;
+  speed0: number;
+  slowVel: number;
+  enterMs: number;
+  slowMs: number;
+  stopMs: number;
+  dist: number;
+  stopFrom: number;
+};
+
 type SpinJob = {
   col: number;
   strip: Container;
@@ -91,6 +113,10 @@ type SpinJob = {
   rows: number;
   done: boolean;
   settled: boolean;
+  scatterTeaseArmed: boolean;
+  scatterTeaseDist: number;
+  scatterSlowVel: number;
+  scatterTease: ScatterTease | null;
 };
 
 export type SpinRound = {
@@ -128,6 +154,7 @@ export class BoardController {
   private scatterOverlay = new Graphics();
   private sheenTick: (() => void) | null = null;
   private sheenResolve: (() => void) | null = null;
+  private scatterHit: number[] = [];
 
   constructor(app: Application) {
     this.app = app;
@@ -216,30 +243,48 @@ export class BoardController {
     });
   }
 
-  private planSpin(waysGaps: number[], scatterGaps: number[]) {
+  private planSpin(waysGaps: number[], scatterGaps: number[], scatterHit: number[] = []) {
     const s0 = (MAX_ROWS + BASE_FILLERS) * CELL;
     const velocity = (LINEAR_FRAC * s0) / LINEAR_MS;
     const gravityLead = 0.5 * velocity * SPIN_GRAVITY_MS;
-    const plans: Array<{ delay: number; fillers: number; velocity: number }> = [];
+    const twoScatterNext = scatterHit.length === 2 ? Math.max(...scatterHit) + 1 : -1;
+    const plans: Array<{
+      delay: number;
+      fillers: number;
+      velocity: number;
+      scatterTease: boolean;
+      slowVel: number;
+      teaseDist: number;
+    }> = [];
     let prevStop = 0;
 
     for (let col = 0; col < COLS; col += 1) {
       const delay = col * START_STAGGER_MS;
       const waysGap = waysGaps[col] || 0;
       const scatterGap = scatterGaps[col] || 0;
+      const scatterTease = col === twoScatterNext;
       const rows = getReelRows(col);
-      const stopStagger = scatterGap > 0 ? 0 : STOP_STAGGER_MS;
+      const stopStagger = scatterGap > 0 || scatterTease ? 0 : STOP_STAGGER_MS;
+      const extraFull = scatterTease ? 0 : scatterGap;
       const minStop =
-        col === 0 ? delay + SPIN_WINDUP_MS + LINEAR_MS : prevStop + stopStagger + waysGap + scatterGap;
+        col === 0 ? delay + SPIN_WINDUP_MS + LINEAR_MS : prevStop + stopStagger + waysGap + extraFull;
       const tFall = Math.max(80, minStop - delay - SPIN_WINDUP_MS);
-      let rest = velocity * tFall - SPIN_WINDUP_PX - gravityLead;
+      const slowVel = velocity * SCATTER_TEASE_SLOW_FRAC;
+      const teaseDist = scatterTease
+        ? 0.5 * (velocity + slowVel) * SCATTER_TEASE_ENTER_MS +
+          slowVel * SCATTER_TEASE_SLOW_MS +
+          0.5 * slowVel * SCATTER_TEASE_STOP_MS
+        : 0;
+      let rest = velocity * tFall - SPIN_WINDUP_PX - gravityLead + teaseDist;
       rest = Math.max((rows + 10) * CELL, rest);
       let needed = Math.ceil(rest / CELL) - rows;
       needed = Math.max(10, needed);
       const restOffset = (rows + needed) * CELL;
-      const actualFall = (restOffset + SPIN_WINDUP_PX + gravityLead) / velocity;
+      const actualFall = scatterTease
+        ? tFall + SCATTER_TEASE_ENTER_MS + SCATTER_TEASE_SLOW_MS + SCATTER_TEASE_STOP_MS
+        : (restOffset + SPIN_WINDUP_PX + gravityLead) / velocity;
       prevStop = delay + SPIN_WINDUP_MS + actualFall;
-      plans.push({ delay, fillers: needed, velocity });
+      plans.push({ delay, fillers: needed, velocity, scatterTease, slowVel, teaseDist });
     }
     return plans;
   }
@@ -251,7 +296,7 @@ export class BoardController {
       badge.text = "";
     });
     const highlights = round.totalWin > 0 ? round.highlights : [];
-    await this.spinTo(round.raw, round.waysGaps, round.scatterGaps, highlights);
+    await this.spinTo(round.raw, round.waysGaps, round.scatterGaps, highlights, round.scatterHit);
     if (highlights.length) {
       this.dimNonWinners(highlights, COLS - 1);
       await this.playWinSheen(highlights);
@@ -264,13 +309,15 @@ export class BoardController {
     waysGaps: number[] = [],
     scatterGaps: number[] = [],
     highlights: Array<{ reel: number; row: number }> = [],
+    scatterHit: number[] = [],
   ) {
     if (this.spinning) return;
     this.spinning = true;
+    this.scatterHit = scatterHit.slice();
     this.teaseOverlay.clear();
     this.scatterOverlay.clear();
     this.teaseOverlay.alpha = 1;
-    const plans = this.planSpin(waysGaps, scatterGaps);
+    const plans = this.planSpin(waysGaps, scatterGaps, scatterHit);
     const now = performance.now();
     this.jobs = [];
     const rng = spinRng();
@@ -304,6 +351,10 @@ export class BoardController {
         rows,
         done: false,
         settled: false,
+        scatterTeaseArmed: plan.scatterTease,
+        scatterTeaseDist: plan.teaseDist,
+        scatterSlowVel: plan.slowVel,
+        scatterTease: null,
       });
     }
 
@@ -396,6 +447,10 @@ export class BoardController {
         this.tickLandBounce(job, now);
         continue;
       }
+      if (job.scatterTease) {
+        this.tickScatterTease(job, now);
+        continue;
+      }
       if (now < job.startAt) continue;
       const elapsed = now - job.startAt;
       if (elapsed < job.windupMs) {
@@ -416,6 +471,65 @@ export class BoardController {
     }
   }
 
+  private beginScatterTease(job: SpinJob, now: number, offset: number) {
+    if (job.landed || job.scatterTease || offset <= 0) return;
+    job.scatterTease = {
+      phase: "enter",
+      phaseAt: now,
+      lastAt: now,
+      offset,
+      speed0: job.velocity,
+      slowVel: job.scatterSlowVel || job.velocity * SCATTER_TEASE_SLOW_FRAC,
+      enterMs: SCATTER_TEASE_ENTER_MS,
+      slowMs: SCATTER_TEASE_SLOW_MS,
+      stopMs: SCATTER_TEASE_STOP_MS,
+      dist: job.scatterTeaseDist,
+      stopFrom: 0,
+    };
+  }
+
+  private tickScatterTease(job: SpinJob, now: number) {
+    const tease = job.scatterTease;
+    if (!tease) return;
+    const dt = Math.min(Math.max(now - tease.lastAt, 0), 34);
+    tease.lastAt = now;
+    const phaseElapsed = now - tease.phaseAt;
+
+    if (tease.phase === "stop") {
+      const u = easeOutCubic(Math.min(phaseElapsed / tease.stopMs, 1));
+      tease.offset = Math.max(0, tease.stopFrom * (1 - u));
+      job.strip.y = -tease.offset;
+      const speed = tease.slowVel * (1 - u);
+      applySpinBlur(job.strip, job.blur, BLUR_MAX * Math.min(1, speed / job.velocity));
+      if (u >= 1 || tease.offset <= 0.4) this.landReel(job, now);
+      return;
+    }
+
+    let speed = tease.slowVel;
+    if (tease.phase === "enter") {
+      const u = easeOutQuad(Math.min(phaseElapsed / tease.enterMs, 1));
+      speed = tease.speed0 + (tease.slowVel - tease.speed0) * u;
+    }
+    tease.offset = Math.max(0, tease.offset - speed * dt);
+    job.strip.y = -tease.offset;
+    applySpinBlur(job.strip, job.blur, BLUR_MAX * Math.min(1, speed / job.velocity));
+
+    if (tease.offset <= 0.4) {
+      this.landReel(job, now);
+      return;
+    }
+    if (tease.phase === "enter" && phaseElapsed >= tease.enterMs) {
+      tease.phase = "cruise";
+      tease.phaseAt = now;
+      return;
+    }
+    if (tease.phase === "cruise" && phaseElapsed >= tease.slowMs) {
+      tease.phase = "stop";
+      tease.phaseAt = now;
+      tease.stopFrom = Math.max(1, tease.offset);
+    }
+  }
+
   private tickLandBounce(job: SpinJob, now: number) {
     const elapsed = now - job.bounceAt;
     const down = LAND_BOUNCE_DOWN_MS;
@@ -433,8 +547,20 @@ export class BoardController {
     job.done = true;
   }
 
+  private maybeStartScatterTease(settledCol: number, now: number) {
+    if (this.scatterHit.length !== 2) return;
+    const lastHit = Math.max(...this.scatterHit);
+    if (settledCol !== lastHit) return;
+    const next = this.jobs[settledCol + 1];
+    if (!next || next.landed || next.done || next.scatterTease) return;
+    const offset = Math.max(0, -next.strip.y);
+    this.beginScatterTease(next, now, offset);
+  }
+
   private landReel(job: SpinJob, now: number) {
+    if (job.landed) return;
     job.landed = true;
+    job.scatterTease = null;
     job.bounceAt = now;
     applySpinBlur(job.strip, job.blur, 0);
     this.landStatic(job.col, job.finals);
@@ -443,6 +569,7 @@ export class BoardController {
       job.settled = true;
       this.onSettled?.(job.col);
     }
+    this.maybeStartScatterTease(job.col, now);
   }
 
   private async playXWays(round: SpinRound) {

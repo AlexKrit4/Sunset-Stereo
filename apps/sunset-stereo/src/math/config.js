@@ -22,6 +22,10 @@ export const SCATTER_REEL_LAND_CHANCE = 0.11;
 export const WAYS_TEASE_INTER_REEL_MS = 500;
 export const WAYS_TEASE_MIN_REELS = 3;
 export const SCATTER_TEASE_TOTAL_MS = 6000;
+export const SCATTER_TEASE_SLOW_MS = 2000;
+export const SCATTER_TEASE_ENTER_MS = 520;
+export const SCATTER_TEASE_STOP_MS = 760;
+export const SCATTER_TEASE_SLOW_FRAC = 0.15;
 export const XNUDGE_CLUSTER_STRIP_CHANCE = 0.06;
 
 export const PAYOUTS = {

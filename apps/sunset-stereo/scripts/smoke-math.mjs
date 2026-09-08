@@ -1,5 +1,10 @@
 import { playRound } from "../src/math/math.js";
-import { SCATTER_REELS } from "../src/math/config.js";
+import {
+  SCATTER_REELS,
+  SCATTER_TEASE_ENTER_MS,
+  SCATTER_TEASE_SLOW_MS,
+  SCATTER_TEASE_STOP_MS,
+} from "../src/math/config.js";
 
 function assert(cond, message) {
   if (!cond) throw new Error(message);
@@ -39,8 +44,15 @@ for (let i = 0; i < 400; i += 1) {
   assert(sample.xWays.positions.length === 0, "xWays must not resolve");
   assert(sample.nudge.length === 0, "nudge must not resolve");
   assert(sample.scatterCount < 99, "scatterCount present");
-  if (sample.scatterCount >= 3) {
-    assert(!sample.freeSpins, "3+ scatters must not start extra spins");
+  if (sample.scatterCount === 2) {
+    const next = Math.max(...sample.scatterHit) + 1;
+    const teaseMs = SCATTER_TEASE_ENTER_MS + SCATTER_TEASE_SLOW_MS + SCATTER_TEASE_STOP_MS;
+    if (next < 6) {
+      assert(sample.scatterGaps[next] === teaseMs, `2-scatter tease should sit on reel ${next + 1}`);
+      sample.scatterGaps.forEach((ms, reel) => {
+        if (reel !== next) assert(ms === 0, `only the next reel teases after 2 scatters (reel ${reel})`);
+      });
+    }
   }
 }
 
