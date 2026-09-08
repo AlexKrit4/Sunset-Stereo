@@ -165,6 +165,8 @@ export class BoardController {
   private scatterOverlay = new Graphics();
   private sheenTick: (() => void) | null = null;
   private sheenResolve: (() => void) | null = null;
+  private bonusDim = false;
+  private brightCells = new Set<string>();
 
   constructor(app: Application) {
     this.app = app;
@@ -233,7 +235,8 @@ export class BoardController {
     });
     strip.y = 0;
     strip.filters = [];
-    strip.alpha = 1;
+    if (!this.bonusDim) strip.alpha = 1;
+    else this.applyBonusDim();
   }
 
   private landStatic(col: number, names: string[], mults?: number[]) {
@@ -340,31 +343,53 @@ export class BoardController {
       pace: "base" | "bonus" | "respin";
       anticipation?: number[];
       holds?: Position[];
+      upcomingWins?: Position[];
     },
   ) {
     const names = visibleNames(board);
     const extra = Array.from({ length: COLS }, (_, col) => (opts.anticipation?.[col] || 0) * 480);
     const holds = (opts.holds ?? []).map(unpadPosition);
-    this.clearWins();
-    await this.spinTo(names, [], extra, [], opts.pace, holds);
+    const upcomingWins = (opts.upcomingWins ?? []).map(unpadPosition);
+    if (this.bonusDim) this.clearSheens();
+    else this.clearWins();
+    await this.spinTo(names, [], extra, [], opts.pace, holds, upcomingWins);
+    if (upcomingWins.length) this.lockBonusWinners(opts.upcomingWins ?? []);
   }
 
   applyBookHolds(board: RawSymbol[][], positions: Position[]) {
     this.setHolds(visibleNames(board), positions.map(unpadPosition));
+    if (this.bonusDim) this.applyBonusDim();
+  }
+
+  lockBonusWinners(positions: Position[]) {
+    const cells = positions.map(unpadPosition);
+    this.bonusDim = true;
+    this.brightCells = new Set(cells.map((pos) => `${pos.reel}:${pos.row}`));
+    if (this.visible.length) this.setHolds(this.visible, cells);
+    this.applyBonusDim();
   }
 
   async showBookWins(positions: Position[]) {
     const cells = positions.map(unpadPosition);
     if (!cells.length) return;
-    this.dimNonWinners(cells, COLS - 1);
+    if (this.bonusDim) {
+      this.brightCells = new Set(cells.map((pos) => `${pos.reel}:${pos.row}`));
+      if (this.visible.length) this.setHolds(this.visible, cells);
+      this.applyBonusDim();
+    } else {
+      this.dimNonWinners(cells, COLS - 1);
+    }
     await this.playWinSheen(cells);
   }
 
   showBookScatters(_board: RawSymbol[][]) {}
 
   clearBookVisuals() {
+    this.bonusDim = false;
+    this.brightCells.clear();
     this.clearHolds();
     this.clearWins();
+    this.syncBonusDimFlag();
   }
 
   async spinTo(
@@ -374,6 +399,7 @@ export class BoardController {
     highlights: Array<{ reel: number; row: number }> = [],
     pace: "base" | "bonus" | "respin" = "base",
     holds: Array<{ reel: number; row: number }> = [],
+    upcomingWins: Array<{ reel: number; row: number }> = [],
   ) {
     if (this.spinning) return;
     this.spinning = true;
@@ -382,6 +408,7 @@ export class BoardController {
     this.teaseOverlay.alpha = 1;
     const locked = new Set(holds.map((pos) => `${pos.reel}:${pos.row}`));
     if (holds.length) this.setHolds(raw, holds);
+    if (this.bonusDim) this.applyBonusDim();
     const plans = this.planSpin(waysGaps, scatterGaps, pace);
     const now = performance.now();
     this.jobs = [];
@@ -424,7 +451,23 @@ export class BoardController {
       });
     }
 
+    const shown = new Set(holds.map((pos) => `${pos.reel}:${pos.row}`));
     this.onSettled = (col) => {
+      if (this.bonusDim) {
+        for (const pos of upcomingWins) {
+          if (pos.reel === col) shown.add(`${pos.reel}:${pos.row}`);
+        }
+        this.brightCells = shown;
+        this.setHolds(
+          raw,
+          [...shown].map((key) => {
+            const [reel, row] = key.split(":").map(Number);
+            return { reel, row };
+          }),
+        );
+        this.applyBonusDim();
+        return;
+      }
       if (highlights.length) this.dimNonWinners(highlights, col);
     };
 
@@ -669,13 +712,39 @@ export class BoardController {
     }
   }
 
+  private applyBonusDim() {
+    if (!this.bonusDim) return;
+    for (let reel = 0; reel < COLS; reel += 1) {
+      const strip = this.reels[reel];
+      if (strip) strip.alpha = WIN_DIM_ALPHA;
+      const hold = this.holds[reel];
+      if (hold) hold.alpha = 1;
+    }
+    this.syncBonusDimFlag();
+  }
+
+  private syncBonusDimFlag() {
+    if (typeof document === "undefined") return;
+    document.body.dataset.bonusDim = this.bonusDim ? "1" : "0";
+    document.body.dataset.bonusBright = String(this.brightCells.size);
+  }
+
+  private sheenCell(pos: { reel: number; row: number }) {
+    if (this.bonusDim) {
+      const layer = this.holds[pos.reel];
+      const held = layer?.children.find((child) => Math.round(child.y / CELL) === pos.row);
+      if (held instanceof Container) return held;
+    }
+    return this.cells[pos.reel]?.[pos.row];
+  }
+
   private playWinSheen(positions: Array<{ reel: number; row: number }>) {
     this.clearSheens();
     const pad = CELL * 0.06;
     const inner = CELL - pad * 2;
     const jobs = positions
       .map((pos) => {
-        const cell = this.cells[pos.reel]?.[pos.row];
+        const cell = this.sheenCell(pos);
         if (!cell) return null;
         const wrap = new Container();
         wrap.label = "sheen";
@@ -732,11 +801,17 @@ export class BoardController {
       this.app.ticker.remove(this.sheenTick);
       this.sheenTick = null;
     }
+    const stripSheens = (cell: Container) => {
+      cell.children
+        .filter((child) => child.label === "sheen")
+        .forEach((child) => child.destroy());
+    };
     this.cells.forEach((col) => {
-      col.forEach((cell) => {
-        cell.children
-          .filter((child) => child.label === "sheen")
-          .forEach((child) => child.destroy());
+      col.forEach(stripSheens);
+    });
+    this.holds.forEach((layer) => {
+      layer.children.forEach((child) => {
+        if (child instanceof Container) stripSheens(child);
       });
     });
     const resolve = this.sheenResolve;

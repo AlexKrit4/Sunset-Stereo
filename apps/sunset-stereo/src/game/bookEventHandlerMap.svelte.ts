@@ -2,13 +2,31 @@ import { hideSpinWin, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelt
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { runtime } from "./context";
 import { multiplierCentsToMicro } from "../rgs/money";
-import type { BookEventHandlerMap, Position, RawSymbol } from "./typesBookEvent";
+import type { BookEvent, BookEventHandlerMap, Position, RawSymbol } from "./typesBookEvent";
 
 let lastBoard: RawSymbol[][] = [];
 let pendingHolds: Position[] = [];
 
+function nextBonusWinPositions(events: BookEvent[], current: BookEvent): Position[] {
+  const start = events.indexOf(current);
+  for (let index = (start >= 0 ? start + 1 : 0); index < events.length; index += 1) {
+    const event = events[index];
+    if (event.type === "holdRespin") return event.positions;
+    if (event.type === "winInfo") return event.wins.flatMap((win) => win.positions);
+    if (
+      event.type === "reveal" ||
+      event.type === "updateFreeSpin" ||
+      event.type === "freeSpinEnd" ||
+      event.type === "finalWin"
+    ) {
+      return [];
+    }
+  }
+  return [];
+}
+
 export const bookEventHandlerMap: BookEventHandlerMap = {
-  reveal: async (bookEvent) => {
+  reveal: async (bookEvent, context) => {
     hideSpinWin();
     const board = runtime.board;
     if (!board) return;
@@ -20,18 +38,24 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       ui.fsCurrent = 0;
       ui.fsTotal = 0;
       pendingHolds = [];
+      board.clearBookVisuals();
     }
+    const upcomingWins =
+      bookEvent.gameType === "freegame" ? nextBonusWinPositions(context.bookEvents, bookEvent) : [];
     await board.playBookReveal(bookEvent.board, {
       pace,
       anticipation: bookEvent.anticipation,
       holds: pendingHolds,
+      upcomingWins,
     });
-    if (pendingHolds.length) board.applyBookHolds(bookEvent.board, pendingHolds);
+    if (pendingHolds.length && !upcomingWins.length) {
+      board.applyBookHolds(bookEvent.board, pendingHolds);
+    }
   },
 
   holdRespin: async (bookEvent) => {
     pendingHolds = bookEvent.positions;
-    runtime.board?.applyBookHolds(lastBoard, pendingHolds);
+    runtime.board?.lockBonusWinners(bookEvent.positions);
     await waitForTimeout(180);
   },
 
