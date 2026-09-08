@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { Application } from "pixi.js";
   import { createBoard } from "../pixi/board";
+  import { loadSymbolArt } from "../pixi/symbols";
   import { setContext, runtime } from "../game/context";
 
   setContext();
@@ -15,6 +16,8 @@
 
     const boot = async () => {
       if (!host) return;
+      await loadSymbolArt();
+      if (disposed) return;
       const pixi = new Application();
       await pixi.init({
         backgroundAlpha: 0,

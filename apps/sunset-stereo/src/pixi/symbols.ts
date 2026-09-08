@@ -1,5 +1,16 @@
-import { Container, Graphics, Text } from "pixi.js";
+import { Assets, Container, Graphics, Sprite, Texture, Text } from "pixi.js";
 import type { RawSymbol } from "../game/typesBookEvent";
+import palmUrl from "../assets/symbols/palm.jpg";
+import cocktailUrl from "../assets/symbols/cocktail.jpg";
+
+const ART: Partial<Record<string, Texture>> = {};
+
+export async function loadSymbolArt() {
+  if (ART.L4 && ART.L5) return;
+  const [palm, cocktail] = await Promise.all([Assets.load(palmUrl), Assets.load(cocktailUrl)]);
+  ART.L4 = palm as Texture;
+  ART.L5 = cocktail as Texture;
+}
 
 const ALIAS: Record<string, string> = {
   high1: "H1",
@@ -42,12 +53,27 @@ export function createSymbolView(symbol: RawSymbol, size: number): Container {
   const g = new Graphics();
   const name = ALIAS[symbol.name] ?? symbol.name;
   const pad = size * 0.06;
-  const colors = PALETTE[name] ?? PALETTE[symbol.name] ?? PALETTE.L1;
-  fillRound(g, pad, pad, size - pad * 2, size - pad * 2, 10, colors.wood);
-  g.roundRect(pad, pad, size - pad * 2, size - pad * 2, 10).stroke({ color: 0x000000, width: 1, alpha: 0.45 });
-
+  const inner = size - pad * 2;
   const cx = size / 2;
   const cy = size / 2 - 4;
+  const colors = PALETTE[name] ?? PALETTE[symbol.name] ?? PALETTE.L1;
+  const art = ART[name];
+
+  if (art) {
+    const sprite = new Sprite(art);
+    sprite.width = inner;
+    sprite.height = inner;
+    sprite.x = pad;
+    sprite.y = pad;
+    const mask = new Graphics();
+    mask.roundRect(pad, pad, inner, inner, 10).fill(0xffffff);
+    g.roundRect(pad, pad, inner, inner, 10).stroke({ color: 0x000000, width: 1, alpha: 0.4 });
+    root.addChild(mask, sprite, g);
+    sprite.mask = mask;
+  } else {
+  fillRound(g, pad, pad, inner, inner, 10, colors.wood);
+  g.roundRect(pad, pad, inner, inner, 10).stroke({ color: 0x000000, width: 1, alpha: 0.45 });
+
   const s = size * 0.32;
 
   switch (name) {
@@ -177,6 +203,7 @@ export function createSymbolView(symbol: RawSymbol, size: number): Container {
   }
 
   root.addChild(g);
+  }
 
   if (name === "xWays" || name === "xNudge") {
     const tag = new Text({
