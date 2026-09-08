@@ -20,6 +20,10 @@ const LINEAR_MS = 900;
 const DECEL_MS = 120;
 const LINEAR_FRAC = 0.86;
 const BASE_FILLERS = 16;
+const SPIN_WINDUP_PX = 18;
+const SPIN_WINDUP_MS = 110;
+const BLUR_IN_MS = 90;
+const BLUR_MAX = 12;
 const NUDGE_WINDUP_MS = 100;
 const NUDGE_PUSH_MS = 340;
 const NUDGE_WINDUP_FRAC = 0.12;
@@ -213,6 +217,11 @@ export class BoardController {
     this.scatterOverlay.clear();
     this.teaseOverlay.alpha = 1;
     const plans = this.planSpin(waysGaps, scatterGaps);
+
+    await Promise.all(
+      this.reels.map((strip) => this.tweenY(strip, strip.y, -SPIN_WINDUP_PX, SPIN_WINDUP_MS)),
+    );
+
     const now = performance.now();
     this.jobs = [];
     const rng = {
@@ -229,10 +238,11 @@ export class BoardController {
       const fillers = pickStripItems(rng, col, plan.fillers);
       const strip = this.reels[col];
       const blur = this.blurs[col];
+      const travel = (rows + plan.fillers) * CELL;
+      const startOffset = travel + SPIN_WINDUP_PX;
       this.paintStrip(strip, [...finals, ...fillers, ...this.visible[col]]);
-      const startOffset = (rows + plan.fillers) * CELL;
       strip.y = -startOffset;
-      blur.strengthY = 10;
+      blur.strengthY = 0;
       strip.filters = [blur];
       this.jobs.push({
         col,
@@ -320,12 +330,12 @@ export class BoardController {
       let offset: number;
       if (elapsed < job.tDecel) {
         offset = Math.max(0, job.startOffset - job.velocity * elapsed);
-        job.blur.strengthY = 10;
+        job.blur.strengthY = BLUR_MAX * Math.min(1, elapsed / BLUR_IN_MS);
       } else {
         const u = Math.min((elapsed - job.tDecel) / job.decelMs, 1);
         const offAtDecel = Math.max(0, job.startOffset - job.velocity * job.tDecel);
         offset = offAtDecel * (1 - u);
-        job.blur.strengthY = 10 * (1 - u);
+        job.blur.strengthY = BLUR_MAX * (1 - u);
         if (u >= 1) {
           this.landReel(job);
           continue;
