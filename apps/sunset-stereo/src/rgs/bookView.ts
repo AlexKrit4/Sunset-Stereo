@@ -32,3 +32,15 @@ export function unpadPosition(pos: Position): Position {
   const row = pos.row > 0 ? pos.row - 1 : pos.row;
   return { reel: pos.reel, row: Math.max(0, Math.min(3, row)) };
 }
+
+export function winningWays(wins: Array<{ positions: Position[] }>) {
+  return wins.reduce((total, win) => {
+    const perReel = new Map<number, number>();
+    for (const pos of win.positions) {
+      perReel.set(pos.reel, (perReel.get(pos.reel) ?? 0) + 1);
+    }
+    let ways = 1;
+    for (const count of perReel.values()) ways *= count;
+    return total + ways;
+  }, 0);
+}

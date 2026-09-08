@@ -1,6 +1,7 @@
 import { hideSpinWin, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelte";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { runtime } from "./context";
+import { winningWays } from "../rgs/bookView";
 import { multiplierCentsToMicro } from "../rgs/money";
 import type { BookEvent, BookEventHandlerMap, Position, RawSymbol } from "./typesBookEvent";
 
@@ -61,7 +62,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   },
 
   winInfo: async (bookEvent) => {
-    pendingWinLines = bookEvent.wins.length;
+    pendingWinLines = winningWays(bookEvent.wins);
     const positions = bookEvent.wins.flatMap((win) => win.positions);
     await runtime.board?.showBookWins(positions);
     await waitForTimeout(120);
