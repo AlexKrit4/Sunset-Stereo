@@ -27,4 +27,8 @@ __pycache__
 !optimization_program/Cargo.toml
 
 **/site/*
+node_modules/
+dist/
+.svelte-kit/
+stakeengine.egg-info/
 

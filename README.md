@@ -23,7 +23,7 @@
 
 ```
 games/sunset_stereo/   Math SDK: config, state, reels
-frontend/              Локальный плеер book-событий
+apps/sunset-stereo/    Web SDK-style player: Svelte 5 + PixiJS 8 + XState
 src/                   Движок Stake Engine Math SDK (MIT)
 ```
 
@@ -50,17 +50,27 @@ make reels
 
 ## Фронтенд
 
-Локальный плеер повторяет пайплайн Web SDK:
+Плеер собран по схеме Stake Engine Web SDK:
 
-`book → bookEvents → bookEventHandlerMap → UI`
+`book → bookEvents → playBookEvent → bookEventHandlerMap → emitterEvents / Pixi board`
+
+Стек: Svelte 5, PixiJS 8, XState. Символы рисуются на canvas, HUD — credit / stake / spin / extra plays.
 
 ```bash
 make frontend
 ```
 
-Открой `http://localhost:4173`. Space — спин, кнопка Buy — вход в Golden Hour за 80×.
+Открой `http://localhost:4173`. Space — спин. Extra plays — вход в Golden Hour за 80×.
 
-Для публикации на Stake Engine скопируй `apps/lines` из [web-sdk](https://github.com/StakeEngine/web-sdk), подставь типы из `frontend/js` и ассеты Sunset Stereo. Обработчики `reveal`, `winInfo`, `setWin`, `setTotalWin`, `freeSpinTrigger`, `updateFreeSpin`, `updateGlobalMult`, `freeSpinEnd`, `finalWin` уже совпадают с Math SDK.
+Сборка статики:
+
+```bash
+make frontend-build
+```
+
+Артефакт: `apps/sunset-stereo/dist`. Docker: `apps/sunset-stereo/Dockerfile`.
+
+Для публикации на Stake скопируй `apps/lines` из [web-sdk](https://github.com/StakeEngine/web-sdk) и перенеси `apps/sunset-stereo/src/game` плюс Pixi-борд.
 
 ## Символы
 

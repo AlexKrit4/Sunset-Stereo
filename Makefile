@@ -45,7 +45,10 @@ test:
 	$(VENV_PY) -m pytest tests/
 
 frontend:
-	$(PYTHON) -m http.server 4173 --directory frontend
+	cd apps/sunset-stereo && npm install && npm run dev
+
+frontend-build:
+	cd apps/sunset-stereo && npm install && npm run build
 
 clean:
 	rm -rf env __pycache__ *.pyc
