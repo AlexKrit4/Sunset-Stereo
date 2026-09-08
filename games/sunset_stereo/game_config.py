@@ -66,9 +66,9 @@ class GameConfig(Config):
         self.provider_name = "sunset_stereo"
         self.working_name = "Sunset Stereo"
         self.game_name = "Sunset Stereo"
-        self.wincap = 55200.0
+        self.wincap = 15000.0
         self.win_type = "ways"
-        self.rtp = 0.9600
+        self.rtp = 0.9500
         self.output_regular_json = False
         self.construct_paths()
 
@@ -100,6 +100,8 @@ class GameConfig(Config):
         self.padding_reels[self.freegame_type] = self.reels["FR0"]
         self.padding_symbol_values = {}
 
+        # Same strips for every bucket. Max-win books are natural bonus games
+        # that crossed 15000x and were cut off — not a fake all-vinyl reel.
         freegame_condition = {
             "reel_weights": {
                 self.basegame_type: {"BR0": 1},
@@ -107,6 +109,15 @@ class GameConfig(Config):
             },
             "scatter_triggers": {3: 90, 4: 10},
             "force_wincap": False,
+            "force_freegame": True,
+        }
+        wincap_condition = {
+            "reel_weights": {
+                self.basegame_type: {"BR0": 1},
+                self.freegame_type: {"FR0": 1},
+            },
+            "scatter_triggers": {3: 90, 4: 10},
+            "force_wincap": True,
             "force_freegame": True,
         }
         basegame_condition = {
@@ -119,17 +130,6 @@ class GameConfig(Config):
             "force_wincap": False,
             "force_freegame": False,
         }
-        wincap_condition = {
-            "reel_weights": {
-                self.basegame_type: {"BR0": 1},
-                self.freegame_type: {"FR0": 1},
-            },
-            "scatter_triggers": {3: 80, 4: 20},
-            "force_wincap": True,
-            "force_freegame": True,
-        }
-        # Restore wincap_condition before Stake optimization / ACP upload.
-        _ = wincap_condition
 
         self.bet_modes = [
             BetMode(
@@ -141,9 +141,15 @@ class GameConfig(Config):
                 is_feature=True,
                 is_buybonus=False,
                 distributions=[
-                    Distribution(criteria="freegame", quota=0.02, conditions=freegame_condition),
+                    Distribution(
+                        criteria="wincap",
+                        quota=0.001,
+                        win_criteria=self.wincap,
+                        conditions=wincap_condition,
+                    ),
+                    Distribution(criteria="freegame", quota=0.04, conditions=freegame_condition),
                     Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=zerowin_condition),
-                    Distribution(criteria="basegame", quota=0.58, conditions=basegame_condition),
+                    Distribution(criteria="basegame", quota=0.559, conditions=basegame_condition),
                 ],
             ),
         ]

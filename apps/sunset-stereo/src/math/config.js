@@ -1,8 +1,8 @@
 export const GAME = {
   id: "sunset_stereo",
   name: "Sunset Stereo",
-  rtp: 0.96,
-  wincap: 55200,
+  rtp: 0.95,
+  wincap: 15000,
 };
 
 export const REEL_ROWS = [4, 4, 4, 4, 4, 4];

@@ -5,7 +5,7 @@ from game_calculations import GameCalculations, MAX_HOLD_RESPINS
 from game_events import hold_respin_event
 from src.calculations.statistics import get_random_outcome
 from src.calculations.ways import Ways
-from src.events.events import reveal_event
+from src.events.events import reveal_event, wincap_event
 
 
 def quantize_win(value: float) -> float:
@@ -14,6 +14,39 @@ def quantize_win(value: float) -> float:
 
 
 class GameExecutables(GameCalculations):
+    def remaining_to_wincap(self) -> float:
+        """How much of the 15000x ceiling is still unpaid in this book."""
+        room = self.config.wincap - self.win_manager.running_bet_win
+        return quantize_win(max(0.0, room))
+
+    def clamp_win_data_to_ceiling(self) -> bool:
+        """Keep the real board, but never pay past the wincap. Returns True if this hit the cap."""
+        room = self.remaining_to_wincap()
+        total = float(self.win_data.get("totalWin", 0) or 0)
+        crossed = self.win_manager.running_bet_win + total >= self.config.wincap and (
+            total > 0 or self.win_manager.running_bet_win >= self.config.wincap
+        )
+        if total > room:
+            self.win_data["totalWin"] = room
+        return crossed
+
+    def pay_current_board(self) -> None:
+        """Record and emit the current board win, then lock the book if the ceiling was hit."""
+        hit_cap = self.clamp_win_data_to_ceiling()
+        Ways.record_ways_wins(self)
+        self.win_manager.update_spinwin(self.win_data["totalWin"])
+        Ways.emit_wayswin_events(self)
+        if self.win_manager.running_bet_win > self.config.wincap:
+            overflow = self.win_manager.running_bet_win - self.config.wincap
+            self.win_manager.running_bet_win = float(self.config.wincap)
+            self.win_manager.spin_win = max(0.0, self.win_manager.spin_win - overflow)
+        if (
+            (hit_cap or self.win_manager.running_bet_win >= self.config.wincap)
+            and not self.wincap_triggered
+        ):
+            self.wincap_triggered = True
+            wincap_event(self)
+
     def evaluate_ways_board(self, emit_events: bool = True):
         """Populate win-data, optionally record wins and transmit events."""
         self.win_data = Ways.get_ways_data(self.config, self.board)
@@ -24,9 +57,7 @@ class GameExecutables(GameCalculations):
                 win["meta"]["winWithoutMult"] = quantize_win(win["meta"]["winWithoutMult"])
         if not emit_events:
             return
-        Ways.record_ways_wins(self)
-        self.win_manager.update_spinwin(self.win_data["totalWin"])
-        Ways.emit_wayswin_events(self)
+        self.pay_current_board()
 
     def respin_unlocked_cells(self, locked: set[tuple[int, int]]) -> None:
         """Respin cells that are not part of a held winning combination."""
@@ -71,9 +102,9 @@ class GameExecutables(GameCalculations):
             locked = keys
             if len(locked) >= total_cells:
                 break
+            if self.win_manager.running_bet_win + self.win_data["totalWin"] >= self.config.wincap:
+                break
             if step < MAX_HOLD_RESPINS:
                 hold_respin_event(self, locked, continuing=True)
 
-        Ways.record_ways_wins(self)
-        self.win_manager.update_spinwin(self.win_data["totalWin"])
-        Ways.emit_wayswin_events(self)
+        self.pay_current_board()

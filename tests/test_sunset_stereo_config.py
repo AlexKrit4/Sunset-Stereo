@@ -27,6 +27,8 @@ def test_config_loads_six_by_four_ways():
     assert len(config.reels["BR0"]) == 6
     assert len(config.reels["FR0"]) == 6
     assert len(config.reels["BR0"][0]) >= 100
+    assert config.wincap == 15000.0
+    assert config.rtp == 0.95
     assert (6, "H1") in config.paytable
     assert config.paytable[(3, "H1")] == 0.9
     assert (3, "H5") in config.paytable
@@ -37,6 +39,8 @@ def test_only_base_mode():
     config = GameConfig()
     names = {mode.get_name(): mode.get_cost() for mode in config.bet_modes}
     assert names == {"base": 1.0}
+    criteria = [dist.get_criteria() for dist in config.bet_modes[0].get_distributions()]
+    assert criteria == ["wincap", "freegame", "0", "basegame"]
 
 
 def test_scatter_only_on_inner_reels_and_not_stacked():
@@ -121,4 +125,33 @@ def test_hold_respin_stops_before_paying_an_extra_play():
             assert "winInfo" in after or "setWin" in after
             return
     raise AssertionError("expected at least one hold-respin extra play in 80 forced bonus books")
+
+
+def test_wincap_is_a_hard_ceiling_and_stops_the_book():
+    from gamestate import GameState
+
+    GameConfig._instance = None
+    config = GameConfig()
+    config.wincap = 8.0
+    state = GameState(config)
+    state.win_manager.max_allowed_win = 8.0
+    state.betmode = "base"
+    state.criteria = "freegame"
+    hit = False
+    for sim in range(40):
+        state.run_spin(sim)
+        assert state.final_win <= 8.0 + 1e-9
+        events = state.book.to_json()["events"]
+        types = [event["type"] for event in events]
+        if "wincap" in types:
+            hit = True
+            assert state.final_win == 8.0
+            wincap_at = types.index("wincap")
+            assert "reveal" not in types[wincap_at + 1 :]
+            assert types[-1] == "finalWin"
+            final = next(event for event in events if event["type"] == "finalWin")
+            assert final["amount"] == 800
+            break
+    GameConfig._instance = None
+    assert hit, "expected a bonus book to hit the lowered 8x ceiling"
 

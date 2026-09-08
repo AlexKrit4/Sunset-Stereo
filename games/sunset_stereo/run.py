@@ -12,25 +12,25 @@ from src.state.run_sims import create_books
 from src.write_data.write_configs import generate_configs
 
 if __name__ == "__main__":
-    num_threads = 1
-    rust_threads = 1
-    batching_size = 1000
+    num_threads = 4
+    rust_threads = 4
+    batching_size = 5000
     compression = True
     profiling = False
 
-    # 1000 books is a Stake Engine *test* pack, not the production volume.
     num_sim_args = {
-        "base": int(1000),
+        "base": int(1_000_000),
     }
 
     run_conditions = {
         "run_sims": True,
-        "run_optimization": False,
-        "run_analysis": False,
+        "run_optimization": True,
+        "run_analysis": True,
         "run_format_checks": True,
     }
     target_modes = list(num_sim_args.keys())
 
+    GameConfig._instance = None
     config = GameConfig()
     gamestate = GameState(config)
     OptimizationSetup(config)

@@ -33,12 +33,12 @@ Wilds do not land.
 
 Win cap
 -------
-55200x (matches the live player; tune before Stake upload).
+15000x hard ceiling. If a book would pay more, it is cut off and pays
+exactly 15000x. Max-win books are natural bonus games that crossed the
+cap — not a fake full-grid vinyl board.
 
 Target RTP
 ----------
-96.00% (optimization / production sim counts come later).
-Basegame fence 0.680 + freegame fence 0.280, bonus hit-rate target 165.
-
-Current `run.py` emits a 1000-book *test* pack for ACP wiring.
-Do not treat that LUT RTP as the published game RTP.
+95.00%, high volatility.
+Bonus fence ~0.560 at ~1/180, basegame ~0.380 at ~1/5, wincap ~0.010.
+`run.py` emits 1,000,000 compressed books and runs optimization.
