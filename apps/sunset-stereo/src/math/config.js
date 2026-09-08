@@ -5,12 +5,12 @@ export const GAME = {
   wincap: 55200,
 };
 
-export const REEL_ROWS = [2, 3, 4, 4, 3, 2];
+export const REEL_ROWS = [4, 4, 4, 4, 4, 4];
 export const NUM_REELS = 6;
 export const MAX_ROWS = 4;
 
-export const XWAYS_REELS = [1, 4];
-export const XNUDGE_REELS = [2, 3];
+export const XWAYS_REELS = [];
+export const XNUDGE_REELS = [];
 export const SCATTER_REELS = [1, 2, 3, 4];
 
 export const XWAYS_REDUCTION = 12;
@@ -51,9 +51,6 @@ export const SYMBOLS = [
   "high4",
   "high5",
   "scatter",
-  "xWays",
-  "xNudge",
-  "wild",
 ];
 
 export const BETS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 25];

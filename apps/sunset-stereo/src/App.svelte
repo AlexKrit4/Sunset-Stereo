@@ -29,12 +29,11 @@
   <header class="masthead">
     <div>
       <p class="kicker">{GAME.name}</p>
-      <h1>xWays · xNudge</h1>
+      <h1>Sunset Stereo</h1>
     </div>
     <p class="blurb">
-      Six reels, 2–3–4–4–3–2 ways. xWays on reels 2 and 5 become one payable ×2–×6. xNudge on
-      reels 3 and 4 pushes a wild stack from the top. Sunset can tease remaining reels; it does
-      not start extra spins. RTP {(GAME.rtp * 100).toFixed(0)}%.
+      Six reels, four rows, left-to-right ways. Sunset can tease remaining reels; it does not
+      start extra spins. RTP {(GAME.rtp * 100).toFixed(0)}%.
     </p>
   </header>
 
@@ -50,8 +49,7 @@
   <section class="paytable" aria-label="Paytable">
     <h2>Ways pays</h2>
     <p>
-      Left to right, three or more reels. Mixer substitutes. xWays counts as extra copies on that
-      cell. xNudge fills the reel with mixers and multiplies the way.
+      Left to right, three or more reels.
     </p>
     <ul>
       {#each payRows as [id, pays]}

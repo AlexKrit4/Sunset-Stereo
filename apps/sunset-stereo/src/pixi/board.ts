@@ -227,8 +227,6 @@ export class BoardController {
       badge.text = "";
     });
     await this.spinTo(round.raw, round.waysGaps, round.scatterGaps);
-    await this.playXWays(round);
-    await this.playNudge(round);
     if (round.totalWin > 0) {
       this.highlight(round.highlights);
       await wait(round.totalWin >= round.bet * 15 ? 1400 : 640);
