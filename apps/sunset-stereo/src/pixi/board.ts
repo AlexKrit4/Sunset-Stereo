@@ -30,6 +30,8 @@ const NUDGE_WINDUP_MS = 100;
 const NUDGE_PUSH_MS = 340;
 const NUDGE_WINDUP_FRAC = 0.12;
 const NUDGE_WINDUP_MAX_PX = 12;
+const WIN_DIM_ALPHA = 0.38;
+const WIN_DIM_FROM_REEL = 2;
 
 function applySpinBlur(strip: Container, blur: BlurFilter, strength: number) {
   if (strength <= 0.2) {
@@ -89,6 +91,7 @@ export type SpinRound = {
   totalWays: number;
   wins: Array<{ sym: string; reelsMatched: number; ways: number; nudgeLineMult: number; win: number }>;
   highlights: Array<{ reel: number; row: number }>;
+  bet?: number;
 };
 
 export class BoardController {
@@ -226,14 +229,20 @@ export class BoardController {
       badge.visible = false;
       badge.text = "";
     });
-    await this.spinTo(round.raw, round.waysGaps, round.scatterGaps);
-    if (round.totalWin > 0) {
-      this.highlight(round.highlights);
+    const highlights = round.totalWin > 0 ? round.highlights : [];
+    await this.spinTo(round.raw, round.waysGaps, round.scatterGaps, highlights);
+    if (highlights.length) {
+      this.dimNonWinners(highlights, COLS - 1);
       await wait(round.totalWin >= round.bet * 15 ? 1400 : 640);
     }
   }
 
-  async spinTo(raw: string[][], waysGaps: number[] = [], scatterGaps: number[] = []) {
+  async spinTo(
+    raw: string[][],
+    waysGaps: number[] = [],
+    scatterGaps: number[] = [],
+    highlights: Array<{ reel: number; row: number }> = [],
+  ) {
     if (this.spinning) return;
     this.spinning = true;
     this.teaseOverlay.clear();
@@ -282,9 +291,13 @@ export class BoardController {
 
     this.onSettled = (col) => {
       const landed = raw.map((c) => c.slice());
+      this.drawScatterTease(landed, col);
+      if (highlights.length) {
+        this.dimNonWinners(highlights, col);
+        return;
+      }
       const sym = getWaysTeaseSymbol(landed, col);
       this.drawTease(landed, sym, col);
-      this.drawScatterTease(landed, col);
     };
 
     await new Promise<void>((resolve) => {
@@ -526,23 +539,14 @@ export class BoardController {
     });
   }
 
-  highlight(positions: Array<{ reel: number; row: number }>) {
-    this.clearWins();
+  private dimNonWinners(positions: Array<{ reel: number; row: number }>, upTo: number) {
+    if (upTo < WIN_DIM_FROM_REEL || !positions.length) return;
     const hits = new Set(positions.map((pos) => `${pos.reel}:${pos.row}`));
-    this.cells.forEach((col, reel) => {
-      col.forEach((cell, row) => {
-        cell.alpha = hits.has(`${reel}:${row}`) ? 1 : 0.38;
+    for (let reel = 0; reel <= upTo; reel += 1) {
+      this.cells[reel]?.forEach((cell, row) => {
+        cell.alpha = hits.has(`${reel}:${row}`) ? 1 : WIN_DIM_ALPHA;
       });
-    });
-    const overlay = new Graphics();
-    overlay.label = "win";
-    positions.forEach((pos) => {
-      const rows = getReelRows(pos.reel);
-      const x = GAP + pos.reel * CELL + 3;
-      const y = GAP + (MAX_ROWS - rows) * CELL + pos.row * CELL + 3;
-      overlay.roundRect(x, y, CELL - 6, CELL - 6, 8).stroke({ color: 0xe8c878, width: 3 });
-    });
-    this.root.addChild(overlay);
+    }
   }
 
   clearWins() {
