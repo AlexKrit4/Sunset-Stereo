@@ -56,7 +56,7 @@ Upload the folder **`publish/sunset_stereo/`** as the math files. It must contai
 | File | Role |
 | --- | --- |
 | `index.json` | one `base` mode, cost `1.0` |
-| `books_base.jsonl.zst` | 1000 compressed books |
+| `books_base.jsonl.zst` | 1,000,000 compressed books |
 | `lookUpTable_base_0.csv` | `id,weight,payoutMultiplier` (cents of 1× bet) |
 
 Do **not** upload `games/_inactive_sunset_stereo_5x3/`, `frontend/`, or any `lookUpTable_bonus_*`.
@@ -69,8 +69,6 @@ make publish-math
 ```
 
 ACP should report ~95% RTP and max win 15000×. Books that would pay more are cut off and pay exactly 15000×. Max-win samples are natural bonus snowballs, not a fake full-vinyl grid.
-
-This pack is for wiring RGS, replay, and the player — not for a 96% cert.
 
 ### 3. Upload frontend
 
