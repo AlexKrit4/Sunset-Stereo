@@ -555,12 +555,17 @@ export class BoardController {
   layout(viewWidth: number, viewHeight = 0) {
     const w = COLS * CELL + (COLS + 1) * GAP;
     const h = MAX_ROWS * CELL + 2 * GAP;
-    const scaleX = Math.min(1, Math.max(0.35, (viewWidth - 20) / w));
-    const scaleY = viewHeight > 0 ? Math.min(1, Math.max(0.35, (viewHeight - 20) / h)) : scaleX;
+    const padX = 10;
+    const padTop = 26;
+    const padBottom = 10;
+    const scaleX = Math.max(0.35, (viewWidth - padX * 2) / w);
+    const scaleY =
+      viewHeight > 0 ? Math.max(0.35, (viewHeight - padTop - padBottom) / h) : scaleX;
     const scale = Math.min(scaleX, scaleY);
     this.root.scale.set(scale);
     this.root.x = (viewWidth - w * scale) / 2;
-    this.root.y = viewHeight > 0 ? (viewHeight - h * scale) / 2 : 8;
+    this.root.y =
+      viewHeight > 0 ? padTop + (viewHeight - padTop - padBottom - h * scale) / 2 : padTop;
   }
 
   resize(viewWidth: number, viewHeight?: number) {
