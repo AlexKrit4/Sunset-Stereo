@@ -315,12 +315,13 @@ export class BoardController {
   ) {
     if (this.spinning) return;
     this.spinning = true;
-    this.scatterHit = scatterHit.slice();
+    const scatterCols = raw.flatMap((col, i) => (col.includes("scatter") ? [i] : []));
+    this.scatterHit = scatterCols;
     this.spinRaw = raw.map((col) => col.slice());
     this.teaseOverlay.clear();
     this.scatterOverlay.clear();
     this.teaseOverlay.alpha = 1;
-    const plans = this.planSpin(waysGaps, scatterGaps, scatterHit);
+    const plans = this.planSpin(waysGaps, scatterGaps, scatterCols);
     const now = performance.now();
     this.jobs = [];
     const rng = spinRng();
@@ -346,7 +347,7 @@ export class BoardController {
         windupPx: SPIN_WINDUP_PX,
         windupMs: SPIN_WINDUP_MS,
         gravityMs: SPIN_GRAVITY_MS,
-        velocity: plan.velocity * (0.97 + col * 0.012),
+        velocity: plan.scatterTease ? plan.velocity : plan.velocity * (0.97 + col * 0.012),
         bouncePx: LAND_BOUNCE_PX + (col % 3) - 1,
         bounceAt: 0,
         landed: false,
@@ -496,7 +497,8 @@ export class BoardController {
   }
 
   private beginScatterTease(job: SpinJob, now: number, offset: number) {
-    if (job.landed || job.scatterTease || offset <= CELL * 0.25) return;
+    if (job.landed || job.scatterTease) return;
+    if (offset <= 1) return;
     const slowVel = job.scatterSlowVel || CELL / SCATTER_TEASE_CELL_MS;
     job.scatterTease = {
       phase: "enter",
@@ -591,6 +593,10 @@ export class BoardController {
     if (!job.settled) {
       job.settled = true;
       this.onSettled?.(job.col);
+    }
+    const next = this.jobs[job.col + 1];
+    if (next?.scatterTeaseArmed) {
+      this.beginScatterTease(next, now, Math.max(0, -next.strip.y));
     }
     this.nudgeScatterTease(now);
   }
