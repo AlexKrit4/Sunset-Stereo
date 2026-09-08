@@ -55,6 +55,7 @@
     gap: 10px;
     align-items: stretch;
     justify-content: center;
+    margin-top: 16px;
     font-family: ui-sans-serif, system-ui, sans-serif;
   }
   .readout {

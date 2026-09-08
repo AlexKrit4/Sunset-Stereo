@@ -45,20 +45,8 @@ html::before {
 
 .masthead {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  gap: 18px;
-  align-items: end;
+  place-items: center;
   margin-bottom: 18px;
-}
-
-.kicker {
-  margin: 0 0 4px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  font-size: 11px;
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  color: #e0c090;
-  text-shadow: 0 1px 8px rgba(10, 6, 2, 0.85);
 }
 
 h1 {
@@ -70,38 +58,27 @@ h1 {
   text-shadow: 0 2px 16px rgba(10, 6, 2, 0.8);
 }
 
-.blurb {
-  margin: 0;
-  max-width: 42ch;
-  line-height: 1.45;
-  color: #f0dcc4;
-  text-shadow: 0 1px 10px rgba(10, 6, 2, 0.9);
-}
-
 .frame {
   position: relative;
   border: 14px solid #3d2a1a;
   outline: 3px solid #c4a574;
   outline-offset: -6px;
-  box-shadow:
-    inset 0 0 0 1px #1a120c,
-    0 18px 40px rgba(20, 10, 0, 0.45);
+  box-shadow: 0 18px 40px rgba(20, 10, 0, 0.45);
   background: transparent;
 }
 
 .banner {
-  min-height: 1.4em;
+  display: none;
   margin: 12px 0 14px;
   text-align: center;
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-size: 14px;
   color: #f0d8a0;
   text-shadow: 0 1px 8px rgba(10, 6, 2, 0.9);
-  opacity: 0;
 }
 
 .banner.show {
-  opacity: 1;
+  display: block;
 }
 
 .loading {
@@ -115,57 +92,6 @@ h1 {
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
-.paytable {
-  margin-top: 28px;
-  padding: 18px 20px 8px;
-  background: rgba(243, 230, 210, 0.94);
-  color: #2a1c12;
-  border: 1px solid #c4a574;
-}
-
-.paytable h2 {
-  margin: 0 0 8px;
-  font-size: 18px;
-}
-
-.paytable p {
-  margin: 0 0 12px;
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 13px;
-}
-
-.paytable ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 8px 16px;
-}
-
-.paytable li {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 0;
-  border-top: 1px solid rgba(42, 28, 18, 0.12);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 13px;
-}
-
-.paytable strong {
-  font-family: "Iowan Old Style", Palatino, Georgia, serif;
-  font-size: 16px;
-}
-
-footer {
-  margin-top: 22px;
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #e0c8a8;
-  text-shadow: 0 1px 8px rgba(10, 6, 2, 0.9);
-}
 
 .sr-only {
   position: absolute;
@@ -185,6 +111,6 @@ footer {
     background-attachment: scroll;
   }
   .masthead {
-    grid-template-columns: 1fr;
+    place-items: center;
   }
 }

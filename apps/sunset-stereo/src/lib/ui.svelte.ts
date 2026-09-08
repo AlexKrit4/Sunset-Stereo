@@ -22,8 +22,35 @@ export const ui = $state({
   fsTotal: 0,
   banner: "",
   rulesOpen: false,
+  bonusIntroOpen: false,
+  bonusIntroSpins: 0,
   disableSpacebar: false,
 });
+
+let bonusIntroResolve: (() => void) | null = null;
+
+export function waitForBonusStart(totalFs: number) {
+  ui.bonusIntroSpins = totalFs;
+  ui.bonusIntroOpen = true;
+  return new Promise<void>((resolve) => {
+    bonusIntroResolve = resolve;
+  });
+}
+
+export function confirmBonusStart() {
+  ui.bonusIntroOpen = false;
+  const resolve = bonusIntroResolve;
+  bonusIntroResolve = null;
+  resolve?.();
+}
+
+export function cancelBonusIntro() {
+  ui.bonusIntroOpen = false;
+  ui.bonusIntroSpins = 0;
+  const resolve = bonusIntroResolve;
+  bonusIntroResolve = null;
+  resolve?.();
+}
 
 export function showSpinWin(micro: number) {
   if (micro <= 0) {

@@ -1,7 +1,7 @@
-import { hideSpinWin, showSpinWin, ui } from "../lib/ui.svelte";
+import { hideSpinWin, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelte";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { runtime } from "./context";
-import { formatMoneyPlain, multiplierCentsToMicro } from "../rgs/money";
+import { multiplierCentsToMicro } from "../rgs/money";
 import type { BookEventHandlerMap, Position, RawSymbol } from "./typesBookEvent";
 
 let lastBoard: RawSymbol[][] = [];
@@ -56,10 +56,9 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     ui.feature = true;
     ui.fsCurrent = 0;
     ui.fsTotal = bookEvent.totalFs;
-    ui.banner = "3 suns — 10 extra plays";
-    runtime.board?.showBookScatters(lastBoard);
-    await waitForTimeout(720);
+    ui.banner = "";
     runtime.board?.clearBookVisuals();
+    await waitForBonusStart(bookEvent.totalFs);
   },
 
   freeSpinRetrigger: async (bookEvent) => {
@@ -74,7 +73,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     runtime.board?.clearBookVisuals();
     ui.fsCurrent = bookEvent.amount + 1;
     ui.fsTotal = bookEvent.total;
-    ui.banner = `Extra play ${bookEvent.amount + 1} / ${bookEvent.total}`;
+    ui.banner = "";
     await waitForTimeout(40);
   },
 
@@ -98,7 +97,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
 
   finalWin: async (bookEvent) => {
     ui.winMicro = multiplierCentsToMicro(bookEvent.amount);
-    ui.banner = bookEvent.amount ? `Paid ${formatMoneyPlain(ui.winMicro)}` : "";
+    ui.banner = "";
     await waitForTimeout(120);
   },
 };

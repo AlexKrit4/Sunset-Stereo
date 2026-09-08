@@ -1,13 +1,8 @@
 import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
 import { createSymbolView } from "./symbols";
 import { wait } from "../game/eventEmitter";
-import {
-  getReelRows,
-  getWaysTeaseSymbol,
-  pickStripItems,
-  reelMatchesWaysTease,
-} from "../math/math.js";
-import { MAX_ROWS, NUM_REELS, SCATTER_REELS } from "../math/config.js";
+import { getReelRows, pickStripItems } from "../math/math.js";
+import { MAX_ROWS, NUM_REELS } from "../math/config.js";
 import type { RawSymbol, Position } from "../game/typesBookEvent";
 import { unpadPosition, visibleNames } from "../rgs/bookView";
 
@@ -176,12 +171,6 @@ export class BoardController {
   }
 
   mount() {
-    const frame = new Graphics();
-    const { width: w, height: h } = boardMetrics();
-    frame.roundRect(0, 0, w, h, 8).fill({ color: 0x14081c, alpha: 0.12 });
-    frame.roundRect(0, 0, w, h, 8).stroke({ color: 0xc4a574, width: 2, alpha: 0.85 });
-    this.root.addChild(frame);
-
     const window = new Container();
     window.x = GAP;
     window.y = GAP;
@@ -311,7 +300,6 @@ export class BoardController {
   }
 
   private async playBonus(round: SpinRound, hooks: RoundHooks = {}) {
-    this.drawScatterTease(round.raw, COLS - 1);
     await hooks.onBonusStart?.(round);
     await wait(720);
     this.scatterOverlay.clear();
@@ -372,9 +360,7 @@ export class BoardController {
     await this.playWinSheen(cells);
   }
 
-  showBookScatters(board: RawSymbol[][]) {
-    this.drawScatterTease(visibleNames(board), COLS - 1);
-  }
+  showBookScatters(_board: RawSymbol[][]) {}
 
   clearBookVisuals() {
     this.clearHolds();
@@ -439,16 +425,7 @@ export class BoardController {
     }
 
     this.onSettled = (col) => {
-      const landed = raw.map((c) => c.slice());
-      if (pace === "base") this.drawScatterTease(landed, col);
-      if (highlights.length) {
-        this.dimNonWinners(highlights, col);
-        return;
-      }
-      if (pace === "base") {
-        const sym = getWaysTeaseSymbol(landed, col);
-        this.drawTease(landed, sym, col);
-      }
+      if (highlights.length) this.dimNonWinners(highlights, col);
     };
 
     if (!this.jobs.length) {
@@ -482,51 +459,12 @@ export class BoardController {
       const view = asView(board[pos.reel][pos.row]);
       view.y = Math.round(pos.row * CELL);
       view.eventMode = "none";
-      const ring = new Graphics();
-      ring.roundRect(3, 3, CELL - 6, CELL - 6, 8).stroke({ color: 0xf0a050, width: 3, alpha: 0.95 });
-      view.addChild(ring);
       layer.addChild(view);
     });
   }
 
   private clearHolds() {
     this.holds.forEach((layer) => layer.removeChildren());
-  }
-
-  private drawTease(board: string[][], sym: string | null, upTo: number) {
-    this.teaseOverlay.clear();
-    if (!sym || upTo < 2) return;
-    for (let r = 0; r <= upTo; r += 1) {
-      if (!reelMatchesWaysTease(board, r, sym)) continue;
-      const rows = getReelRows(r);
-      const baseY = (MAX_ROWS - rows) * CELL;
-      for (let row = 0; row < rows; row += 1) {
-        const cell = board[r][row];
-        if (cell !== "xNudge" && cell !== "wild" && cell !== sym) continue;
-        this.teaseOverlay.roundRect(r * CELL + 3, baseY + row * CELL + 3, CELL - 6, CELL - 6, 8).stroke({
-          color: 0xe8c878,
-          width: 2,
-          alpha: 0.9,
-        });
-      }
-    }
-  }
-
-  private drawScatterTease(board: string[][], upTo: number) {
-    this.scatterOverlay.clear();
-    for (let r = 0; r <= upTo; r += 1) {
-      if (!SCATTER_REELS.includes(r)) continue;
-      const rows = getReelRows(r);
-      const baseY = (MAX_ROWS - rows) * CELL;
-      for (let row = 0; row < rows; row += 1) {
-        if (board[r][row] !== "scatter") continue;
-        this.scatterOverlay.roundRect(r * CELL + 2, baseY + row * CELL + 2, CELL - 4, CELL - 4, 8).stroke({
-          color: 0xf0a050,
-          width: 3,
-          alpha: 0.95,
-        });
-      }
-    }
   }
 
   private fallOffset(job: SpinJob, fallMs: number) {

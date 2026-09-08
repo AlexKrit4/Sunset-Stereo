@@ -30,6 +30,20 @@ const ART_URLS: Record<string, string> = {
   S: sunsetUrl,
 };
 
+export const SYMBOL_PAY_ART: Record<string, string> = {
+  high1: vinylUrl,
+  high2: headphonesUrl,
+  high3: cassetteUrl,
+  high4: microphoneUrl,
+  high5: ampUrl,
+  low1: speakerUrl,
+  low2: noteUrl,
+  low3: equalizerUrl,
+  low4: palmUrl,
+  low5: cocktailUrl,
+  scatter: sunsetUrl,
+};
+
 export async function loadSymbolArt() {
   const entries = Object.entries(ART_URLS).filter(([key]) => !ART[key]);
   if (!entries.length) return;

@@ -1,7 +1,7 @@
 import { createActor, createMachine } from "xstate";
 import { playBookEvents } from "./playBook";
 import { runtime } from "./context";
-import { hideSpinWin, moneyPlain, ui } from "../lib/ui.svelte";
+import { cancelBonusIntro, hideSpinWin, ui } from "../lib/ui.svelte";
 import { createEngineHandle, fetchReplayBook, type EngineHandle, type BookState } from "../rgs/session";
 import type { Round } from "stake-engine";
 
@@ -65,7 +65,7 @@ export async function bootEngine() {
   if (engine.query.replay) {
     replayBook = await fetchReplayBook(engine.query);
     ui.ready = true;
-    ui.banner = "Replay ready";
+    ui.banner = "";
     return;
   }
 
@@ -115,6 +115,7 @@ export async function playBet() {
   ui.fsTotal = 0;
   ui.winMicro = 0;
   hideSpinWin();
+  cancelBonusIntro();
   betActor.send({ type: "PLAY" });
 
   try {
@@ -125,7 +126,7 @@ export async function playBet() {
       const ended = await engine.EndRound();
       ui.balanceMicro = ended.balance.amount;
     }
-    ui.banner = ui.winMicro ? `Paid ${moneyPlain(ui.winMicro)}` : "";
+    ui.banner = "";
     return true;
   } catch (error) {
     console.error(error);
@@ -144,10 +145,11 @@ export async function playReplay() {
   ui.winMicro = 0;
   ui.banner = "";
   hideSpinWin();
+  cancelBonusIntro();
   betActor.send({ type: "PLAY" });
   try {
     await playBookEvents(replayBook.events);
-    ui.banner = ui.winMicro ? `Replay paid ${moneyPlain(ui.winMicro)}` : "Replay complete";
+    ui.banner = "";
     return true;
   } catch (error) {
     ui.banner = errorMessage(error, "Replay failed.");
