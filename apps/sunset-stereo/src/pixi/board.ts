@@ -17,12 +17,13 @@ export const ROWS = MAX_ROWS;
 const START_STAGGER_MS = 95;
 const STOP_STAGGER_MS = 300;
 const LINEAR_MS = 900;
-const DECEL_MS = 120;
 const LINEAR_FRAC = 0.86;
 const BASE_FILLERS = 16;
 const SPIN_WINDUP_PX = 30;
 const SPIN_WINDUP_MS = 160;
 const SPIN_GRAVITY_MS = 110;
+const STOP_DISTANCE = Math.round(CELL * 1.5);
+const STOP_EASE_POWER = 5;
 const BLUR_MAX = 12;
 const NUDGE_WINDUP_MS = 100;
 const NUDGE_PUSH_MS = 340;
@@ -43,6 +44,16 @@ function easeOutQuad(t: number) {
   return 1 - (1 - x) * (1 - x);
 }
 
+function stopEase(u: number) {
+  const x = Math.min(Math.max(u, 0), 1);
+  return 1 - (1 - x) ** STOP_EASE_POWER;
+}
+
+function stopDurationMs(distance: number, speed: number) {
+  const v = Math.max(0.35, speed);
+  return Math.max(300, Math.min(540, (STOP_EASE_POWER * Math.max(12, distance)) / v));
+}
+
 type SpinJob = {
   col: number;
   strip: Container;
@@ -54,7 +65,11 @@ type SpinJob = {
   gravityMs: number;
   velocity: number;
   tDecel: number;
-  decelMs: number;
+  stopDistance: number;
+  stopping: boolean;
+  stopFrom: number;
+  stopAt: number;
+  stopMs: number;
   finals: string[];
   rows: number;
   done: boolean;
@@ -180,7 +195,8 @@ export class BoardController {
   private planSpin(waysGaps: number[], scatterGaps: number[]) {
     const s0 = (MAX_ROWS + BASE_FILLERS) * CELL;
     const velocity = (LINEAR_FRAC * s0) / LINEAR_MS;
-    const decelDistance = Math.max(0, s0 - velocity * LINEAR_MS);
+    const stopMs = stopDurationMs(STOP_DISTANCE, velocity);
+    const gravityLead = 0.5 * velocity * SPIN_GRAVITY_MS;
     const plans: Array<{ delay: number; tDecel: number; fillers: number; velocity: number }> = [];
     let prevStop = 0;
 
@@ -191,13 +207,20 @@ export class BoardController {
       const rows = getReelRows(col);
       const stopStagger = scatterGap > 0 ? 0 : STOP_STAGGER_MS;
       const minStop =
-        col === 0 ? delay + LINEAR_MS + DECEL_MS : prevStop + stopStagger + waysGap + scatterGap;
-      let tDecel = Math.max(80, minStop - delay - DECEL_MS);
-      let needed = Math.ceil((velocity * tDecel + decelDistance) / CELL) - rows;
+        col === 0
+          ? delay + SPIN_WINDUP_MS + LINEAR_MS + stopMs
+          : prevStop + stopStagger + waysGap + scatterGap;
+      let tDecel = Math.max(80, minStop - delay - SPIN_WINDUP_MS - stopMs);
+      let rest = velocity * tDecel + STOP_DISTANCE - SPIN_WINDUP_PX - gravityLead;
+      rest = Math.max((rows + 10) * CELL, rest);
+      let needed = Math.ceil(rest / CELL) - rows;
       needed = Math.max(10, needed);
-      const startOffset = (rows + needed) * CELL;
-      tDecel = Math.max(tDecel, (startOffset - decelDistance) / velocity);
-      prevStop = delay + tDecel + DECEL_MS;
+      const restOffset = (rows + needed) * CELL;
+      tDecel = Math.max(
+        tDecel,
+        (restOffset - STOP_DISTANCE + SPIN_WINDUP_PX + gravityLead) / velocity,
+      );
+      prevStop = delay + SPIN_WINDUP_MS + tDecel + stopMs;
       plans.push({ delay, tDecel, fillers: needed, velocity });
     }
     return plans;
@@ -257,7 +280,11 @@ export class BoardController {
         gravityMs: SPIN_GRAVITY_MS,
         velocity: plan.velocity,
         tDecel: plan.tDecel,
-        decelMs: DECEL_MS,
+        stopDistance: STOP_DISTANCE,
+        stopping: false,
+        stopFrom: 0,
+        stopAt: 0,
+        stopMs: stopDurationMs(STOP_DISTANCE, plan.velocity),
         finals,
         rows,
         done: false,
@@ -352,29 +379,37 @@ export class BoardController {
         const tossed = job.windupPx * easeOutQuad(elapsed / job.windupMs);
         offset = job.restOffset + tossed;
         job.blur.strengthY = 0;
+      } else if (job.stopping) {
+        const u = Math.min((now - job.stopAt) / job.stopMs, 1);
+        const remain = 1 - stopEase(u);
+        offset = job.stopFrom * remain;
+        const speed = (STOP_EASE_POWER * job.stopFrom * remain ** (STOP_EASE_POWER - 1)) / job.stopMs;
+        job.blur.strengthY = BLUR_MAX * Math.min(1, speed / job.velocity);
+        if (u >= 1) {
+          this.landReel(job);
+          continue;
+        }
       } else {
         const fallMs = elapsed - job.windupMs;
-        if (fallMs < job.tDecel) {
-          offset = this.fallOffset(job, fallMs);
-          job.blur.strengthY = BLUR_MAX * Math.min(1, this.fallSpeed(job, fallMs) / job.velocity);
-        } else {
-          const u = Math.min((fallMs - job.tDecel) / job.decelMs, 1);
-          const offAtDecel = this.fallOffset(job, job.tDecel);
-          offset = offAtDecel * (1 - u);
-          job.blur.strengthY = BLUR_MAX * (1 - u);
-          if (u >= 1) {
-            this.landReel(job);
-            continue;
-          }
+        offset = this.fallOffset(job, fallMs);
+        const speed = this.fallSpeed(job, fallMs);
+        job.blur.strengthY = BLUR_MAX * Math.min(1, speed / job.velocity);
+        if (fallMs > job.gravityMs && (offset <= job.stopDistance || fallMs >= job.tDecel)) {
+          job.stopping = true;
+          job.stopFrom = Math.max(offset, 1);
+          job.stopAt = now;
+          job.stopMs = stopDurationMs(job.stopFrom, speed);
+          offset = job.stopFrom;
         }
       }
-      job.strip.y = -Math.round(offset);
+      job.strip.y = -offset;
     }
   }
 
   private landReel(job: SpinJob) {
     job.done = true;
     job.blur.strengthY = 0;
+    job.strip.y = 0;
     job.strip.filters = [];
     this.landStatic(job.col, job.finals);
     if (!job.settled) {
