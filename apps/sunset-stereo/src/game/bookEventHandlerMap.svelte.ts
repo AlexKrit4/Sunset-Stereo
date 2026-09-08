@@ -56,7 +56,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   holdRespin: async (bookEvent) => {
     pendingHolds = bookEvent.positions;
     runtime.board?.lockBonusWinners(bookEvent.positions);
-    await waitForTimeout(180);
+    await waitForTimeout(260);
   },
 
   winInfo: async (bookEvent) => {
