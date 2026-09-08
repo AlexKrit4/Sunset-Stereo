@@ -129,7 +129,7 @@ export class BoardController {
       const blur = new BlurFilter({ strength: 0, quality: 3 });
       blur.strengthX = 0;
       blur.strengthY = 0;
-      const seed = Array.from({ length: rows }, (_, row) => ["low4", "low5", "high3", "low1"][(col + row) % 4]);
+      const seed = Array.from({ length: rows }, (_, row) => ["low4", "low5", "high3", "high1"][(col + row) % 4]);
       this.paintStrip(strip, seed);
       host.addChild(strip);
       window.addChild(host);

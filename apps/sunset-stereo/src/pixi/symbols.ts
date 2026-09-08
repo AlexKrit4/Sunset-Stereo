@@ -1,15 +1,42 @@
 import { Assets, Container, Graphics, Sprite, Texture, Text } from "pixi.js";
 import type { RawSymbol } from "../game/typesBookEvent";
+import vinylUrl from "../assets/symbols/vinyl.jpg";
+import headphonesUrl from "../assets/symbols/headphones.jpg";
+import cassetteUrl from "../assets/symbols/cassette.jpg";
+import microphoneUrl from "../assets/symbols/microphone.jpg";
+import ampUrl from "../assets/symbols/amp.jpg";
+import speakerUrl from "../assets/symbols/speaker.jpg";
+import noteUrl from "../assets/symbols/note.jpg";
+import equalizerUrl from "../assets/symbols/equalizer.jpg";
 import palmUrl from "../assets/symbols/palm.jpg";
 import cocktailUrl from "../assets/symbols/cocktail.jpg";
+import mixerUrl from "../assets/symbols/mixer.jpg";
+import sunsetUrl from "../assets/symbols/sunset.jpg";
 
 const ART: Partial<Record<string, Texture>> = {};
 
+const ART_URLS: Record<string, string> = {
+  H1: vinylUrl,
+  H2: headphonesUrl,
+  H3: cassetteUrl,
+  H4: microphoneUrl,
+  H5: ampUrl,
+  L1: speakerUrl,
+  L2: noteUrl,
+  L3: equalizerUrl,
+  L4: palmUrl,
+  L5: cocktailUrl,
+  W: mixerUrl,
+  S: sunsetUrl,
+};
+
 export async function loadSymbolArt() {
-  if (ART.L4 && ART.L5) return;
-  const [palm, cocktail] = await Promise.all([Assets.load(palmUrl), Assets.load(cocktailUrl)]);
-  ART.L4 = palm as Texture;
-  ART.L5 = cocktail as Texture;
+  const entries = Object.entries(ART_URLS).filter(([key]) => !ART[key]);
+  if (!entries.length) return;
+  const loaded = await Promise.all(entries.map(([, url]) => Assets.load(url)));
+  entries.forEach(([key], index) => {
+    ART[key] = loaded[index] as Texture;
+  });
 }
 
 const ALIAS: Record<string, string> = {
