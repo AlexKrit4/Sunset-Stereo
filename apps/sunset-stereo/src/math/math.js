@@ -7,9 +7,6 @@ import {
   REEL_ROWS,
   SCATTER_REEL_LAND_CHANCE,
   SCATTER_REELS,
-  SCATTER_TEASE_ENTER_MS,
-  SCATTER_TEASE_SLOW_MS,
-  SCATTER_TEASE_STOP_MS,
   SCATTER_TEASE_TOTAL_MS,
   SCATTER_WEIGHT,
   SYMBOLS,
@@ -251,10 +248,6 @@ function buildWaysTeaseGaps(b) {
   return gaps;
 }
 
-function twoScatterTeaseMs() {
-  return SCATTER_TEASE_ENTER_MS + SCATTER_TEASE_SLOW_MS + SCATTER_TEASE_STOP_MS;
-}
-
 function buildScatterTeaseGaps(b) {
   const gaps = Array(NUM_REELS).fill(0);
   const hit = SCATTER_REELS.filter((r) => reelHasScatter(b, r)).sort((a, c) => a - c);
@@ -270,10 +263,7 @@ function buildScatterTeaseGaps(b) {
     }
   };
   if (hit.length >= 3) addGap(hit[1] + 1, hit[hit.length - 1]);
-  else if (hit.length === 2) {
-    const next = Math.max(...hit) + 1;
-    if (next < NUM_REELS) gaps[next] += twoScatterTeaseMs();
-  }
+  else if (hit.length === 2) addGap(Math.max(...hit) + 1, SCATTER_REELS[SCATTER_REELS.length - 1]);
   return { gaps, hit };
 }
 
