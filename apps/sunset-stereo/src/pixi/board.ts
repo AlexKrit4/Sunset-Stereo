@@ -14,6 +14,13 @@ export const GAP = 5;
 export const COLS = NUM_REELS;
 export const ROWS = MAX_ROWS;
 
+function boardMetrics() {
+  return {
+    width: COLS * CELL + GAP * 2,
+    height: MAX_ROWS * CELL + GAP * 2,
+  };
+}
+
 const START_STAGGER_MS = 95;
 const STOP_STAGGER_MS = 300;
 const LINEAR_MS = 900;
@@ -135,8 +142,7 @@ export class BoardController {
 
   mount() {
     const frame = new Graphics();
-    const w = COLS * CELL + (COLS + 1) * GAP;
-    const h = MAX_ROWS * CELL + 2 * GAP;
+    const { width: w, height: h } = boardMetrics();
     frame.roundRect(0, 0, w, h, 8).fill({ color: 0x14081c, alpha: 0.12 });
     frame.roundRect(0, 0, w, h, 8).stroke({ color: 0xc4a574, width: 2, alpha: 0.85 });
     this.root.addChild(frame);
@@ -666,8 +672,7 @@ export class BoardController {
   }
 
   layout(viewWidth: number, viewHeight = 0) {
-    const w = COLS * CELL + (COLS + 1) * GAP;
-    const h = MAX_ROWS * CELL + 2 * GAP;
+    const { width: w, height: h } = boardMetrics();
     const padX = 6;
     const padTop = 22;
     const padBottom = 6;
@@ -693,8 +698,5 @@ export function createBoard(app: Application) {
 }
 
 export function boardSize() {
-  return {
-    width: COLS * CELL + (COLS + 1) * GAP,
-    height: MAX_ROWS * CELL + 2 * GAP,
-  };
+  return boardMetrics();
 }
