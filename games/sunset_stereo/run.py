@@ -108,6 +108,9 @@ if __name__ == "__main__":
     if sim_mode == "bonus":
         stats = weight_bonus_lookup(config.publish_path)
         print("weighted bonus LUT", stats)
+        from copy_publish import verify_bonus_payouts
+
+        verify_bonus_payouts(config.publish_path)
 
     if run_conditions["run_optimization"]:
         OptimizationExecution().run_all_modes(config, target_modes, rust_threads)

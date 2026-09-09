@@ -237,10 +237,11 @@ def lut_stats(rows: list[tuple[int, int, int]]) -> dict[str, float]:
 
 
 def write_lut(path: str, rows: list[tuple[int, int, int]]) -> None:
-    with open(path, "w", encoding="utf-8", newline="") as handle:
-        writer = csv.writer(handle)
+    # Stake Engine hashes LUT payouts against books. csv.writer's default
+    # \r\n terminator makes the third column parse as a mismatch.
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
         for book_id, weight, cents in rows:
-            writer.writerow([book_id, weight, cents])
+            handle.write(f"{int(book_id)},{int(weight)},{int(cents)}\n")
 
 
 def weight_bonus_lookup(publish_dir: str) -> dict[str, float]:

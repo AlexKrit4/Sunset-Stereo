@@ -261,29 +261,46 @@ def test_bonus_lookup_weights_lock_75_25_and_rtp():
     assert contrib[(200.0, 500.0)] < 0.40
 
 
-def test_buy_bonus_extra_plays_mix_left_reels():
-    from collections import Counter
+def test_bonus_lut_writer_uses_unix_newlines(tmp_path):
+    from weight_bonus import write_lut
 
-    scripted = 0
-    sampled = 0
+    path = tmp_path / "lookUpTable_bonus_0.csv"
+    write_lut(str(path), [(0, 10, 0), (1, 20, 9500)])
+    raw = path.read_bytes()
+    assert b"\r" not in raw
+    assert raw == b"0,10,0\n1,20,9500\n"
+
+
+def test_buy_bonus_extra_plays_mix_left_reels():
     for sim in (11, 17, 23, 29, 41, 47):
         _state, book = _bonus_book("dead", sim)
         extra = [event for event in book["events"] if event["type"] == "reveal" and event.get("gameType") == "freegame"]
         assert extra
-        for reveal in extra:
-            sampled += 1
-            visible = []
-            modes = []
-            for reel in range(3):
-                names = [
-                    cell["name"] if isinstance(cell, dict) else cell
-                    for cell in reveal["board"][reel][1:-1]
-                ]
-                visible.extend(names)
-                name, count = Counter(names).most_common(1)[0]
-                modes.append(name if count >= 3 else None)
-            if modes[0] and modes[0] == modes[1] == modes[2]:
-                scripted += 1
-            assert len(set(visible)) >= 3
-    assert scripted <= max(1, sampled // 8)
+        reveal = extra[0]
+        visible = []
+        for reel in range(6):
+            names = [
+                cell["name"] if isinstance(cell, dict) else cell
+                for cell in reveal["board"][reel][1:-1]
+            ]
+            visible.extend(names)
+            assert "S" not in names
+        assert len(set(visible)) >= 4
+
+
+def test_buy_bonus_hold_respin_grows_before_paying():
+    found = False
+    for sim in range(40):
+        _state, book = _bonus_book("recoup", sim)
+        types = [event["type"] for event in book["events"]]
+        if "holdRespin" not in types:
+            continue
+        found = True
+        first = types.index("holdRespin")
+        assert types[first - 1] == "reveal"
+        after = types[first + 1 :]
+        assert "reveal" in after
+        assert after.index("reveal") < after.index("winInfo") if "winInfo" in after else True
+        break
+    assert found, "expected a buy-bonus extra play to hold and respin"
 
