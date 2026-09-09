@@ -174,6 +174,7 @@ export class BoardController {
   private sheenResolve: (() => void) | null = null;
   private bonusDim = false;
   private brightCells = new Set<string>();
+  private landingBright = new Set<string>();
   private holdTicks = new Set<() => void>();
 
   constructor(app: Application) {
@@ -243,8 +244,7 @@ export class BoardController {
     });
     strip.y = 0;
     strip.filters = [];
-    if (!this.bonusDim) strip.alpha = 1;
-    else this.applyBonusDim();
+    strip.alpha = this.bonusDim ? WIN_DIM_ALPHA : 1;
   }
 
   private landStatic(col: number, names: string[], mults?: number[]) {
@@ -351,11 +351,14 @@ export class BoardController {
       pace: "base" | "bonus" | "respin";
       anticipation?: number[];
       holds?: Position[];
+      upcomingWins?: Position[];
     },
   ) {
     const names = visibleNames(board);
     const extra = Array.from({ length: COLS }, (_, col) => (opts.anticipation?.[col] || 0) * 480);
     const holds = (opts.holds ?? []).map(unpadPosition);
+    const upcomingWins = (opts.upcomingWins ?? []).map(unpadPosition);
+    this.landingBright = new Set(upcomingWins.map((pos) => `${pos.reel}:${pos.row}`));
     if (this.bonusDim) this.clearSheens();
     else this.clearWins();
     await this.spinTo(names, [], extra, [], opts.pace, holds);
@@ -371,6 +374,7 @@ export class BoardController {
     const animateNew = this.bonusDim;
     this.bonusDim = true;
     this.brightCells = new Set(cells.map((pos) => `${pos.reel}:${pos.row}`));
+    this.landingBright.clear();
     if (this.visible.length) this.syncHolds(this.visible, cells, animateNew);
     this.applyBonusDim();
   }
@@ -383,20 +387,12 @@ export class BoardController {
   }
 
   async presentNewBonusWins(fresh: Position[], allWins: Position[], firstCombo: boolean) {
-    if (!fresh.length) {
-      this.lockBonusWinners(allWins);
-      return;
-    }
-    if (firstCombo) {
-      await wait(80);
+    if (fresh.length) {
+      await wait(firstCombo ? 80 : 50);
       await this.flashBonusWins(fresh);
-      this.lockBonusWinners(allWins);
-      await wait(140);
-      return;
     }
     this.lockBonusWinners(allWins);
-    await this.waitForHoldPops();
-    await this.flashBonusWins(fresh);
+    if (fresh.length) await wait(firstCombo ? 140 : 80);
   }
 
   async showBookWins(positions: Position[]) {
@@ -417,6 +413,7 @@ export class BoardController {
   clearBookVisuals() {
     this.bonusDim = false;
     this.brightCells.clear();
+    this.landingBright.clear();
     this.clearHolds();
     this.clearWins();
     this.syncBonusDimFlag();
@@ -553,20 +550,6 @@ export class BoardController {
       this.animateHoldIn(view);
     }
     return view;
-  }
-
-  private waitForHoldPops() {
-    if (!this.holdTicks.size) return Promise.resolve();
-    return new Promise<void>((resolve) => {
-      const started = performance.now();
-      const tick = () => {
-        if (!this.holdTicks.size || performance.now() - started > HOLD_POP_MS + 80) {
-          this.app.ticker.remove(tick);
-          resolve();
-        }
-      };
-      this.app.ticker.add(tick);
-    });
   }
 
   private animateHoldIn(view: Container) {
@@ -801,11 +784,21 @@ export class BoardController {
 
   private applyBonusDim() {
     if (!this.bonusDim) return;
+    const bright = new Set([...this.brightCells, ...this.landingBright]);
+    const spinning = new Set(this.jobs.filter((job) => !job.landed).map((job) => job.col));
     for (let reel = 0; reel < COLS; reel += 1) {
       const strip = this.reels[reel];
-      if (strip) strip.alpha = WIN_DIM_ALPHA;
       const hold = this.holds[reel];
       if (hold) hold.alpha = 1;
+      if (!strip) continue;
+      if (spinning.has(reel)) {
+        strip.alpha = WIN_DIM_ALPHA;
+        continue;
+      }
+      strip.alpha = 1;
+      this.cells[reel]?.forEach((cell, row) => {
+        cell.alpha = bright.has(`${reel}:${row}`) ? 1 : WIN_DIM_ALPHA;
+      });
     }
     this.syncBonusDimFlag();
   }
@@ -817,6 +810,8 @@ export class BoardController {
   }
 
   private sheenCell(pos: { reel: number; row: number }) {
+    const key = `${pos.reel}:${pos.row}`;
+    if (this.landingBright.has(key)) return this.cells[pos.reel]?.[pos.row];
     if (this.bonusDim) {
       const layer = this.holds[pos.reel];
       const held = layer?.children.find((child) => child.label === this.holdLabel(pos.reel, pos.row));

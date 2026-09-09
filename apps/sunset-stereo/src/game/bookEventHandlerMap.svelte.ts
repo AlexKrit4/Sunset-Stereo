@@ -53,17 +53,18 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       board.clearBookVisuals();
     }
     const upcoming = bookEvent.gameType === "freegame" ? nextBonusWin(context.bookEvents, bookEvent) : null;
+    const already = new Set(pendingHolds.map(cellKey));
+    const fresh = upcoming?.positions.filter((pos) => !already.has(cellKey(pos))) ?? [];
     await board.playBookReveal(bookEvent.board, {
       pace,
       anticipation: bookEvent.anticipation,
       holds: pendingHolds,
+      upcomingWins: fresh,
     });
     if (pendingHolds.length && !upcoming?.beforeRespin) {
       board.applyBookHolds(bookEvent.board, pendingHolds);
     }
     if (upcoming?.beforeRespin) {
-      const already = new Set(pendingHolds.map(cellKey));
-      const fresh = upcoming.positions.filter((pos) => !already.has(cellKey(pos)));
       await board.presentNewBonusWins(fresh, upcoming.positions, pendingHolds.length === 0);
     }
   },
