@@ -75,7 +75,9 @@ def assign_weights(rows: list[tuple[int, int, int]]) -> list[tuple[int, int, int
     recoup_payouts = [cents / 100.0 for _, cents in buckets["recoup"]]
     recoup_rel = _barbell_to_mean(recoup_payouts, recoup_target)
 
-    scale = 10_000_000
+    # Large scale so the weight-1 floor on thousands of recoup books
+    # cannot pull RTP away from the 95% target.
+    scale = 1_000_000_000
     weights: dict[int, int] = {}
     dead_each = max(1, int(round((DEAD_MASS / len(buckets["dead"])) * scale)))
     for book_id, _ in buckets["dead"]:
@@ -101,7 +103,7 @@ def _barbell_to_mean(payouts: list[float], target: float) -> list[float]:
     weights = [1.0] * n
     below = [i for i, payout in enumerate(payouts) if payout <= target]
     above = [i for i, payout in enumerate(payouts) if payout >= target]
-    extra = 1_000_000.0
+    extra = 1_000_000_000_000.0
     if not below and not above:
         return weights
     if not below:
