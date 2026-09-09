@@ -13,6 +13,44 @@ BUY_BONUS_DEAD = 37_500
 BUY_BONUS_RECOUP = 12_490
 BUY_BONUS_WINCAP = 10
 
+# Extra-play alphabet. Independent cell draws, not per-reel scripted strips.
+BONUS_PAYING = ["H1", "H2", "H3", "H4", "H5", "L1", "L2", "L3", "L4", "L5"]
+
+# Book-count mix for the 50k pack. Weights (RTP) are applied later.
+# Dead 75% of books, recoup 25%. Bands are in 1× stake units.
+DEAD_BANDS = (
+    (0.0, 0.1, 220),
+    (0.1, 20.0, 280),
+    (20.0, 50.0, 280),
+    (50.0, 95.0, 220),
+)
+RECOUP_BANDS = (
+    (95.0, 200.0, 480),
+    (200.0, 500.0, 200),
+    (500.0, 1000.0, 140),
+    (1000.0, 2000.0, 90),
+    (2000.0, 5000.0, 55),
+    (5000.0, 10000.0, 25),
+    (10000.0, 15000.0, 10),
+)
+
+
+def bonus_payout_band(criteria: str, sim: int) -> tuple[float, float] | None:
+    """Target payout window for one buy-bonus book, in 1× units."""
+    if criteria == "wincap":
+        return (15000.0, 15000.0)
+    slot = (int(sim) * 1103515245 + 12345) % 1000
+    table = DEAD_BANDS if criteria == "dead" else RECOUP_BANDS if criteria == "recoup" else None
+    if table is None:
+        return None
+    acc = 0
+    for lo, hi, weight in table:
+        acc += weight
+        if slot < acc:
+            return (lo, hi)
+    return (table[-1][0], table[-1][1])
+
+
 # Matches apps/sunset-stereo/src/math/config.js PAYOUTS (H1=high1 … L5=low5).
 WAYS_PAYTABLE = {
     (6, "H1"): 20,
@@ -147,7 +185,7 @@ class GameConfig(Config):
         bonus_dead_condition = {
             "reel_weights": {
                 self.basegame_type: {"BR0": 1},
-                self.freegame_type: {"FR_DEAD": 1},
+                self.freegame_type: {"FR0": 1},
             },
             "scatter_triggers": {3: 1},
             "force_wincap": False,
@@ -156,7 +194,7 @@ class GameConfig(Config):
         bonus_recoup_condition = {
             "reel_weights": {
                 self.basegame_type: {"BR0": 1},
-                self.freegame_type: {"FR_RECOUP": 1},
+                self.freegame_type: {"FR0": 1},
             },
             "scatter_triggers": {3: 1},
             "force_wincap": False,

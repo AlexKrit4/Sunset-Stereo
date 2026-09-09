@@ -1,5 +1,4 @@
 from game_override import GameStateOverride
-from src.events.events import reveal_event
 import random
 
 
@@ -13,17 +12,14 @@ class GameState(GameStateOverride):
             if self.repeat_count and self.repeat_count % 40 == 0:
                 random.seed((simulation_seed or sim) + 1 + self.repeat_count * 1_000_003)
             self.reset_book()
-            self.draw_board(emit_event=False)
-            if self.criteria == "dead":
-                self.dampen_dead_trigger_board()
-            reveal_event(self)
+            self.draw_board()
             self.evaluate_ways_board()
             self.win_manager.update_gametype_wins(self.gametype)
             if self.check_fs_condition():
                 self.run_freespin_from_base()
             self.evaluate_finalwin()
             self.check_repeat()
-            if self.repeat and self.repeat_count >= 800:
+            if self.repeat and self.repeat_count >= 2500:
                 raise RuntimeError(
                     f"spin {sim} criteria={self.criteria} stuck at win={self.final_win} after {self.repeat_count} retries"
                 )

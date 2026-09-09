@@ -237,14 +237,14 @@ def test_buy_bonus_wincap_hits_the_15000x_ceiling():
 
 
 def test_bonus_lookup_weights_lock_75_25_and_rtp():
-    from weight_bonus import assign_weights, lut_stats
+    from weight_bonus import assign_weights, lut_stats, rtp_by_range
 
     rows = []
     book_id = 0
-    for cents in [0, 10, 4000, 8000, 9400] * 8:
+    for cents in [0, 20, 80, 300, 700, 1400, 3500, 8000, 9400] * 8:
         rows.append((book_id, 1, cents))
         book_id += 1
-    for cents in [9500, 12000, 40000, 180000, 900000] * 3:
+    for cents in [9600, 15000, 35000, 80000, 160000, 350000, 800000, 1_200_000] * 5:
         rows.append((book_id, 1, cents))
         book_id += 1
     rows.append((book_id, 1, 1_500_000))
@@ -255,4 +255,35 @@ def test_bonus_lookup_weights_lock_75_25_and_rtp():
     assert 0.94 <= stats["rtp"] <= 0.96
     assert stats["wincap_mass"] < 0.001
     assert stats["hit_rate"] >= 1 / 50
+    assert stats["peak_range_rtp"] < 0.40
+    assert stats["recoup_ranges_used"] >= 4
+    contrib = rtp_by_range(weighted)
+    assert contrib[(200.0, 500.0)] < 0.40
+
+
+def test_buy_bonus_extra_plays_mix_left_reels():
+    from collections import Counter
+
+    scripted = 0
+    sampled = 0
+    for sim in (11, 17, 23, 29, 41, 47):
+        _state, book = _bonus_book("dead", sim)
+        extra = [event for event in book["events"] if event["type"] == "reveal" and event.get("gameType") == "freegame"]
+        assert extra
+        for reveal in extra:
+            sampled += 1
+            visible = []
+            modes = []
+            for reel in range(3):
+                names = [
+                    cell["name"] if isinstance(cell, dict) else cell
+                    for cell in reveal["board"][reel][1:-1]
+                ]
+                visible.extend(names)
+                name, count = Counter(names).most_common(1)[0]
+                modes.append(name if count >= 3 else None)
+            if modes[0] and modes[0] == modes[1] == modes[2]:
+                scripted += 1
+            assert len(set(visible)) >= 3
+    assert scripted <= max(1, sampled // 8)
 

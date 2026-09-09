@@ -35,24 +35,17 @@ FS_WEIGHTS = [
     {"H1": 10, "H2": 12, "H3": 13, "H4": 13, "H5": 13, "L1": 14, "L2": 14, "L3": 14, "L4": 14, "L5": 15, "S": 0},
 ]
 
-# Buy-bonus extra-play strips. Same 6×4 ways, no scatters. Bias only the
-# fill mix so dead/recoup/wincap quotas finish; reelstops stay random.
+# Buy-bonus extra-play strips. Same mix on every reel so the first three
+# columns are not a scripted L1/L3/L5 pattern.
 def _uniform(weights: dict[str, int]) -> list[dict[str, int]]:
     return [dict(weights) for _ in range(6)]
 
 
-# Adjacent reels barely share symbols, so 4+ ways (which explode on a 4-row
-# grid) almost never land. Dead books stay under the 95× buy without cloning boards.
-DEAD_WEIGHTS = [
-    {"L1": 48, "L2": 8, "H5": 3, "H4": 2, "H3": 1, "H2": 1, "H1": 1, "L3": 2, "L4": 2, "L5": 2, "S": 0},
-    {"L3": 48, "L4": 8, "H5": 3, "H4": 2, "H3": 1, "H2": 1, "H1": 1, "L1": 2, "L2": 2, "L5": 2, "S": 0},
-    {"L5": 48, "H5": 8, "H4": 4, "H3": 2, "H2": 1, "H1": 1, "L1": 2, "L2": 2, "L3": 2, "L4": 2, "S": 0},
-    {"H4": 40, "L2": 12, "H3": 6, "H2": 2, "H1": 1, "H5": 3, "L1": 2, "L3": 4, "L4": 4, "L5": 4, "S": 0},
-    {"H3": 40, "L1": 12, "H2": 6, "H1": 2, "H5": 3, "H4": 3, "L2": 4, "L3": 4, "L4": 4, "L5": 4, "S": 0},
-    {"H2": 36, "L4": 14, "H1": 6, "H5": 4, "H4": 4, "H3": 4, "L1": 4, "L2": 4, "L3": 4, "L5": 4, "S": 0},
-]
+DEAD_WEIGHTS = _uniform(
+    {"H1": 10, "H2": 12, "H3": 13, "H4": 13, "H5": 13, "L1": 14, "L2": 14, "L3": 14, "L4": 14, "L5": 15, "S": 0}
+)
 RECOUP_WEIGHTS = _uniform(
-    {"H1": 22, "H2": 18, "H3": 14, "H4": 12, "H5": 10, "L1": 8, "L2": 7, "L3": 6, "L4": 5, "L5": 4, "S": 0}
+    {"H1": 12, "H2": 12, "H3": 13, "H4": 13, "H5": 13, "L1": 13, "L2": 13, "L3": 13, "L4": 13, "L5": 13, "S": 0}
 )
 WCAP_WEIGHTS = _uniform(
     {"H1": 48, "H2": 22, "H3": 10, "H4": 6, "H5": 4, "L1": 3, "L2": 3, "L3": 2, "L4": 1, "L5": 1, "S": 0}
