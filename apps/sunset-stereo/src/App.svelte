@@ -4,7 +4,8 @@
   import Hud from "./components/Hud.svelte";
   import Rules from "./components/Rules.svelte";
   import BonusIntro from "./components/BonusIntro.svelte";
-  import { bootEngine, playBet } from "./game/betMachine.svelte";
+  import BuyMenu from "./components/BuyMenu.svelte";
+  import { bootEngine, playBet, playBuyBonus } from "./game/betMachine.svelte";
   import { changeBet, confirmBonusStart, ui } from "./lib/ui.svelte";
   import { bindMusicUnlock, bootMusic, musicBedFromUi, setMusicBed, unlockMusic } from "./lib/music";
 
@@ -25,7 +26,12 @@
       ui.ready = true;
     });
     const onKey = (event: KeyboardEvent) => {
-      if (event.code !== "Space" || ui.disableSpacebar || ui.rulesOpen) return;
+      if (event.code === "Escape" && ui.buyMenuOpen) {
+        event.preventDefault();
+        ui.buyMenuOpen = false;
+        return;
+      }
+      if (event.code !== "Space" || ui.disableSpacebar || ui.rulesOpen || ui.buyMenuOpen) return;
       event.preventDefault();
       unlockMusic();
       if (ui.bonusIntroOpen) {
@@ -64,5 +70,6 @@
   <p id="mixValue" class="sr-only">1×</p>
 
   <Hud onSpin={() => spin()} onBet={changeBet} />
+  <BuyMenu onBuy={() => playBuyBonus()} />
   <Rules />
 </div>

@@ -35,6 +35,22 @@ FS_WEIGHTS = [
     {"H1": 10, "H2": 12, "H3": 13, "H4": 13, "H5": 13, "L1": 14, "L2": 14, "L3": 14, "L4": 14, "L5": 15, "S": 0},
 ]
 
+# Buy-bonus extra-play strips. Same 6×4 ways, no scatters. Bias only the
+# fill mix so dead/recoup/wincap quotas finish; reelstops stay random.
+def _uniform(weights: dict[str, int]) -> list[dict[str, int]]:
+    return [dict(weights) for _ in range(6)]
+
+
+DEAD_WEIGHTS = _uniform(
+    {"H1": 2, "H2": 3, "H3": 5, "H4": 6, "H5": 7, "L1": 12, "L2": 14, "L3": 16, "L4": 18, "L5": 22, "S": 0}
+)
+RECOUP_WEIGHTS = _uniform(
+    {"H1": 22, "H2": 18, "H3": 14, "H4": 12, "H5": 10, "L1": 8, "L2": 7, "L3": 6, "L4": 5, "L5": 4, "S": 0}
+)
+WCAP_WEIGHTS = _uniform(
+    {"H1": 48, "H2": 22, "H3": 10, "H4": 6, "H5": 4, "L1": 3, "L2": 3, "L3": 2, "L4": 1, "L5": 1, "S": 0}
+)
+
 
 def _pick(weights: dict[str, int], rng: random.Random) -> str:
     symbols, values = zip(*weights.items())
@@ -95,14 +111,20 @@ def write_csv(name: str, strips: list[list[str]]) -> None:
         print(f"  reel {idx}: {dict(count)}")
 
 
-def main() -> None:
+def write_bonus_strips() -> None:
+    """Extra-play strips for the 95× 3-scatter buy. Does not touch BR0/FR0."""
     os.makedirs(REELS_DIR, exist_ok=True)
-    rng = random.Random(19890707)
-    strips = [build_strip(w, 196, rng) for w in BASE_WEIGHTS]
-    write_csv("BR0.csv", strips)
-    fs_rng = random.Random(19890708)
-    fs_strips = [build_strip(w, 196, fs_rng) for w in FS_WEIGHTS]
-    write_csv("FR0.csv", fs_strips)
+    write_csv("FR_DEAD.csv", [build_strip(w, 196, random.Random(19890711 + i)) for i, w in enumerate(DEAD_WEIGHTS)])
+    write_csv("FR_RECOUP.csv", [build_strip(w, 196, random.Random(19890721 + i)) for i, w in enumerate(RECOUP_WEIGHTS)])
+    write_csv("FR_WCAP.csv", [build_strip(w, 196, random.Random(19890731 + i)) for i, w in enumerate(WCAP_WEIGHTS)])
+
+
+def main() -> None:
+    """Rewrite FR_DEAD / FR_RECOUP / FR_WCAP only. BR0 and FR0 are frozen
+    to the published 1,000,000-book base pack and must not be regenerated.
+    """
+    os.makedirs(REELS_DIR, exist_ok=True)
+    write_bonus_strips()
 
 
 if __name__ == "__main__":

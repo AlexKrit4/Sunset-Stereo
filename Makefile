@@ -40,6 +40,10 @@ run GAME:
 		echo "Compression is enabled, skipping formatting."; \
 	fi
 
+bonus:
+	SUNSET_SIM_MODE=bonus $(PYTHON) games/sunset_stereo/run.py
+	$(PYTHON) games/sunset_stereo/copy_publish.py
+
 test:
 	cd $(CURDIR)
 	$(VENV_PY) -m pytest tests/

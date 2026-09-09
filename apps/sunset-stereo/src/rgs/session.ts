@@ -22,7 +22,7 @@ const DEFAULT_FLAGS = {
   disabledAutoplay: false,
   disabledSlamstop: false,
   disabledSpacebar: false,
-  disabledBuyFeature: true,
+  disabledBuyFeature: false,
   displayNetPosition: false,
   displayRTP: true,
   displaySessionTimer: false,
@@ -46,10 +46,14 @@ function asBook(state: unknown, fallbackMult = 0): BookState {
 }
 
 function createMockClient() {
-  const books = (demo as { books: BookState[] }).books;
+  const demoPack = demo as { books: BookState[]; bonusBooks?: BookState[] };
+  const books = demoPack.books;
+  const bonusBooks = demoPack.bonusBooks?.length ? demoPack.bonusBooks : books.filter((book) => book.criteria === "freegame");
+  const MODE_COST: Record<string, number> = { base: 1, bonus: 95 };
   let balance = 1000 * API_MULTIPLIER;
   let active: Round | null = null;
   let nextIndex = 0;
+  let nextBonus = 0;
 
   return {
     kind: "mock" as const,
@@ -69,10 +73,15 @@ function createMockClient() {
     },
     async Play({ amount, mode }: { amount: number; mode: string }): Promise<PlayResponse> {
       if (active?.active) throw new Error("A round is already active.");
-      if (amount > balance) throw new Error("Not enough credit.");
-      balance -= amount;
-      const book = books[nextIndex % books.length] ?? books[0];
-      nextIndex += 1;
+      const cost = MODE_COST[mode] ?? 1;
+      const debit = Math.round(amount * cost);
+      if (debit > balance) throw new Error("Not enough credit.");
+      balance -= debit;
+      const pool = mode === "bonus" ? bonusBooks : books;
+      const cursor = mode === "bonus" ? nextBonus : nextIndex;
+      const book = pool[cursor % pool.length] ?? pool[0];
+      if (mode === "bonus") nextBonus += 1;
+      else nextIndex += 1;
       const payout = Math.round((book.payoutMultiplier / 100) * amount);
       active = {
         betID: Date.now(),
@@ -137,7 +146,8 @@ export async function fetchReplayBook(query: EngineQuery): Promise<BookState> {
     const body = (await res.json()) as { payoutMultiplier?: number; state?: unknown };
     return asBook(body.state ?? body, Math.round((body.payoutMultiplier ?? 0) * 100));
   }
-  const books = (demo as { books: BookState[] }).books;
+  const demoPack = demo as { books: BookState[]; bonusBooks?: BookState[] };
+  const books = [...demoPack.books, ...(demoPack.bonusBooks ?? [])];
   const found = books.find((book) => String(book.id) === String(query.event));
   if (!found) {
     throw new Error(query.event ? `Replay book ${query.event} is not in the demo set.` : "Replay needs rgs_url or a demo event id.");

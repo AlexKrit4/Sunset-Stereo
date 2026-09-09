@@ -13,7 +13,7 @@
 | Сетка | **6×4**, left-to-right ways |
 | RTP (цель) | 95% |
 | Максимум | 15000× |
-| Buy bonus | нет |
+| Buy bonus | 95×, 3 scatters → 10 extra plays |
 | Wilds / xWays / xNudge | не выпадают |
 | Scatter | барабаны 2–5, не больше одного на барабан |
 | Бонус | 3 солнца → 10 экстра-спинов (hold + respin). База + бонус = одна ставка / одна книга |
@@ -47,14 +47,17 @@ make run GAME=sunset_stereo
 
 Это прод-математика: 1 000 000 книг, цель RTP ~95%, высокая волатильность, потолок 15000×. Оптимизация включена. Готовые файлы для ACP лежат в [`publish/sunset_stereo/`](publish/sunset_stereo/).
 
-- `index.json`
+- `index.json` (modes `base` cost 1.0 and `bonus` cost 95.0)
 - `books_base.jsonl.zst`
 - `lookUpTable_base_0.csv`
+- `books_bonus.jsonl.zst`
+- `lookUpTable_bonus_0.csv`
 
 Скопировать их после нового прогона:
 
 ```bash
 PYTHONPATH=. python3 games/sunset_stereo/run.py
+SUNSET_SIM_MODE=bonus PYTHONPATH=. python3 games/sunset_stereo/run.py
 make publish-math
 ```
 

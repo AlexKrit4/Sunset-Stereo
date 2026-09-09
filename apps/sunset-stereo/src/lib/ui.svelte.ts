@@ -26,7 +26,9 @@ export const ui = $state({
   bonusIntroOpen: false,
   bonusIntroSpins: 0,
   disableSpacebar: false,
+  disableBuyFeature: false,
   musicMuted: false,
+  buyMenuOpen: false,
 });
 
 let bonusIntroResolve: (() => void) | null = null;
@@ -95,4 +97,6 @@ export const labels = {
   paid: () => (ui.social ? "Won" : "Paid"),
   stake: () => (ui.social ? "Play amount" : "Stake"),
   spin: () => (ui.replay ? "Play" : ui.social ? "Play" : "Spin"),
+  buy: () => (ui.social ? "Bonus" : "Buy"),
+  buyBonus: () => (ui.social ? "Get bonus" : "Buy bonus"),
 };

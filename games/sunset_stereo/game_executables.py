@@ -63,10 +63,15 @@ class GameExecutables(GameCalculations):
         """Respin cells that are not part of a held winning combination."""
         reelstrip_id = get_random_outcome(self.get_current_distribution_conditions()["reel_weights"][self.gametype])
         reelstrip = self.config.reels[reelstrip_id]
+        force_wincap = bool(self.get_current_distribution_conditions().get("force_wincap"))
         for reel in range(self.config.num_reels):
             strip = [symbol for symbol in reelstrip[reel] if symbol != "S"]
             if not strip:
                 strip = list(reelstrip[reel])
+            if force_wincap:
+                highs = [symbol for symbol in strip if symbol in {"H1", "H2"}]
+                if highs:
+                    strip = highs + strip
             for row in range(self.config.num_rows[reel]):
                 if (reel, row) in locked:
                     continue

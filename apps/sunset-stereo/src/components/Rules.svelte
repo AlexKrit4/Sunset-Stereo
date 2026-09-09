@@ -22,10 +22,13 @@
         6×4 left-to-right ways. Three or more matching symbols from the leftmost reel pay.
         Three suns on reels 2–5 start 10 extra plays. A winning extra play holds and respins
         unlocked cells until nothing new is built, then pays. Base game plus extra plays is one bet.
+        Buy bonus / Get bonus purchases 3 scatters for 95× the selected stake and starts those
+        10 extra plays immediately.
       </p>
-      <p>RTP {(GAME.rtp * 100).toFixed(0)}%. Max win {GAME.wincap.toLocaleString()}×.</p>
+      <p>RTP {(GAME.rtp * 100).toFixed(0)}%. Max win {GAME.wincap.toLocaleString()}× of the 1× stake.</p>
       <p>
-        Spin / Play starts a round. + / – change the stake using bet levels from the game server.
+        Spin / Play starts a round. Buy / Get bonus opens the feature list (currently 3 scatters).
+        + / – change the stake using bet levels from the game server.
         Spacebar also starts a round unless the operator disables it. Credit / Balance is the wallet.
         Paid / Won is the last round result. Extra plays shows the bonus counter.
       </p>

@@ -6,6 +6,13 @@ from src.config.distributions import Distribution
 from src.config.betmode import BetMode
 
 
+# 3-scatter buy: debit is 95× the selected 1× bet. Book payouts stay in 1× units.
+BUY_BONUS_COST = 95.0
+BUY_BONUS_BOOKS = 50_000
+BUY_BONUS_DEAD = 37_500
+BUY_BONUS_RECOUP = 12_490
+BUY_BONUS_WINCAP = 10
+
 # Matches apps/sunset-stereo/src/math/config.js PAYOUTS (H1=high1 … L5=low5).
 WAYS_PAYTABLE = {
     (6, "H1"): 20,
@@ -91,7 +98,13 @@ class GameConfig(Config):
             self.freegame_type: 2,
         }
 
-        reels = {"BR0": "BR0.csv", "FR0": "FR0.csv"}
+        reels = {
+            "BR0": "BR0.csv",
+            "FR0": "FR0.csv",
+            "FR_DEAD": "FR_DEAD.csv",
+            "FR_RECOUP": "FR_RECOUP.csv",
+            "FR_WCAP": "FR_WCAP.csv",
+        }
         self.reels = {}
         for reel_id, filename in reels.items():
             self.reels[reel_id] = self.read_reels_csv(os.path.join(self.reels_path, filename))
@@ -131,6 +144,34 @@ class GameConfig(Config):
             "force_freegame": False,
         }
 
+        bonus_dead_condition = {
+            "reel_weights": {
+                self.basegame_type: {"BR0": 1},
+                self.freegame_type: {"FR_DEAD": 1},
+            },
+            "scatter_triggers": {3: 1},
+            "force_wincap": False,
+            "force_freegame": True,
+        }
+        bonus_recoup_condition = {
+            "reel_weights": {
+                self.basegame_type: {"BR0": 1},
+                self.freegame_type: {"FR_RECOUP": 1},
+            },
+            "scatter_triggers": {3: 1},
+            "force_wincap": False,
+            "force_freegame": True,
+        }
+        bonus_wincap_condition = {
+            "reel_weights": {
+                self.basegame_type: {"BR0": 1},
+                self.freegame_type: {"FR_WCAP": 1},
+            },
+            "scatter_triggers": {3: 1},
+            "force_wincap": True,
+            "force_freegame": True,
+        }
+
         self.bet_modes = [
             BetMode(
                 name="base",
@@ -150,6 +191,33 @@ class GameConfig(Config):
                     Distribution(criteria="freegame", quota=0.04, conditions=freegame_condition),
                     Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=zerowin_condition),
                     Distribution(criteria="basegame", quota=0.559, conditions=basegame_condition),
+                ],
+            ),
+            BetMode(
+                name="bonus",
+                cost=BUY_BONUS_COST,
+                rtp=self.rtp,
+                max_win=self.wincap,
+                auto_close_disabled=False,
+                is_feature=False,
+                is_buybonus=True,
+                distributions=[
+                    Distribution(
+                        criteria="wincap",
+                        fixed_amt=BUY_BONUS_WINCAP,
+                        win_criteria=self.wincap,
+                        conditions=bonus_wincap_condition,
+                    ),
+                    Distribution(
+                        criteria="dead",
+                        fixed_amt=BUY_BONUS_DEAD,
+                        conditions=bonus_dead_condition,
+                    ),
+                    Distribution(
+                        criteria="recoup",
+                        fixed_amt=BUY_BONUS_RECOUP,
+                        conditions=bonus_recoup_condition,
+                    ),
                 ],
             ),
         ]

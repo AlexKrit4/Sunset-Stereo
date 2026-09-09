@@ -77,6 +77,7 @@ export async function bootEngine() {
   ui.betMicro = auth.config.defaultBetLevel || ui.betLevels[0];
   ui.social = auth.jurisdictionFlags.socialCasino || engine.query.social;
   ui.disableSpacebar = auth.jurisdictionFlags.disabledSpacebar;
+  ui.disableBuyFeature = Boolean(auth.jurisdictionFlags.disabledBuyFeature);
   if (auth.round?.active) {
     ui.ready = true;
     await playEngineRound(auth.round);
@@ -95,7 +96,7 @@ async function playEngineRound(round: Round) {
   await playBookEvents(book.events);
 }
 
-export async function playBet() {
+export async function playBet(mode = "base") {
   unlockMusic();
   if (ui.busy || !ui.ready || betActor.getSnapshot().matches("playing")) return false;
   if (!runtime.board) {
@@ -116,12 +117,13 @@ export async function playBet() {
   ui.fsCurrent = 0;
   ui.fsTotal = 0;
   ui.winMicro = 0;
+  ui.buyMenuOpen = false;
   hideSpinWin();
   cancelBonusIntro();
   betActor.send({ type: "PLAY" });
 
   try {
-    const result = await engine.Play({ amount: ui.betMicro, mode: "base" });
+    const result = await engine.Play({ amount: ui.betMicro, mode });
     ui.balanceMicro = result.balance.amount;
     await playEngineRound(result.round);
     if (result.round.active) {
@@ -132,13 +134,17 @@ export async function playBet() {
     return true;
   } catch (error) {
     console.error(error);
-    ui.banner = errorMessage(error, "Spin failed.");
+    ui.banner = errorMessage(error, mode === "bonus" ? "Buy failed." : "Spin failed.");
     ui.feature = false;
     return false;
   } finally {
     ui.busy = false;
     betActor.send({ type: "SETTLE" });
   }
+}
+
+export async function playBuyBonus() {
+  return playBet("bonus");
 }
 
 export async function playReplay() {
