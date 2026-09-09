@@ -14,6 +14,32 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC = os.path.join(ROOT, "games", "sunset_stereo", "library", "publish_files")
 DST = os.path.join(ROOT, "publish", "sunset_stereo")
 MODE_ORDER = ("base", "bonus")
+INDEX_KEYS = ("name", "cost", "events", "weights")
+
+
+def engine_index(modes: list) -> dict:
+    """Stake Engine index.json: only name, cost, events, weights."""
+    cleaned = []
+    for mode in modes:
+        cleaned.append(
+            {
+                "name": str(mode["name"]),
+                "cost": float(mode["cost"]),
+                "events": str(mode["events"]),
+                "weights": str(mode["weights"]),
+            }
+        )
+    return {"modes": cleaned}
+
+
+def write_engine_index(path: str, modes: list) -> None:
+    payload = engine_index(modes)
+    text = json.dumps(payload, indent=4, ensure_ascii=True)
+    leftover = text[json.JSONDecoder().raw_decode(text)[1] :]
+    if leftover:
+        raise ValueError(f"index.json has trailing data: {leftover!r}")
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
 
 
 def _load_index(path: str) -> dict:
@@ -51,10 +77,7 @@ def main() -> None:
         if name not in seen:
             modes.append(mode)
 
-    index = {"modes": modes}
-    with open(os.path.join(DST, "index.json"), "w", encoding="utf-8") as handle:
-        json.dump(index, handle, indent=4)
-        handle.write("\n")
+    write_engine_index(os.path.join(DST, "index.json"), modes)
     shutil.copy2(os.path.join(DST, "index.json"), os.path.join(SRC, "index.json"))
     print("wrote index.json")
 

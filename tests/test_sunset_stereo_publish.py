@@ -9,9 +9,13 @@ PUBLISH = os.path.join(ROOT, "publish", "sunset_stereo")
 
 
 def test_publish_index_lists_base_and_optional_bonus():
-    with open(os.path.join(PUBLISH, "index.json"), encoding="utf-8") as handle:
-        index = json.load(handle)
+    path = os.path.join(PUBLISH, "index.json")
+    raw = open(path, encoding="utf-8").read()
+    decoder = json.JSONDecoder()
+    index, end = decoder.raw_decode(raw)
+    assert raw[end:].strip() == "", "Engine rejects trailing junk after index.json"
     modes = {mode["name"]: mode for mode in index["modes"]}
+    assert list(index["modes"][0].keys()) == ["name", "cost", "events", "weights"]
     assert "base" in modes
     assert modes["base"]["cost"] == 1.0
     assert modes["base"]["events"] == "books_base.jsonl.zst"

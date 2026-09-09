@@ -44,9 +44,9 @@ def _write_fallback_index(config) -> None:
         "weights": "lookUpTable_bonus_0.csv",
     }
     payload = {"modes": [by_name["base"], by_name["bonus"]]}
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle, indent=4)
-        handle.write("\n")
+    from copy_publish import write_engine_index
+
+    write_engine_index(path, payload["modes"])
     print("wrote fallback index.json")
 
 
