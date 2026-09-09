@@ -378,6 +378,13 @@ export class BoardController {
     this.applyBonusDim();
   }
 
+  async flashBonusWins(positions: Position[]) {
+    const cells = positions.map(unpadPosition);
+    if (!cells.length) return;
+    await this.playWinSheen(cells);
+    await wait(200);
+  }
+
   async showBookWins(positions: Position[]) {
     const cells = positions.map(unpadPosition);
     if (!cells.length) return;

@@ -1,7 +1,7 @@
 import { hideSpinWin, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelte";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { runtime } from "./context";
-import { winningWays } from "../rgs/bookView";
+import { unpadPosition, winningWays } from "../rgs/bookView";
 import { multiplierCentsToMicro } from "../rgs/money";
 import type { BookEvent, BookEventHandlerMap, Position, RawSymbol } from "./typesBookEvent";
 
@@ -53,12 +53,25 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     if (pendingHolds.length && !upcomingWins.length) {
       board.applyBookHolds(bookEvent.board, pendingHolds);
     }
+    if (bookEvent.gameType === "freegame" && upcomingWins.length) {
+      const already = new Set(
+        pendingHolds.map((pos) => {
+          const cell = unpadPosition(pos);
+          return `${cell.reel}:${cell.row}`;
+        }),
+      );
+      const fresh = upcomingWins.filter((pos) => {
+        const cell = unpadPosition(pos);
+        return !already.has(`${cell.reel}:${cell.row}`);
+      });
+      if (fresh.length) await board.flashBonusWins(fresh);
+    }
   },
 
   holdRespin: async (bookEvent) => {
     pendingHolds = bookEvent.positions;
     runtime.board?.lockBonusWinners(bookEvent.positions);
-    await waitForTimeout(260);
+    await waitForTimeout(80);
   },
 
   winInfo: async (bookEvent) => {
