@@ -9,8 +9,8 @@ let base: HTMLAudioElement | null = null;
 let bonus: HTMLAudioElement | null = null;
 let unlocked = false;
 let current: Bed = "base";
-let fadeFrame = 0;
 let listening = false;
+const fades = new WeakMap<HTMLAudioElement, number>();
 
 function trackUrl(file: string) {
   return `${import.meta.env.BASE_URL}audio/${file}`;
@@ -40,41 +40,63 @@ function writeMuted(muted: boolean) {
   }
 }
 
-function cancelFade() {
-  if (fadeFrame) cancelAnimationFrame(fadeFrame);
-  fadeFrame = 0;
-}
-
-function fadeTo(target: HTMLAudioElement, next: number, ms = FADE_MS) {
+function fadeVolume(target: HTMLAudioElement, next: number, ms = FADE_MS) {
+  const prev = fades.get(target);
+  if (prev) cancelAnimationFrame(prev);
   const from = target.volume;
   const started = performance.now();
-  cancelFade();
-  return new Promise<void>((resolve) => {
-    const tick = (now: number) => {
-      const u = Math.min((now - started) / ms, 1);
-      target.volume = from + (next - from) * u;
-      if (u < 1) {
-        fadeFrame = requestAnimationFrame(tick);
-        return;
-      }
-      fadeFrame = 0;
-      target.volume = next;
-      resolve();
-    };
-    fadeFrame = requestAnimationFrame(tick);
-  });
+  const tick = (now: number) => {
+    const u = Math.min((now - started) / ms, 1);
+    target.volume = from + (next - from) * u;
+    if (u < 1) {
+      fades.set(target, requestAnimationFrame(tick));
+      return;
+    }
+    fades.delete(target);
+    target.volume = next;
+  };
+  fades.set(target, requestAnimationFrame(tick));
 }
 
-function activeTrack() {
-  return current === "bonus" ? bonus : base;
+function stopFades() {
+  if (base) {
+    const id = fades.get(base);
+    if (id) cancelAnimationFrame(id);
+    fades.delete(base);
+  }
+  if (bonus) {
+    const id = fades.get(bonus);
+    if (id) cancelAnimationFrame(id);
+    fades.delete(bonus);
+  }
 }
 
-function idleTrack() {
-  return current === "bonus" ? base : bonus;
+function applyBedVolumes(immediate = false) {
+  if (!base || !bonus) return;
+  const next = current === "bonus" ? bonus : base;
+  const prev = current === "bonus" ? base : bonus;
+  if (ui.musicMuted) {
+    next.volume = 0;
+    prev.volume = 0;
+    return;
+  }
+  if (immediate) {
+    next.volume = VOLUME;
+    prev.volume = 0;
+    return;
+  }
+  fadeVolume(next, VOLUME);
+  fadeVolume(prev, 0);
 }
 
-function isPlaying(audio: HTMLAudioElement | null) {
-  return Boolean(audio && !audio.paused && !audio.ended);
+function startBoth() {
+  if (!base || !bonus || ui.musicMuted) return;
+  void base.play().then(() => {
+    unlocked = true;
+  }).catch(() => {});
+  void bonus.play().then(() => {
+    unlocked = true;
+  }).catch(() => {});
 }
 
 export function bootMusic() {
@@ -84,77 +106,35 @@ export function bootMusic() {
   bonus = makeLoop("sunset-bonus-loop.mp3");
 }
 
-/** Call from a click/tap/key handler. play() is fired in this turn, not after await. */
+/** Call from a click/tap/key handler. play() stays in this turn. */
 export function unlockMusic() {
   bootMusic();
   if (!base || !bonus || ui.musicMuted) return;
-  const active = activeTrack();
-  const idle = idleTrack();
-  if (!active || !idle) return;
-
-  if (!isPlaying(active)) {
-    active.volume = active.volume > 0 ? active.volume : 0;
-    void active.play().then(() => {
-      unlocked = true;
-      if (!ui.musicMuted && active.volume < VOLUME) void fadeTo(active, VOLUME);
-    }).catch(() => {
-      unlocked = false;
-    });
-  } else {
-    unlocked = true;
-  }
-
-  if (idle.paused) {
-    idle.volume = 0;
-    void idle.play().then(() => {
-      if (idle !== activeTrack()) {
-        idle.pause();
-        idle.currentTime = 0;
-      }
-    }).catch(() => {
-      /* second bed unlocks on the next gesture */
-    });
-  }
+  startBoth();
+  applyBedVolumes(base.paused && bonus.paused);
 }
 
-export async function setMusicBed(bed: Bed) {
+export function setMusicBed(bed: Bed) {
   current = bed;
   if (!base || !bonus || ui.musicMuted) return;
-  if (!unlocked && !isPlaying(base) && !isPlaying(bonus)) return;
-  const next = bed === "bonus" ? bonus : base;
-  const prev = bed === "bonus" ? base : bonus;
-  if (isPlaying(next) && prev.paused) return;
-  try {
-    if (next.paused) {
-      next.volume = 0;
-      await next.play();
-    }
-    unlocked = true;
-    await Promise.all([fadeTo(next, VOLUME), fadeTo(prev, 0)]);
-    if (current === bed && prev !== next) {
-      prev.pause();
-      prev.currentTime = 0;
-    }
-  } catch {
-    unlocked = isPlaying(next);
-  }
+  applyBedVolumes();
 }
 
-export async function toggleMusicMute() {
+export function toggleMusicMute() {
   bootMusic();
   ui.musicMuted = !ui.musicMuted;
   writeMuted(ui.musicMuted);
   if (!base || !bonus) return;
   if (ui.musicMuted) {
-    cancelFade();
+    stopFades();
     base.pause();
     bonus.pause();
     base.volume = 0;
     bonus.volume = 0;
     return;
   }
-  unlockMusic();
-  await setMusicBed(current);
+  startBoth();
+  applyBedVolumes(true);
 }
 
 export function musicBedFromUi() {
@@ -167,11 +147,10 @@ export function bindMusicUnlock() {
   listening = true;
   const onGesture = () => {
     unlockMusic();
-    if (unlocked || ui.musicMuted) return;
   };
   const onVisible = () => {
     if (document.hidden || ui.musicMuted) return;
-    if (unlocked || isPlaying(base) || isPlaying(bonus)) unlockMusic();
+    unlockMusic();
   };
   window.addEventListener("pointerdown", onGesture);
   window.addEventListener("click", onGesture);

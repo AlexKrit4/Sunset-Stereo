@@ -14,7 +14,7 @@
   }
 
   $effect(() => {
-    void setMusicBed(musicBedFromUi());
+    setMusicBed(musicBedFromUi());
   });
 
   onMount(() => {

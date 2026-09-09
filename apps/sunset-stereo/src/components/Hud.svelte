@@ -51,7 +51,7 @@
     id="musicBtn"
     class="ghost"
     type="button"
-    onclick={() => void toggleMusicMute()}
+    onclick={() => toggleMusicMute()}
     aria-pressed={!ui.musicMuted}
   >
     {ui.musicMuted ? "Music off" : "Music"}
