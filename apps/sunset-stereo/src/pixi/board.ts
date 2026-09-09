@@ -39,7 +39,6 @@ const WIN_DIM_ALPHA = 0.38;
 const WIN_DIM_FROM_REEL = 2;
 const WIN_SHEEN_MS = 640;
 const WIN_SHEEN_STAGGER_MS = 36;
-const HOLD_POP_MS = 380;
 
 function spinRng() {
   return {
@@ -77,12 +76,6 @@ function easeOutQuad(t: number) {
 function easeInOutQuad(t: number) {
   const x = Math.min(Math.max(t, 0), 1);
   return x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2;
-}
-
-function holdPopScale(t: number) {
-  const u = Math.min(Math.max(t, 0), 1);
-  if (u < 0.72) return 0.72 + 0.36 * easeOutCubic(u / 0.72);
-  return 1.08 - 0.08 * easeOutCubic((u - 0.72) / 0.28);
 }
 
 type SpinJob = {
@@ -175,7 +168,6 @@ export class BoardController {
   private bonusDim = false;
   private brightCells = new Set<string>();
   private landingBright = new Set<string>();
-  private holdTicks = new Set<() => void>();
 
   constructor(app: Application) {
     this.app = app;
@@ -365,17 +357,16 @@ export class BoardController {
   }
 
   applyBookHolds(board: RawSymbol[][], positions: Position[]) {
-    this.syncHolds(visibleNames(board), positions.map(unpadPosition), this.bonusDim);
+    this.syncHolds(visibleNames(board), positions.map(unpadPosition));
     if (this.bonusDim) this.applyBonusDim();
   }
 
   lockBonusWinners(positions: Position[]) {
     const cells = positions.map(unpadPosition);
-    const animateNew = this.bonusDim;
     this.bonusDim = true;
     this.brightCells = new Set(cells.map((pos) => `${pos.reel}:${pos.row}`));
     this.landingBright.clear();
-    if (this.visible.length) this.syncHolds(this.visible, cells, animateNew);
+    if (this.visible.length) this.syncHolds(this.visible, cells);
     this.applyBonusDim();
   }
 
@@ -398,7 +389,6 @@ export class BoardController {
     }
     this.lockBonusWinners(allWins);
     if (!fresh.length) return;
-    await this.waitForHoldPops();
     await this.flashBonusWins(fresh);
   }
 
@@ -407,7 +397,7 @@ export class BoardController {
     if (!cells.length) return;
     if (this.bonusDim) {
       this.brightCells = new Set(cells.map((pos) => `${pos.reel}:${pos.row}`));
-      if (this.visible.length) this.syncHolds(this.visible, cells, true);
+      if (this.visible.length) this.syncHolds(this.visible, cells);
       this.applyBonusDim();
     } else {
       this.dimNonWinners(cells, COLS - 1);
@@ -440,7 +430,7 @@ export class BoardController {
     this.scatterOverlay.clear();
     this.teaseOverlay.alpha = 1;
     const locked = new Set(holds.map((pos) => `${pos.reel}:${pos.row}`));
-    if (holds.length) this.syncHolds(raw, holds, false);
+    if (holds.length) this.syncHolds(raw, holds);
     if (this.bonusDim) this.applyBonusDim();
     const plans = this.planSpin(waysGaps, scatterGaps, pace);
     const now = performance.now();
@@ -520,14 +510,10 @@ export class BoardController {
   }
 
   private setHolds(board: string[][], positions: Array<{ reel: number; row: number }>) {
-    this.syncHolds(board, positions, false);
+    this.syncHolds(board, positions);
   }
 
-  private syncHolds(
-    board: string[][],
-    positions: Array<{ reel: number; row: number }>,
-    animateNew: boolean,
-  ) {
+  private syncHolds(board: string[][], positions: Array<{ reel: number; row: number }>) {
     const wanted = new Set(positions.map((pos) => this.holdLabel(pos.reel, pos.row)));
     this.holds.forEach((layer) => {
       layer.children.slice().forEach((child) => {
@@ -540,64 +526,21 @@ export class BoardController {
       if (!layer || !name) return;
       const label = this.holdLabel(pos.reel, pos.row);
       if (layer.children.some((child) => child.label === label)) return;
-      layer.addChild(this.makeHoldView(name, pos, animateNew));
+      layer.addChild(this.makeHoldView(name, pos));
     });
   }
 
-  private makeHoldView(name: string, pos: { reel: number; row: number }, animate: boolean) {
+  private makeHoldView(name: string, pos: { reel: number; row: number }) {
     const view = asView(name);
     view.label = this.holdLabel(pos.reel, pos.row);
     view.eventMode = "none";
     view.pivot.set(CELL / 2, CELL / 2);
     view.x = CELL / 2;
     view.y = Math.round(pos.row * CELL) + CELL / 2;
-    if (animate) {
-      view.alpha = 0;
-      view.scale.set(0.72);
-      this.animateHoldIn(view);
-    }
     return view;
   }
 
-  private waitForHoldPops() {
-    if (!this.holdTicks.size) return Promise.resolve();
-    return new Promise<void>((resolve) => {
-      const started = performance.now();
-      const tick = () => {
-        if (!this.holdTicks.size || performance.now() - started > HOLD_POP_MS + 80) {
-          this.app.ticker.remove(tick);
-          resolve();
-        }
-      };
-      this.app.ticker.add(tick);
-    });
-  }
-
-  private animateHoldIn(view: Container) {
-    const start = performance.now();
-    const tick = () => {
-      if (!view.parent) {
-        this.app.ticker.remove(tick);
-        this.holdTicks.delete(tick);
-        return;
-      }
-      const u = Math.min((performance.now() - start) / HOLD_POP_MS, 1);
-      view.alpha = Math.min(1, u / 0.42);
-      view.scale.set(holdPopScale(u));
-      if (u >= 1) {
-        view.alpha = 1;
-        view.scale.set(1);
-        this.app.ticker.remove(tick);
-        this.holdTicks.delete(tick);
-      }
-    };
-    this.holdTicks.add(tick);
-    this.app.ticker.add(tick);
-  }
-
   private clearHolds() {
-    this.holdTicks.forEach((tick) => this.app.ticker.remove(tick));
-    this.holdTicks.clear();
     this.holds.forEach((layer) => layer.removeChildren());
   }
 
