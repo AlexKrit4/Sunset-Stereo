@@ -1,3 +1,23 @@
+#!/usr/bin/env bash
+# Pack apps/sunset-stereo/dist for Stake Engine ACP upload.
+# Engine requires static files only (index.html at the game root, relative URLs, no external fonts).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+DIST="$ROOT/apps/sunset-stereo/dist"
+STAGE="$ROOT/publish/STAKE_UPLOAD"
+ZIP="$ROOT/publish/Sunset-Stereo-frontend.zip"
+
+if [[ ! -f "$DIST/index.html" ]]; then
+  echo "missing $DIST/index.html — run: make frontend-build" >&2
+  exit 1
+fi
+
+rm -rf "$STAGE/frontend"
+mkdir -p "$STAGE/frontend"
+cp -a "$DIST"/. "$STAGE/frontend/"
+
+cat > "$STAGE/КАК_ЗАЛИТЬ.txt" <<'EOF'
 Sunset Stereo — что заливать в Stake Engine ACP
 ==============================================
 
@@ -37,3 +57,17 @@ FRONTEND: статический Vite-билд (base="./"), без внешни�
   games/_inactive_sunset_stereo_5x3
   frontend/  (старый 5x3 DOM)
   lookUpTable_bonus_*
+EOF
+
+rm -f "$ZIP"
+STAGE_ZIP="$(mktemp -d)"
+mkdir -p "$STAGE_ZIP/Sunset Stereo"
+cp -a "$STAGE/frontend" "$STAGE_ZIP/Sunset Stereo/frontend"
+cp -a "$STAGE/КАК_ЗАЛИТЬ.txt" "$STAGE_ZIP/Sunset Stereo/КАК_ЗАЛИТЬ.txt"
+(
+  cd "$STAGE_ZIP"
+  zip -r -q "$ZIP" "Sunset Stereo"
+)
+rm -rf "$STAGE_ZIP"
+echo "wrote $ZIP ($(du -h "$ZIP" | cut -f1))"
+echo "ACP folder: $STAGE/frontend"

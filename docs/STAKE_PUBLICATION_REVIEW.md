@@ -41,7 +41,11 @@ Ready-to-upload math zip (~193 MB, 1,000,000 books):
 
 http://13.143.132.112:1337/Sunset-Stereo-math.zip
 
-Unpack to `Z:\` so you get `Z:\Sunset Stereo\math`. Upload that folder in ACP. RTP 95%, high volatility, hard 15000× ceiling.
+Ready-to-upload frontend zip (static Vite `dist`, relative `./` URLs, no external fonts):
+
+http://13.143.132.112:1337/Sunset-Stereo-frontend.zip
+
+Unpack both to `Z:\` so you get `Z:\Sunset Stereo\math` and `Z:\Sunset Stereo\frontend`. Upload those folders in ACP. RTP 95%, high volatility, hard 15000× ceiling. Live mock: http://13.143.132.112:1337/
 
 ### 1. Create the game in ACP
 
@@ -73,12 +77,12 @@ ACP should report ~95% RTP and max win 15000×. Books that would pay more are cu
 ### 3. Upload frontend
 
 ```bash
-make frontend-build
+make frontend-zip
 ```
 
-Upload the **contents** of `apps/sunset-stereo/dist/` (including `index.html`, `assets/`, hashed JPGs). Do not zip the `dist` folder name as an extra root if ACP expects the files at the game root.
+Or download http://13.143.132.112:1337/Sunset-Stereo-frontend.zip and unpack to `Z:\Sunset Stereo\frontend`.
 
-Engine hosts:
+Upload the **contents** of that folder (or of `apps/sunset-stereo/dist/`): `index.html`, `assets/`, `audio/`, `sunset-scene.jpg`. Do not wrap them in an extra root folder. Engine hosts:
 
 `https://{team}.cdn.stake-engine.com/{gameId}/{version}/index.html?sessionID=…&rgs_url=…&lang=en&device=desktop`
 

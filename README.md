@@ -82,7 +82,11 @@ make frontend
 
 http://13.143.132.112:1337/Sunset-Stereo-math.zip
 
-Распакуй в `Z:\` — получится `Z:\Sunset Stereo\math`. Как заливать — `КАК_ЗАЛИТЬ.txt` внутри архива.
+Готовый архив FRONTEND для ACP (статический `dist`, `base: "./"`):
+
+http://13.143.132.112:1337/Sunset-Stereo-frontend.zip
+
+Распакуй оба в `Z:\` — получится `Z:\Sunset Stereo\math` и `Z:\Sunset Stereo\frontend`. Как заливать — `КАК_ЗАЛИТЬ.txt` внутри архива. Живой мок-плеер: http://13.143.132.112:1337/
 
 ## Символы
 

@@ -50,6 +50,9 @@ frontend:
 frontend-build:
 	cd apps/sunset-stereo && npm install && npm run build
 
+frontend-zip: frontend-build
+	bash apps/sunset-stereo/scripts/pack-engine.sh
+
 publish-math:
 	$(PYTHON) games/sunset_stereo/copy_publish.py
 
