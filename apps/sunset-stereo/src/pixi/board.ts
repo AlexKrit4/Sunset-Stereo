@@ -37,8 +37,8 @@ const NUDGE_WINDUP_FRAC = 0.12;
 const NUDGE_WINDUP_MAX_PX = 12;
 const WIN_DIM_ALPHA = 0.38;
 const WIN_DIM_FROM_REEL = 2;
-const WIN_SHEEN_MS = 520;
-const WIN_SHEEN_STAGGER_MS = 42;
+const WIN_SHEEN_MS = 640;
+const WIN_SHEEN_STAGGER_MS = 36;
 const HOLD_POP_MS = 380;
 
 function spinRng() {
@@ -351,17 +351,14 @@ export class BoardController {
       pace: "base" | "bonus" | "respin";
       anticipation?: number[];
       holds?: Position[];
-      upcomingWins?: Position[];
     },
   ) {
     const names = visibleNames(board);
     const extra = Array.from({ length: COLS }, (_, col) => (opts.anticipation?.[col] || 0) * 480);
     const holds = (opts.holds ?? []).map(unpadPosition);
-    const upcomingWins = (opts.upcomingWins ?? []).map(unpadPosition);
     if (this.bonusDim) this.clearSheens();
     else this.clearWins();
-    await this.spinTo(names, [], extra, [], opts.pace, holds, upcomingWins);
-    if (upcomingWins.length) this.lockBonusWinners(opts.upcomingWins ?? []);
+    await this.spinTo(names, [], extra, [], opts.pace, holds);
   }
 
   applyBookHolds(board: RawSymbol[][], positions: Position[]) {
@@ -382,7 +379,24 @@ export class BoardController {
     const cells = positions.map(unpadPosition);
     if (!cells.length) return;
     await this.playWinSheen(cells);
-    await wait(200);
+    await wait(220);
+  }
+
+  async presentNewBonusWins(fresh: Position[], allWins: Position[], firstCombo: boolean) {
+    if (!fresh.length) {
+      this.lockBonusWinners(allWins);
+      return;
+    }
+    if (firstCombo) {
+      await wait(80);
+      await this.flashBonusWins(fresh);
+      this.lockBonusWinners(allWins);
+      await wait(140);
+      return;
+    }
+    this.lockBonusWinners(allWins);
+    await this.waitForHoldPops();
+    await this.flashBonusWins(fresh);
   }
 
   async showBookWins(positions: Position[]) {
@@ -415,7 +429,6 @@ export class BoardController {
     highlights: Array<{ reel: number; row: number }> = [],
     pace: "base" | "bonus" | "respin" = "base",
     holds: Array<{ reel: number; row: number }> = [],
-    upcomingWins: Array<{ reel: number; row: number }> = [],
   ) {
     if (this.spinning) return;
     this.spinning = true;
@@ -467,21 +480,8 @@ export class BoardController {
       });
     }
 
-    const shown = new Set(holds.map((pos) => `${pos.reel}:${pos.row}`));
     this.onSettled = (col) => {
       if (this.bonusDim) {
-        for (const pos of upcomingWins) {
-          if (pos.reel === col) shown.add(`${pos.reel}:${pos.row}`);
-        }
-        this.brightCells = shown;
-        this.syncHolds(
-          raw,
-          [...shown].map((key) => {
-            const [reel, row] = key.split(":").map(Number);
-            return { reel, row };
-          }),
-          true,
-        );
         this.applyBonusDim();
         return;
       }
@@ -553,6 +553,20 @@ export class BoardController {
       this.animateHoldIn(view);
     }
     return view;
+  }
+
+  private waitForHoldPops() {
+    if (!this.holdTicks.size) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const started = performance.now();
+      const tick = () => {
+        if (!this.holdTicks.size || performance.now() - started > HOLD_POP_MS + 80) {
+          this.app.ticker.remove(tick);
+          resolve();
+        }
+      };
+      this.app.ticker.add(tick);
+    });
   }
 
   private animateHoldIn(view: Container) {
@@ -824,18 +838,23 @@ export class BoardController {
         wrap.eventMode = "none";
         const mask = new Graphics();
         mask.roundRect(pad, pad, inner, inner, 10).fill(0xffffff);
+        const pulse = new Graphics();
+        pulse.roundRect(pad, pad, inner, inner, 10).fill({ color: 0xffe7a8, alpha: 0.7 });
+        pulse.blendMode = "add";
+        pulse.alpha = 0;
         const shine = new Graphics();
         const len = CELL * 2.35;
-        shine.rect(-len / 2, -14, len, 28).fill({ color: 0xfff4dc, alpha: 0.16 });
-        shine.rect(-len / 2, -7, len, 14).fill({ color: 0xfffaf2, alpha: 0.34 });
-        shine.rect(-len / 2, -2.2, len, 4.4).fill({ color: 0xffffff, alpha: 0.7 });
+        shine.rect(-len / 2, -16, len, 32).fill({ color: 0xfff4dc, alpha: 0.28 });
+        shine.rect(-len / 2, -8, len, 16).fill({ color: 0xfffaf2, alpha: 0.5 });
+        shine.rect(-len / 2, -2.4, len, 4.8).fill({ color: 0xffffff, alpha: 0.92 });
         shine.rotation = -Math.PI / 4;
         shine.blendMode = "add";
-        wrap.addChild(mask, shine);
+        wrap.addChild(mask, pulse, shine);
         wrap.mask = mask;
         cell.addChild(wrap);
         return {
           shine,
+          pulse,
           delay: pos.reel * WIN_SHEEN_STAGGER_MS + pos.row * 12,
           fromX: pad - 8,
           fromY: pad - 8,
@@ -858,9 +877,11 @@ export class BoardController {
       const tick = () => {
         const elapsed = performance.now() - start;
         for (const job of jobs) {
-          const u = easeInOutQuad(Math.min(Math.max((elapsed - job.delay) / WIN_SHEEN_MS, 0), 1));
+          const local = Math.min(Math.max((elapsed - job.delay) / WIN_SHEEN_MS, 0), 1);
+          const u = easeInOutQuad(local);
           job.shine.x = job.fromX + (job.toX - job.fromX) * u;
           job.shine.y = job.fromY + (job.toY - job.fromY) * u;
+          job.pulse.alpha = Math.sin(local * Math.PI) * 0.9;
         }
         if (elapsed >= totalMs) this.clearSheens();
       };

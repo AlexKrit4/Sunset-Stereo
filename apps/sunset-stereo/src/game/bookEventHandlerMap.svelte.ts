@@ -9,22 +9,32 @@ let lastBoard: RawSymbol[][] = [];
 let pendingHolds: Position[] = [];
 let pendingWinLines = 0;
 
-function nextBonusWinPositions(events: BookEvent[], current: BookEvent): Position[] {
-  const start = events.indexOf(current);
-  for (let index = (start >= 0 ? start + 1 : 0); index < events.length; index += 1) {
+function cellKey(pos: Position) {
+  const cell = unpadPosition(pos);
+  return `${cell.reel}:${cell.row}`;
+}
+
+function nextBonusWin(
+  events: BookEvent[],
+  current: BookEvent,
+): { positions: Position[]; beforeRespin: boolean } | null {
+  let start = events.indexOf(current);
+  if (start < 0) start = events.findIndex((event) => event.index === current.index);
+  if (start < 0) return null;
+  for (let index = start + 1; index < events.length; index += 1) {
     const event = events[index];
-    if (event.type === "holdRespin") return event.positions;
-    if (event.type === "winInfo") return event.wins.flatMap((win) => win.positions);
+    if (event.type === "holdRespin") return { positions: event.positions, beforeRespin: true };
+    if (event.type === "winInfo") return { positions: event.wins.flatMap((win) => win.positions), beforeRespin: false };
     if (
       event.type === "reveal" ||
       event.type === "updateFreeSpin" ||
       event.type === "freeSpinEnd" ||
       event.type === "finalWin"
     ) {
-      return [];
+      return null;
     }
   }
-  return [];
+  return null;
 }
 
 export const bookEventHandlerMap: BookEventHandlerMap = {
@@ -42,29 +52,19 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       pendingHolds = [];
       board.clearBookVisuals();
     }
-    const upcomingWins =
-      bookEvent.gameType === "freegame" ? nextBonusWinPositions(context.bookEvents, bookEvent) : [];
+    const upcoming = bookEvent.gameType === "freegame" ? nextBonusWin(context.bookEvents, bookEvent) : null;
     await board.playBookReveal(bookEvent.board, {
       pace,
       anticipation: bookEvent.anticipation,
       holds: pendingHolds,
-      upcomingWins,
     });
-    if (pendingHolds.length && !upcomingWins.length) {
+    if (pendingHolds.length && !upcoming?.beforeRespin) {
       board.applyBookHolds(bookEvent.board, pendingHolds);
     }
-    if (bookEvent.gameType === "freegame" && upcomingWins.length) {
-      const already = new Set(
-        pendingHolds.map((pos) => {
-          const cell = unpadPosition(pos);
-          return `${cell.reel}:${cell.row}`;
-        }),
-      );
-      const fresh = upcomingWins.filter((pos) => {
-        const cell = unpadPosition(pos);
-        return !already.has(`${cell.reel}:${cell.row}`);
-      });
-      if (fresh.length) await board.flashBonusWins(fresh);
+    if (upcoming?.beforeRespin) {
+      const already = new Set(pendingHolds.map(cellKey));
+      const fresh = upcoming.positions.filter((pos) => !already.has(cellKey(pos)));
+      await board.presentNewBonusWins(fresh, upcoming.positions, pendingHolds.length === 0);
     }
   },
 
