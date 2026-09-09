@@ -387,12 +387,19 @@ export class BoardController {
   }
 
   async presentNewBonusWins(fresh: Position[], allWins: Position[], firstCombo: boolean) {
-    if (fresh.length) {
-      await wait(firstCombo ? 80 : 50);
-      await this.flashBonusWins(fresh);
+    if (firstCombo) {
+      if (fresh.length) {
+        await wait(80);
+        await this.flashBonusWins(fresh);
+      }
+      this.lockBonusWinners(allWins);
+      if (fresh.length) await wait(140);
+      return;
     }
     this.lockBonusWinners(allWins);
-    if (fresh.length) await wait(firstCombo ? 140 : 80);
+    if (!fresh.length) return;
+    await this.waitForHoldPops();
+    await this.flashBonusWins(fresh);
   }
 
   async showBookWins(positions: Position[]) {
@@ -550,6 +557,20 @@ export class BoardController {
       this.animateHoldIn(view);
     }
     return view;
+  }
+
+  private waitForHoldPops() {
+    if (!this.holdTicks.size) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const started = performance.now();
+      const tick = () => {
+        if (!this.holdTicks.size || performance.now() - started > HOLD_POP_MS + 80) {
+          this.app.ticker.remove(tick);
+          resolve();
+        }
+      };
+      this.app.ticker.add(tick);
+    });
   }
 
   private animateHoldIn(view: Container) {
