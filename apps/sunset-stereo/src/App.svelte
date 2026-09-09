@@ -6,9 +6,10 @@
   import BonusIntro from "./components/BonusIntro.svelte";
   import { bootEngine, playBet } from "./game/betMachine.svelte";
   import { changeBet, confirmBonusStart, ui } from "./lib/ui.svelte";
-  import { bootMusic, musicBedFromUi, setMusicBed, unlockMusic } from "./lib/music";
+  import { bindMusicUnlock, bootMusic, musicBedFromUi, setMusicBed, unlockMusic } from "./lib/music";
 
   async function spin() {
+    unlockMusic();
     await playBet();
   }
 
@@ -18,10 +19,7 @@
 
   onMount(() => {
     bootMusic();
-    const unlock = () => {
-      void unlockMusic();
-    };
-    window.addEventListener("pointerdown", unlock, { once: true });
+    const unbindMusic = bindMusicUnlock();
     void bootEngine().catch((error) => {
       ui.error = error instanceof Error ? error.message : "Could not start the engine session.";
       ui.ready = true;
@@ -29,7 +27,7 @@
     const onKey = (event: KeyboardEvent) => {
       if (event.code !== "Space" || ui.disableSpacebar || ui.rulesOpen) return;
       event.preventDefault();
-      void unlockMusic();
+      unlockMusic();
       if (ui.bonusIntroOpen) {
         confirmBonusStart();
         return;
@@ -38,7 +36,7 @@
     };
     window.addEventListener("keydown", onKey);
     return () => {
-      window.removeEventListener("pointerdown", unlock);
+      unbindMusic();
       window.removeEventListener("keydown", onKey);
     };
   });

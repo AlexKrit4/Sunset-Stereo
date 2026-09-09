@@ -2,6 +2,7 @@ import { createActor, createMachine } from "xstate";
 import { playBookEvents } from "./playBook";
 import { runtime } from "./context";
 import { cancelBonusIntro, hideSpinWin, ui } from "../lib/ui.svelte";
+import { unlockMusic } from "../lib/music";
 import { createEngineHandle, fetchReplayBook, type EngineHandle, type BookState } from "../rgs/session";
 import type { Round } from "stake-engine";
 
@@ -95,6 +96,7 @@ async function playEngineRound(round: Round) {
 }
 
 export async function playBet() {
+  unlockMusic();
   if (ui.busy || !ui.ready || betActor.getSnapshot().matches("playing")) return false;
   if (!runtime.board) {
     ui.banner = "Reels are still loading.";
@@ -140,6 +142,7 @@ export async function playBet() {
 }
 
 export async function playReplay() {
+  unlockMusic();
   if (!replayBook || !runtime.board) return false;
   ui.busy = true;
   ui.winMicro = 0;
