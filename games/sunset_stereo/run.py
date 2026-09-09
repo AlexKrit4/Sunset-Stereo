@@ -99,15 +99,15 @@ if __name__ == "__main__":
             profiling,
         )
 
-    if sim_mode == "bonus":
-        stats = weight_bonus_lookup(config.publish_path)
-        print("weighted bonus LUT", stats)
-
     try:
         generate_configs(gamestate)
     except FileNotFoundError as exc:
         print("generate_configs skipped missing files:", exc)
         _write_fallback_index(config)
+
+    if sim_mode == "bonus":
+        stats = weight_bonus_lookup(config.publish_path)
+        print("weighted bonus LUT", stats)
 
     if run_conditions["run_optimization"]:
         OptimizationExecution().run_all_modes(config, target_modes, rust_threads)
