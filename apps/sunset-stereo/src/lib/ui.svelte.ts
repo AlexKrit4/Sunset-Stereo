@@ -26,6 +26,7 @@ export const ui = $state({
   bonusIntroOpen: false,
   bonusIntroSpins: 0,
   disableSpacebar: false,
+  musicMuted: false,
 });
 
 let bonusIntroResolve: (() => void) | null = null;

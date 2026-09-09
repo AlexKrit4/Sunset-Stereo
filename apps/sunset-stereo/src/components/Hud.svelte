@@ -1,5 +1,6 @@
 <script lang="ts">
   import { moneyHud, labels, ui } from "../lib/ui.svelte";
+  import { toggleMusicMute } from "../lib/music";
 
   let {
     onSpin,
@@ -46,6 +47,15 @@
     {ui.replay && ui.winMicro ? "Play again" : labels.spin()}
   </button>
   <button class="ghost" type="button" onclick={() => (ui.rulesOpen = true)}>Rules</button>
+  <button
+    id="musicBtn"
+    class="ghost"
+    type="button"
+    onclick={() => void toggleMusicMute()}
+    aria-pressed={!ui.musicMuted}
+  >
+    {ui.musicMuted ? "Music off" : "Music"}
+  </button>
 </div>
 
 <style>
