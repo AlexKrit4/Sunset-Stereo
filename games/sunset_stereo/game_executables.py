@@ -84,6 +84,20 @@ class GameExecutables(GameCalculations):
         self.get_special_symbols_on_board()
         self.anticipation = [0] * self.config.num_reels
 
+    def dampen_dead_trigger_board(self) -> None:
+        """Keep the 3-scatter trigger, but stop the base board from already paying ~95×."""
+        mix = ["L1", "L2", "L3", "L4", "L5", "H3", "H4", "H5"]
+        for reel in range(self.config.num_reels):
+            for row in range(self.config.num_rows[reel]):
+                cell = self.board[reel][row]
+                name = cell.name if hasattr(cell, "name") else cell
+                if name == "S":
+                    continue
+                self.board[reel][row] = self.create_symbol(mix[(reel * 3 + row) % len(mix)])
+                if random.random() < 0.35:
+                    self.board[reel][row] = self.create_symbol(random.choice(mix))
+        self.get_special_symbols_on_board()
+
     def play_hold_respin_spin(self) -> None:
         """One extra play: pay only after hold-respins stop adding winning cells."""
         self.draw_board()
