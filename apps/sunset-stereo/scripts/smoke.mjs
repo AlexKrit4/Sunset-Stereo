@@ -137,8 +137,20 @@ if (!/3 scatters/i.test(menuState.offer)) throw new Error("buy menu must list 3 
 await click(67, "#buyScatterBtn");
 const buyStarted = Date.now();
 let buyHud;
-for (let i = 0; i < 240; i += 1) {
+let startedBonus = false;
+for (let i = 0; i < 300; i += 1) {
   await new Promise((r) => setTimeout(r, 400));
+  if (!startedBonus) {
+    const startBtn = await send(200 + i, "Runtime.evaluate", {
+      expression: "Boolean(document.getElementById('bonusStartBtn'))",
+      returnByValue: true,
+    });
+    if (startBtn.result.value) {
+      await click(400 + i, "#bonusStartBtn");
+      startedBonus = true;
+      log("clicked bonus start");
+    }
+  }
   buyHud = await readHud(100 + i);
   if (!buyHud.busy) {
     log("after buy", buyHud, `ms=${Date.now() - buyStarted}`);
