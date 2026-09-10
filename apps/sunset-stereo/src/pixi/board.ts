@@ -27,9 +27,11 @@ const SPIN_WINDUP_PX = 30;
 const SPIN_WINDUP_MS = 160;
 const SPIN_GRAVITY_MS = 110;
 const BLUR_MAX = 12;
-const LAND_BOUNCE_PX = 9;
-const LAND_BOUNCE_DOWN_MS = 52;
-const LAND_BOUNCE_UP_MS = 150;
+const REEL_BRAKE_PX = 135;
+const REEL_BRAKE_MS = 240;
+const LAND_BOUNCE_PX = 6;
+const LAND_BOUNCE_DOWN_MS = 80;
+const LAND_BOUNCE_UP_MS = 200;
 const SPIN_BELOW_ROWS = 4;
 const NUDGE_WINDUP_MS = 100;
 const NUDGE_PUSH_MS = 340;
@@ -119,6 +121,9 @@ type SpinJob = {
   windupMs: number;
   gravityMs: number;
   velocity: number;
+  braking: boolean;
+  brakeAt: number;
+  brakeFrom: number;
   bouncePx: number;
   bounceAt: number;
   landed: boolean;
@@ -519,6 +524,9 @@ export class BoardController {
         windupMs: SPIN_WINDUP_MS,
         gravityMs: SPIN_GRAVITY_MS,
         velocity: plan.velocity * (0.97 + col * 0.012),
+        braking: false,
+        brakeAt: 0,
+        brakeFrom: 0,
         bouncePx: LAND_BOUNCE_PX + (col % 3) - 1,
         bounceAt: 0,
         landed: false,
@@ -675,16 +683,32 @@ export class BoardController {
         applySpinBlur(job.strip, job.blur, 0);
         continue;
       }
+      if (job.braking) {
+        this.tickReelBrake(job, now);
+        continue;
+      }
       const fallMs = elapsed - job.windupMs;
       const offset = this.fallOffset(job, fallMs);
-      if (offset <= 0) {
-        this.landReel(job, now);
+      if (offset <= REEL_BRAKE_PX) {
+        job.braking = true;
+        job.brakeAt = now;
+        job.brakeFrom =
+          offset > 0 ? offset : Math.min(REEL_BRAKE_PX, Math.max(-job.strip.y, job.velocity * 16));
+        this.tickReelBrake(job, now);
         continue;
       }
       job.strip.y = -offset;
       const spinBlur = BLUR_MAX * Math.min(1, this.fallSpeed(job, fallMs) / job.velocity);
       applySpinBlur(job.strip, job.blur, offset < CELL ? spinBlur * (offset / CELL) : spinBlur);
     }
+  }
+
+  private tickReelBrake(job: SpinJob, now: number) {
+    const progress = Math.min(Math.max((now - job.brakeAt) / REEL_BRAKE_MS, 0), 1);
+    const remaining = job.brakeFrom * (1 - easeOutCubic(progress));
+    job.strip.y = -remaining;
+    applySpinBlur(job.strip, job.blur, BLUR_MAX * 0.32 * (1 - progress));
+    if (progress >= 1) this.landReel(job, now);
   }
 
   private tickLandBounce(job: SpinJob, now: number) {
