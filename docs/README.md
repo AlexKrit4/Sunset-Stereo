@@ -1,18 +1,9 @@
 # Docs for the next model
 
-Read **[ENGINE_DOCUMENTATION.md](./ENGINE_DOCUMENTATION.md)** first.
+Read **[engine/README.md](./engine/README.md)** first. That folder is markdown Stake Engine documentation (Math SDK, frontend SDK, RGS, approval) plus publish hard rules.
 
-Publication gap analysis vs that dump: **[STAKE_PUBLICATION_REVIEW.md](./STAKE_PUBLICATION_REVIEW.md)** (includes ACP steps for the 1M-book math upload).
+Fallback scrape of the old site: **[ENGINE_DOCUMENTATION.md](./ENGINE_DOCUMENTATION.md)**. Prefer `docs/engine/` when they disagree.
 
-Production game is **6×4 ways** (`games/sunset_stereo/`, `apps/sunset-stereo/`). The 5×3 lines + Golden Hour package is inactive.
+Sunset Stereo publication notes: **[STAKE_PUBLICATION_REVIEW.md](./STAKE_PUBLICATION_REVIEW.md)** (ACP upload steps; buy-bonus is 95× for 3 scatters — some older bullets in that file still describe the first test pack).
 
-It contains every public technical section from https://engine.io/docs:
-
-- Math SDK (setup, quick start, game format, gamestate, source files, optimization, samples)
-- Frontend SDK (getting started, file structure, events, Storybook, UI, context)
-- RGS (play/wallet APIs and fifty-fifty example)
-- Approval guidelines (replay, tiles, math verification, checklist, jurisdiction)
-
-Part 1 is the live site text. Part 2 is the official Math SDK markdown with code blocks.
-
-Do not fetch engine.io in a browser to continue implementation — this dump is the source of truth in-repo.
+Production game is **6×4 ways** (`games/sunset_stereo/`, `apps/sunset-stereo/`). The 5×3 lines + Golden Hour package is inactive. Do not fetch engine.io / stake-engine.com in a browser to continue implementation — use `docs/engine/`.
