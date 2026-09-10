@@ -426,10 +426,12 @@ export class BoardController {
     const extra = Array.from({ length: COLS }, (_, col) => (opts.anticipation?.[col] || 0) * 480);
     const holds = (opts.holds ?? []).map(unpadPosition);
     const upcomingWins = (opts.upcomingWins ?? []).map(unpadPosition);
-    this.landingBright = new Set(upcomingWins.map((pos) => `${pos.reel}:${pos.row}`));
+    this.landingBright.clear();
     if (this.bonusDim) this.clearSheens();
     else this.clearWins();
-    await this.spinTo(names, [], extra, [], opts.pace, holds);
+    const spin = this.spinTo(names, [], extra, [], opts.pace, holds);
+    this.landingBright = new Set(upcomingWins.map((pos) => `${pos.reel}:${pos.row}`));
+    await spin;
   }
 
   applyBookHolds(board: RawSymbol[][], positions: Position[]) {
