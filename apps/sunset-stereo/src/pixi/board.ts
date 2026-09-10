@@ -276,10 +276,10 @@ export class BoardController {
   }
 
   private paintStrip(strip: Container, names: string[], mults?: number[]) {
-    strip.children.forEach((child) => {
+    const previousChildren = strip.removeChildren();
+    previousChildren.forEach((child) => {
       if (child instanceof Container) this.cellAnimations.get(child)?.finish();
     });
-    strip.removeChildren();
     names.forEach((name, index) => {
       const view = asView(name, mults?.[index] ?? 1);
       this.setCellRestPosition(view, index);
@@ -479,7 +479,6 @@ export class BoardController {
   ) {
     if (this.spinning) return;
     this.markSymbolActivity();
-    this.finishCellAnimations();
     this.spinning = true;
     this.teaseOverlay.clear();
     this.scatterOverlay.clear();
@@ -621,10 +620,7 @@ export class BoardController {
     this.reelMasks.forEach((mask, reel) => {
       mask.clear();
       const rows = getReelRows(reel);
-      for (let row = 0; row < rows; row += 1) {
-        if (this.heldCells.has(`${reel}:${row}`)) continue;
-        mask.rect(0, row * CELL, CELL, CELL).fill(0xffffff);
-      }
+      mask.rect(0, 0, CELL, rows * CELL).fill(0xffffff);
     });
   }
 
@@ -794,10 +790,6 @@ export class BoardController {
   private markSymbolActivity() {
     const spread = SYMBOL_IDLE_MAX_MS - SYMBOL_IDLE_MIN_MS;
     this.nextSymbolIdleAt = performance.now() + SYMBOL_IDLE_MIN_MS + Math.random() * spread;
-  }
-
-  private finishCellAnimations() {
-    [...this.cellAnimations.values()].forEach((animation) => animation.finish());
   }
 
   private animateCell(
