@@ -40,11 +40,15 @@ const WIN_DIM_FROM_REEL = 2;
 const WIN_SHEEN_MS = 640;
 const WIN_SHEEN_STAGGER_MS = 36;
 const COCKTAIL_NAMES = new Set(["L5", "low5"]);
+const ANIMATED_SYMBOL_NAMES = new Set(["H1", "H2", "H3", "H4", "H5", "L1", "L2", "L3", "L4", "L5"]);
 const COCKTAIL_LAND_MS = 720;
-const COCKTAIL_IDLE_MIN_MS = 2600;
-const COCKTAIL_IDLE_MAX_MS = 4800;
+const SYMBOL_IDLE_MIN_MS = 2400;
+const SYMBOL_IDLE_MAX_MS = 4400;
 const COCKTAIL_IDLE_MS = 2400;
 const COCKTAIL_WIN_MS = 1800;
+const THEMED_LAND_MS = 900;
+const THEMED_IDLE_MS = 2400;
+const THEMED_WIN_MS = 1800;
 
 type CellAnimation = {
   tick: () => void;
@@ -180,8 +184,8 @@ export class BoardController {
   private brightCells = new Set<string>();
   private landingBright = new Set<string>();
   private cellAnimations = new Map<Container, CellAnimation>();
-  private nextCocktailIdleAt = performance.now() + COCKTAIL_IDLE_MIN_MS;
-  private idleTick = () => this.tickCocktailIdle();
+  private nextSymbolIdleAt = performance.now() + SYMBOL_IDLE_MIN_MS;
+  private idleTick = () => this.tickSymbolIdle();
 
   constructor(app: Application) {
     this.app = app;
@@ -427,8 +431,8 @@ export class BoardController {
     } else {
       this.dimNonWinners(cells, COLS - 1);
     }
-    this.markCocktailActivity();
-    await Promise.all([this.playWinSheen(cells), this.playCocktailWins(cells)]);
+    this.markSymbolActivity();
+    await Promise.all([this.playWinSheen(cells), this.playSymbolWins(cells)]);
   }
 
   showBookScatters(_board: RawSymbol[][]) {}
@@ -451,7 +455,7 @@ export class BoardController {
     holds: Array<{ reel: number; row: number }> = [],
   ) {
     if (this.spinning) return;
-    this.markCocktailActivity();
+    this.markSymbolActivity();
     this.finishCellAnimations();
     this.spinning = true;
     this.teaseOverlay.clear();
@@ -639,7 +643,7 @@ export class BoardController {
     job.bounceAt = now;
     applySpinBlur(job.strip, job.blur, 0);
     this.landStatic(job.col, job.finals);
-    this.playCocktailLanding(job.col);
+    this.playSymbolLanding(job.col);
     job.strip.y = 0;
     if (!job.settled) {
       job.settled = true;
@@ -712,14 +716,14 @@ export class BoardController {
     }
   }
 
-  private markCocktailActivity() {
-    const spread = COCKTAIL_IDLE_MAX_MS - COCKTAIL_IDLE_MIN_MS;
-    this.nextCocktailIdleAt = performance.now() + COCKTAIL_IDLE_MIN_MS + Math.random() * spread;
+  private markSymbolActivity() {
+    const spread = SYMBOL_IDLE_MAX_MS - SYMBOL_IDLE_MIN_MS;
+    this.nextSymbolIdleAt = performance.now() + SYMBOL_IDLE_MIN_MS + Math.random() * spread;
   }
 
   private clearCellEffects(cell: Container) {
     cell.children
-      .filter((child) => child.label?.startsWith("cocktail-fx"))
+      .filter((child) => child.label?.startsWith("symbol-fx"))
       .forEach((child) => child.destroy());
   }
 
@@ -743,6 +747,7 @@ export class BoardController {
       cell.position.set(restX, restY);
       cell.scale.set(1);
       cell.rotation = 0;
+      this.resetSymbolParts(cell);
       this.clearCellEffects(cell);
     };
     const finish = () => {
@@ -770,15 +775,19 @@ export class BoardController {
     return promise;
   }
 
-  private playCocktailLanding(reel: number) {
+  private playSymbolLanding(reel: number) {
     this.visible[reel]?.forEach((name, row) => {
-      if (!COCKTAIL_NAMES.has(name)) return;
+      if (!ANIMATED_SYMBOL_NAMES.has(name)) return;
       const cell = this.cells[reel]?.[row];
       if (!cell) return;
+      if (!COCKTAIL_NAMES.has(name)) {
+        void this.playThemedLanding(cell, name);
+        return;
+      }
       this.cellAnimations.get(cell)?.finish();
       this.clearCellEffects(cell);
       const splash = new Graphics();
-      splash.label = "cocktail-fx-land";
+      splash.label = "symbol-fx-cocktail-land";
       splash.ellipse(CELL / 2, CELL * 0.8, CELL * 0.28, 5).stroke({
         color: 0xffd37a,
         width: 3,
@@ -819,10 +828,10 @@ export class BoardController {
     });
   }
 
-  private tickCocktailIdle() {
+  private tickSymbolIdle() {
     const now = performance.now();
     if (
-      now < this.nextCocktailIdleAt ||
+      now < this.nextSymbolIdleAt ||
       this.spinning ||
       this.bonusDim ||
       Boolean(this.sheenTick) ||
@@ -830,22 +839,26 @@ export class BoardController {
     ) {
       return;
     }
-    const candidates: Container[] = [];
+    const candidates: Array<{ cell: Container; name: string }> = [];
     this.visible.forEach((names, reel) => {
       names.forEach((name, row) => {
         const cell = this.cells[reel]?.[row];
-        if (COCKTAIL_NAMES.has(name) && cell?.parent) candidates.push(cell);
+        if (ANIMATED_SYMBOL_NAMES.has(name) && cell?.parent) candidates.push({ cell, name });
       });
     });
     if (!candidates.length) {
-      this.markCocktailActivity();
+      this.markSymbolActivity();
       return;
     }
-    const cell = candidates[Math.floor(Math.random() * candidates.length)];
+    const { cell, name } = candidates[Math.floor(Math.random() * candidates.length)];
+    if (!COCKTAIL_NAMES.has(name)) {
+      void this.playThemedIdle(cell, name).finally(() => this.markSymbolActivity());
+      return;
+    }
     this.cellAnimations.get(cell)?.finish();
     this.clearCellEffects(cell);
     const glint = new Graphics();
-    glint.label = "cocktail-fx-idle";
+    glint.label = "symbol-fx-cocktail-idle";
     glint
       .moveTo(CELL * 0.7, CELL * 0.19)
       .lineTo(CELL * 0.7, CELL * 0.33)
@@ -865,21 +878,25 @@ export class BoardController {
       glint.alpha = Math.max(0, Math.sin(progress * Math.PI * 2)) * 0.95;
       glint.scale.set(0.4 + envelope * 0.85);
       glint.rotation = progress * Math.PI * 0.8;
-    }).finally(() => this.markCocktailActivity());
+    }).finally(() => this.markSymbolActivity());
   }
 
-  private playCocktailWins(positions: Array<{ reel: number; row: number }>) {
-    const cocktails = [...new Set(positions
-      .filter((pos) => COCKTAIL_NAMES.has(this.visible[pos.reel]?.[pos.row]))
-      .map((pos) => this.sheenCell(pos))
-      .filter((cell): cell is Container => Boolean(cell)))];
-    if (!cocktails.length) return Promise.resolve();
+  private playSymbolWins(positions: Array<{ reel: number; row: number }>) {
+    const seen = new Set<Container>();
+    const symbols = positions
+      .map((pos) => ({ cell: this.sheenCell(pos), name: this.visible[pos.reel]?.[pos.row] }))
+      .filter(
+        (entry): entry is { cell: Container; name: string } =>
+          Boolean(entry.cell) && ANIMATED_SYMBOL_NAMES.has(entry.name) && !seen.has(entry.cell!) && Boolean(seen.add(entry.cell!)),
+      );
+    if (!symbols.length) return Promise.resolve();
     return Promise.all(
-      cocktails.map((cell, index) => {
+      symbols.map(({ cell, name }, index) => {
+        if (!COCKTAIL_NAMES.has(name)) return this.playThemedWin(cell, name, index);
         this.cellAnimations.get(cell)?.finish();
         this.clearCellEffects(cell);
         const celebration = new Graphics();
-        celebration.label = "cocktail-fx-win";
+        celebration.label = "symbol-fx-cocktail-win";
         celebration.circle(CELL / 2, CELL / 2, CELL * 0.39).stroke({
           color: 0xffd060,
           width: 4,
@@ -917,6 +934,274 @@ export class BoardController {
         });
       }),
     ).then(() => undefined);
+  }
+
+  private symbolPart(cell: Container, name: string) {
+    const part = cell.children.find((child) => child.label === `symbol-part:${name}`);
+    return part instanceof Container ? part : null;
+  }
+
+  private equalizerParts(cell: Container) {
+    return [1, 2, 3, 4]
+      .map((index) => this.symbolPart(cell, `equalizer-bar-${index}`))
+      .filter((part): part is Container => Boolean(part));
+  }
+
+  private resetSymbolParts(cell: Container) {
+    cell.children
+      .filter((child) => child.label?.startsWith("symbol-part:"))
+      .forEach((child) => {
+        child.scale.set(1);
+        child.rotation = 0;
+        child.alpha = 1;
+      });
+  }
+
+  private prepareThemedAnimation(cell: Container) {
+    this.cellAnimations.get(cell)?.finish();
+    this.clearCellEffects(cell);
+    this.resetSymbolParts(cell);
+  }
+
+  private playThemedLanding(cell: Container, name: string) {
+    this.prepareThemedAnimation(cell);
+    const impact = new Graphics();
+    impact.label = "symbol-fx-land";
+    impact.ellipse(CELL / 2, CELL * 0.82, CELL * 0.3, 4).fill({
+      color: name === "L4" ? 0x8cff9d : 0xffc064,
+      alpha: 0.75,
+    });
+    impact.alpha = 0;
+    cell.addChild(impact);
+    const crown = this.symbolPart(cell, "palm-crown");
+    const bars = this.equalizerParts(cell);
+    const restY = cell.y;
+    return this.animateCell(cell, THEMED_LAND_MS, (progress) => {
+      if (progress < 0.26) {
+        const u = easeOutQuad(progress / 0.26);
+        cell.y = restY - 18 + u * 24;
+        cell.scale.set(0.9 + u * 0.18, 1.12 - u * 0.3);
+        impact.alpha = u;
+        impact.scale.set(0.55 + u * 0.65, 0.7 + u * 0.35);
+      } else {
+        const u = (progress - 0.26) / 0.74;
+        const damping = 1 - u;
+        cell.y = restY + Math.cos(u * Math.PI * 3) * 6 * damping;
+        cell.scale.set(1 + Math.sin(u * Math.PI * 3) * 0.08 * damping, 1 - Math.sin(u * Math.PI * 3) * 0.1 * damping);
+        impact.alpha = Math.max(0, 1 - u * 2.4);
+      }
+
+      if (name === "L4" && crown) {
+        crown.rotation = Math.sin(progress * Math.PI * 5) * (1 - progress) * 0.25;
+        crown.scale.set(1 + Math.sin(progress * Math.PI * 4) * (1 - progress) * 0.06);
+      } else if (name === "L3" && bars.length) {
+        bars.forEach((bar, index) => {
+          const phase = Math.min(Math.max((progress - index * 0.07) / 0.72, 0), 1);
+          bar.scale.y = 1 - Math.sin(phase * Math.PI) * 0.5;
+        });
+      } else if (name === "H3") {
+        cell.rotation = Math.sin(progress * Math.PI * 4) * (1 - progress) * 0.08;
+      } else if (name === "H4") {
+        cell.rotation = Math.sin(progress * Math.PI * 3) * (1 - progress) * 0.07;
+      } else if (name === "H5") {
+        cell.scale.x *= 1 - Math.sin(progress * Math.PI) * 0.04;
+      }
+    });
+  }
+
+  private playThemedIdle(cell: Container, name: string) {
+    this.prepareThemedAnimation(cell);
+    const fx = new Graphics();
+    fx.label = "symbol-fx-idle";
+    const crown = this.symbolPart(cell, "palm-crown");
+    const bars = this.equalizerParts(cell);
+    const restX = cell.x;
+    const restY = cell.y;
+
+    if (name === "L2") {
+      fx.circle(67, 27, 3).fill({ color: 0xffed9a, alpha: 0.95 });
+      fx.circle(73, 16, 2).fill({ color: 0xff9bd2, alpha: 0.9 });
+    } else if (name === "L1" || name === "H2" || name === "H4") {
+      [18, 27, 36].forEach((radius) =>
+        fx.circle(CELL / 2, CELL / 2, radius).stroke({ color: 0xffc86b, width: 2, alpha: 0.55 }),
+      );
+    } else if (name === "H3") {
+      [31, 59].forEach((x) => {
+        fx.circle(x, 45, 8).stroke({ color: 0xffee9a, width: 2, alpha: 0.9 });
+        fx.moveTo(x, 37).lineTo(x, 53).stroke({ color: 0xffee9a, width: 1.5, alpha: 0.8 });
+      });
+    } else if (name === "H5") {
+      [27, 38, 49, 60].forEach((x) => fx.circle(x, 25, 2.5).fill({ color: 0xffd060, alpha: 0.95 }));
+    } else if (name === "H1") {
+      fx.circle(CELL / 2, CELL / 2, 8).stroke({ color: 0xffe2a0, width: 2, alpha: 0.85 });
+      fx.moveTo(CELL / 2, CELL / 2).lineTo(66, 35).stroke({ color: 0xffe2a0, width: 2, alpha: 0.85 });
+    }
+    fx.alpha = 0;
+    cell.addChild(fx);
+
+    return this.animateCell(cell, THEMED_IDLE_MS, (progress) => {
+      const envelope = Math.sin(progress * Math.PI);
+      const wave = Math.sin(progress * Math.PI * 4);
+      fx.alpha = envelope * 0.85;
+
+      if (name === "L4") {
+        cell.rotation = wave * envelope * 0.055;
+        cell.y = restY - envelope * 4;
+        if (crown) crown.rotation = Math.sin(progress * Math.PI * 6) * envelope * 0.09;
+      } else if (name === "L3" && bars.length) {
+        bars.forEach((bar, index) => {
+          bar.scale.y = 1 - (0.1 + index * 0.035) * envelope * (0.5 + 0.5 * Math.sin(progress * Math.PI * 6 + index));
+        });
+      } else if (name === "L2") {
+        cell.y = restY - envelope * 7;
+        cell.rotation = wave * envelope * 0.055;
+        fx.y = -envelope * 8;
+      } else if (name === "L1") {
+        const pulse = 1 + envelope * (0.025 + 0.025 * Math.sin(progress * Math.PI * 8));
+        cell.scale.set(pulse);
+        fx.scale.set(0.75 + progress * 0.7);
+        fx.alpha *= 1 - progress;
+      } else if (name === "H1") {
+        cell.rotation = easeInOutQuad(progress) * Math.PI * 0.7;
+        fx.rotation = -cell.rotation;
+      } else if (name === "H2") {
+        const beat = Math.max(0, Math.sin(progress * Math.PI * 6)) * envelope;
+        cell.scale.set(1 + beat * 0.06);
+        fx.scale.set(0.75 + progress * 0.55);
+        fx.alpha *= 1 - progress;
+      } else if (name === "H3") {
+        cell.rotation = wave * envelope * 0.025;
+        fx.rotation = progress * Math.PI * 2;
+      } else if (name === "H4") {
+        cell.rotation = wave * envelope * 0.07;
+        fx.x = wave * 3;
+        fx.scale.set(0.8 + progress * 0.45);
+      } else if (name === "H5") {
+        cell.x = restX + wave * envelope * 0.5;
+        fx.alpha = (0.3 + 0.7 * Math.max(0, Math.sin(progress * Math.PI * 8))) * envelope;
+      }
+    });
+  }
+
+  private playThemedWin(cell: Container, name: string, index: number) {
+    this.prepareThemedAnimation(cell);
+    const fx = new Container();
+    fx.label = "symbol-fx-win";
+    const drawing = new Graphics();
+    fx.addChild(drawing);
+    const crown = this.symbolPart(cell, "palm-crown");
+    const bars = this.equalizerParts(cell);
+    const equalizerCells: Graphics[] = [];
+    const restX = cell.x;
+    const restY = cell.y;
+
+    if (name === "L1") {
+      [18, 28, 38].forEach((radius) =>
+        drawing.circle(CELL / 2, CELL / 2, radius).stroke({ color: 0xffd060, width: 3, alpha: 0.9 }),
+      );
+    } else if (name === "L3") {
+      const heights = [4, 6, 3, 5];
+      heights.forEach((height, column) => {
+        for (let row = 0; row < height; row += 1) {
+          const cellBar = new Graphics();
+          cellBar.roundRect(21 + column * 13, 66 - row * 10, 9, 7, 2).fill({
+            color: row > 3 ? 0xff6b5c : 0xffd45c,
+            alpha: 0.95,
+          });
+          cellBar.alpha = 0;
+          fx.addChild(cellBar);
+          equalizerCells.push(cellBar);
+        }
+      });
+    } else if (name === "L4") {
+      [[18, 25], [72, 22], [14, 56], [76, 58], [46, 12]].forEach(([x, y], particle) =>
+        drawing.circle(x, y, 2 + (particle % 2)).fill({ color: particle % 2 ? 0x7dff9b : 0xffe27a, alpha: 0.95 }),
+      );
+    } else if (name === "H1") {
+      drawing.circle(45, 45, 39).stroke({ color: 0xffca62, width: 3, alpha: 0.95 });
+      drawing.moveTo(45, 45).lineTo(70, 24).stroke({ color: 0xffffff, width: 2, alpha: 0.9 });
+    } else if (name === "H2") {
+      [22, 32, 42].forEach((radius) =>
+        drawing.circle(45, 45, radius).stroke({ color: 0xffc45c, width: 2.5, alpha: 0.8 }),
+      );
+    } else if (name === "H3") {
+      [31, 59].forEach((x) => {
+        drawing.circle(x, 45, 10).stroke({ color: 0xffeea0, width: 2.5, alpha: 0.95 });
+        drawing.moveTo(x, 35).lineTo(x, 55).stroke({ color: 0xffeea0, width: 2, alpha: 0.95 });
+      });
+      drawing.moveTo(31, 45).bezierCurveTo(41, 26, 49, 64, 59, 45).stroke({ color: 0xff8fbc, width: 2, alpha: 0.85 });
+    } else if (name === "H4") {
+      [20, 31, 42].forEach((radius) =>
+        drawing.circle(45, 39, radius).stroke({ color: 0xffd978, width: 2.5, alpha: 0.82 }),
+      );
+    } else if (name === "H5") {
+      drawing
+        .moveTo(16, 60)
+        .lineTo(31, 42)
+        .lineTo(40, 52)
+        .lineTo(56, 30)
+        .lineTo(73, 48)
+        .stroke({ color: 0xffed72, width: 3, alpha: 0.95 });
+    } else if (name === "L2") {
+      drawing.circle(45, 45, 39).stroke({ color: 0xffd66b, width: 3, alpha: 0.9 });
+      drawing.circle(45, 45, 33).stroke({ color: 0xff79d9, width: 2, alpha: 0.75 });
+    }
+    drawing.blendMode = "add";
+    fx.alpha = 0;
+    cell.addChild(fx);
+
+    return this.animateCell(cell, THEMED_WIN_MS + index * 20, (progress) => {
+      const entrance = easeOutCubic(Math.min(progress / 0.2, 1));
+      const exit = progress > 0.82 ? 1 - easeOutQuad((progress - 0.82) / 0.18) : 1;
+      const energy = entrance * exit;
+      fx.alpha = energy;
+
+      if (name === "L2") {
+        cell.rotation = easeInOutQuad(progress) * Math.PI * 2;
+        cell.scale.set(1 + Math.sin(progress * Math.PI * 4) * energy * 0.08);
+        fx.rotation = -cell.rotation * 0.35;
+      } else if (name === "L1") {
+        const kick = Math.max(0, Math.sin(progress * Math.PI * 8)) * energy;
+        cell.scale.set(1 + kick * 0.1);
+        fx.scale.set(0.55 + progress * 1.2);
+        fx.alpha *= 1 - progress * 0.85;
+      } else if (name === "L3") {
+        bars.forEach((bar, barIndex) => {
+          const local = Math.min(Math.max(progress * 2.2 - barIndex * 0.1, 0), 1);
+          bar.scale.y = 0.28 + easeOutCubic(local) * 0.72;
+        });
+        equalizerCells.forEach((barCell, cellIndex) => {
+          const local = Math.min(Math.max(progress * 2.4 - cellIndex * 0.035, 0), 1);
+          barCell.alpha = local * exit;
+        });
+        cell.scale.set(1 + Math.sin(progress * Math.PI * 6) * energy * 0.04);
+      } else if (name === "L4") {
+        if (crown) crown.rotation = Math.sin(progress * Math.PI * 12) * energy * 0.13;
+        cell.scale.set(1 + Math.sin(progress * Math.PI * 4) * energy * 0.07);
+        drawing.rotation = progress * Math.PI * 2;
+      } else if (name === "H1") {
+        cell.rotation = progress * Math.PI * 4;
+        fx.rotation = -progress * Math.PI * 2;
+        cell.scale.set(1 + energy * 0.08);
+      } else if (name === "H2") {
+        const beat = Math.max(0, Math.sin(progress * Math.PI * 8)) * energy;
+        cell.scale.set(1 + beat * 0.12);
+        fx.scale.set(0.6 + progress * 1.15);
+        fx.alpha *= 1 - progress * 0.75;
+      } else if (name === "H3") {
+        cell.rotation = Math.sin(progress * Math.PI * 8) * energy * 0.04;
+        drawing.rotation = progress * Math.PI * 4;
+      } else if (name === "H4") {
+        cell.rotation = Math.sin(progress * Math.PI * 6) * energy * 0.08;
+        fx.scale.set(0.65 + progress * 1.1);
+        fx.alpha *= 1 - progress * 0.78;
+      } else if (name === "H5") {
+        cell.x = restX + Math.sin(progress * Math.PI * 14) * energy * 2;
+        cell.scale.set(1 + Math.sin(progress * Math.PI * 6) * energy * 0.06);
+        drawing.alpha = 0.45 + Math.max(0, Math.sin(progress * Math.PI * 10)) * 0.55;
+      }
+      cell.y = restY - Math.sin(progress * Math.PI * 2) * energy * 4;
+    });
   }
 
   private async nudgePush(reel: number, names: string[], expandRow: number) {

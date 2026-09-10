@@ -9,11 +9,18 @@ import speakerUrl from "../assets/symbols/speaker.png";
 import noteUrl from "../assets/symbols/note.png";
 import equalizerUrl from "../assets/symbols/equalizer.png";
 import palmUrl from "../assets/symbols/palm.png";
+import palmCrownUrl from "../assets/symbols/palm-crown.png";
+import palmTrunkUrl from "../assets/symbols/palm-trunk.png";
+import equalizerBar1Url from "../assets/symbols/equalizer-bar-1.png";
+import equalizerBar2Url from "../assets/symbols/equalizer-bar-2.png";
+import equalizerBar3Url from "../assets/symbols/equalizer-bar-3.png";
+import equalizerBar4Url from "../assets/symbols/equalizer-bar-4.png";
 import cocktailUrl from "../assets/symbols/cocktail.png";
 import mixerUrl from "../assets/symbols/mixer.png";
 import sunsetUrl from "../assets/symbols/sunset.png";
 
 const ART: Partial<Record<string, Texture>> = {};
+const PART_ART: Partial<Record<string, Texture>> = {};
 
 const ART_URLS: Record<string, string> = {
   H1: vinylUrl,
@@ -28,6 +35,15 @@ const ART_URLS: Record<string, string> = {
   L5: cocktailUrl,
   W: mixerUrl,
   S: sunsetUrl,
+};
+
+const PART_URLS: Record<string, string> = {
+  "palm-trunk": palmTrunkUrl,
+  "palm-crown": palmCrownUrl,
+  "equalizer-bar-1": equalizerBar1Url,
+  "equalizer-bar-2": equalizerBar2Url,
+  "equalizer-bar-3": equalizerBar3Url,
+  "equalizer-bar-4": equalizerBar4Url,
 };
 
 export const SYMBOL_PAY_ART: Record<string, string> = {
@@ -46,10 +62,14 @@ export const SYMBOL_PAY_ART: Record<string, string> = {
 
 export async function loadSymbolArt() {
   const entries = Object.entries(ART_URLS).filter(([key]) => !ART[key]);
-  if (!entries.length) return;
+  const partEntries = Object.entries(PART_URLS).filter(([key]) => !PART_ART[key]);
   const loaded = await Promise.all(entries.map(([, url]) => Assets.load(url)));
+  const loadedParts = await Promise.all(partEntries.map(([, url]) => Assets.load(url)));
   entries.forEach(([key], index) => {
     ART[key] = loaded[index] as Texture;
+  });
+  partEntries.forEach(([key], index) => {
+    PART_ART[key] = loadedParts[index] as Texture;
   });
 }
 
@@ -100,8 +120,34 @@ export function createSymbolView(symbol: RawSymbol, size: number): Container {
   const colors = PALETTE[name] ?? PALETTE[symbol.name] ?? PALETTE.L1;
   const art = ART[name];
 
-  if (art) {
+  if (name === "L4" && PART_ART["palm-trunk"] && PART_ART["palm-crown"]) {
+    for (const partName of ["palm-trunk", "palm-crown"]) {
+      const image = new Sprite(PART_ART[partName]);
+      image.label = `symbol-part:${partName}`;
+      image.width = inner;
+      image.height = inner;
+      if (partName === "palm-crown") {
+        image.anchor.set(0.5, 0.55);
+        image.position.set(pad + inner / 2, pad + inner * 0.55);
+      } else {
+        image.position.set(pad, pad);
+      }
+      root.addChild(image);
+    }
+  } else if (name === "L3" && PART_ART["equalizer-bar-1"]) {
+    for (let index = 1; index <= 4; index += 1) {
+      const partName = `equalizer-bar-${index}`;
+      const image = new Sprite(PART_ART[partName]);
+      image.label = `symbol-part:${partName}`;
+      image.width = inner;
+      image.height = inner;
+      image.anchor.set(0.5, 1);
+      image.position.set(pad + inner / 2, pad + inner);
+      root.addChild(image);
+    }
+  } else if (art) {
     const image = new Sprite(art);
+    image.label = "symbol-part:art";
     image.position.set(pad, pad);
     image.width = inner;
     image.height = inner;
