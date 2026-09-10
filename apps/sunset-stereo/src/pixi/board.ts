@@ -39,6 +39,17 @@ const WIN_DIM_ALPHA = 0.38;
 const WIN_DIM_FROM_REEL = 2;
 const WIN_SHEEN_MS = 640;
 const WIN_SHEEN_STAGGER_MS = 36;
+const COCKTAIL_NAMES = new Set(["L5", "low5"]);
+const COCKTAIL_LAND_MS = 430;
+const COCKTAIL_IDLE_MIN_MS = 4200;
+const COCKTAIL_IDLE_MAX_MS = 7800;
+const COCKTAIL_IDLE_MS = 1250;
+const COCKTAIL_WIN_MS = 980;
+
+type CellAnimation = {
+  tick: () => void;
+  finish: () => void;
+};
 
 function spinRng() {
   return {
@@ -168,6 +179,9 @@ export class BoardController {
   private bonusDim = false;
   private brightCells = new Set<string>();
   private landingBright = new Set<string>();
+  private cellAnimations = new Map<Container, CellAnimation>();
+  private nextCocktailIdleAt = performance.now() + COCKTAIL_IDLE_MIN_MS;
+  private idleTick = () => this.tickCocktailIdle();
 
   constructor(app: Application) {
     this.app = app;
@@ -225,13 +239,24 @@ export class BoardController {
     window.addChild(this.teaseOverlay, this.scatterOverlay);
     this.root.addChild(window);
     this.app.stage.addChild(this.root);
+    this.app.ticker.add(this.idleTick);
+  }
+
+  private setCellRestPosition(view: Container, row: number) {
+    view.pivot.set(CELL / 2, CELL / 2);
+    view.position.set(CELL / 2, Math.round(row * CELL) + CELL / 2);
+    view.scale.set(1);
+    view.rotation = 0;
   }
 
   private paintStrip(strip: Container, names: string[], mults?: number[]) {
+    strip.children.forEach((child) => {
+      if (child instanceof Container) this.cellAnimations.get(child)?.finish();
+    });
     strip.removeChildren();
     names.forEach((name, index) => {
       const view = asView(name, mults?.[index] ?? 1);
-      view.y = Math.round(index * CELL);
+      this.setCellRestPosition(view, index);
       strip.addChild(view);
     });
     strip.y = 0;
@@ -402,7 +427,8 @@ export class BoardController {
     } else {
       this.dimNonWinners(cells, COLS - 1);
     }
-    await this.playWinSheen(cells);
+    this.markCocktailActivity();
+    await Promise.all([this.playWinSheen(cells), this.playCocktailWins(cells)]);
   }
 
   showBookScatters(_board: RawSymbol[][]) {}
@@ -425,6 +451,8 @@ export class BoardController {
     holds: Array<{ reel: number; row: number }> = [],
   ) {
     if (this.spinning) return;
+    this.markCocktailActivity();
+    this.finishCellAnimations();
     this.spinning = true;
     this.teaseOverlay.clear();
     this.scatterOverlay.clear();
@@ -611,6 +639,7 @@ export class BoardController {
     job.bounceAt = now;
     applySpinBlur(job.strip, job.blur, 0);
     this.landStatic(job.col, job.finals);
+    this.playCocktailLanding(job.col);
     job.strip.y = 0;
     if (!job.settled) {
       job.settled = true;
@@ -642,7 +671,7 @@ export class BoardController {
   private replaceCell(col: number, row: number, name: string, mult = 1) {
     const strip = this.reels[col];
     const next = asView(name, mult);
-    next.y = Math.round(row * CELL);
+    this.setCellRestPosition(next, row);
     if (row < strip.children.length) strip.removeChildAt(row);
     strip.addChildAt(next, Math.min(row, strip.children.length));
     this.cells[col][row] = next;
@@ -681,6 +710,213 @@ export class BoardController {
       badge.text = "";
       badge.visible = false;
     }
+  }
+
+  private markCocktailActivity() {
+    const spread = COCKTAIL_IDLE_MAX_MS - COCKTAIL_IDLE_MIN_MS;
+    this.nextCocktailIdleAt = performance.now() + COCKTAIL_IDLE_MIN_MS + Math.random() * spread;
+  }
+
+  private clearCellEffects(cell: Container) {
+    cell.children
+      .filter((child) => child.label?.startsWith("cocktail-fx"))
+      .forEach((child) => child.destroy());
+  }
+
+  private finishCellAnimations() {
+    [...this.cellAnimations.values()].forEach((animation) => animation.finish());
+  }
+
+  private animateCell(
+    cell: Container,
+    duration: number,
+    render: (progress: number, elapsed: number) => void,
+  ) {
+    const restX = cell.x;
+    const restY = cell.y;
+    let settled = false;
+    let resolveAnimation: () => void = () => {};
+    const promise = new Promise<void>((resolve) => {
+      resolveAnimation = resolve;
+    });
+    const reset = () => {
+      cell.position.set(restX, restY);
+      cell.scale.set(1);
+      cell.rotation = 0;
+      this.clearCellEffects(cell);
+    };
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      this.app.ticker.remove(tick);
+      reset();
+      this.cellAnimations.delete(cell);
+      resolveAnimation();
+    };
+    const started = performance.now();
+    const tick = () => {
+      if (!cell.parent) {
+        finish();
+        return;
+      }
+      const elapsed = performance.now() - started;
+      const progress = Math.min(elapsed / duration, 1);
+      render(progress, elapsed);
+      if (progress >= 1) finish();
+    };
+    this.cellAnimations.set(cell, { tick, finish });
+    render(0, 0);
+    this.app.ticker.add(tick);
+    return promise;
+  }
+
+  private playCocktailLanding(reel: number) {
+    this.visible[reel]?.forEach((name, row) => {
+      if (!COCKTAIL_NAMES.has(name)) return;
+      const cell = this.cells[reel]?.[row];
+      if (!cell) return;
+      this.cellAnimations.get(cell)?.finish();
+      this.clearCellEffects(cell);
+      const splash = new Graphics();
+      splash.label = "cocktail-fx-land";
+      splash.ellipse(CELL / 2, CELL * 0.8, CELL * 0.28, 5).stroke({
+        color: 0xffd37a,
+        width: 3,
+        alpha: 0.9,
+      });
+      [-1, 0, 1].forEach((offset) => {
+        splash.circle(CELL / 2 + offset * 15, CELL * 0.72 - Math.abs(offset) * 3, 2.5).fill({
+          color: offset === 0 ? 0xfff2be : 0xffa85c,
+          alpha: 0.92,
+        });
+      });
+      splash.alpha = 0;
+      cell.addChild(splash);
+      const restY = cell.y;
+      void this.animateCell(cell, COCKTAIL_LAND_MS, (progress) => {
+        if (progress < 0.2) {
+          const u = easeOutQuad(progress / 0.2);
+          cell.y = restY - 10 + 13 * u;
+          cell.scale.set(0.9 + 0.22 * u, 1.12 - 0.3 * u);
+          cell.rotation = -0.045 + 0.08 * u;
+          splash.alpha = u;
+          splash.scale.set(0.7 + u * 0.35);
+        } else if (progress < 0.58) {
+          const u = easeOutCubic((progress - 0.2) / 0.38);
+          cell.y = restY + 3 - 5 * u;
+          cell.scale.set(1.12 - 0.15 * u, 0.82 + 0.24 * u);
+          cell.rotation = 0.035 - 0.055 * u;
+          splash.alpha = 1 - u;
+          splash.scale.set(1.05 + u * 0.35);
+        } else {
+          const u = easeOutCubic((progress - 0.58) / 0.42);
+          cell.y = restY - 2 + 2 * u;
+          cell.scale.set(0.97 + 0.03 * u, 1.06 - 0.06 * u);
+          cell.rotation = -0.02 * (1 - u);
+          splash.alpha = 0;
+        }
+      });
+    });
+  }
+
+  private tickCocktailIdle() {
+    const now = performance.now();
+    if (
+      now < this.nextCocktailIdleAt ||
+      this.spinning ||
+      this.bonusDim ||
+      Boolean(this.sheenTick) ||
+      this.cellAnimations.size > 0
+    ) {
+      return;
+    }
+    const candidates: Container[] = [];
+    this.visible.forEach((names, reel) => {
+      names.forEach((name, row) => {
+        const cell = this.cells[reel]?.[row];
+        if (COCKTAIL_NAMES.has(name) && cell?.parent) candidates.push(cell);
+      });
+    });
+    if (!candidates.length) {
+      this.markCocktailActivity();
+      return;
+    }
+    const cell = candidates[Math.floor(Math.random() * candidates.length)];
+    this.cellAnimations.get(cell)?.finish();
+    this.clearCellEffects(cell);
+    const glint = new Graphics();
+    glint.label = "cocktail-fx-idle";
+    glint
+      .moveTo(CELL * 0.7, CELL * 0.19)
+      .lineTo(CELL * 0.7, CELL * 0.33)
+      .moveTo(CELL * 0.63, CELL * 0.26)
+      .lineTo(CELL * 0.77, CELL * 0.26)
+      .stroke({ color: 0xfff7d0, width: 2.5, alpha: 0.95 });
+    glint.alpha = 0;
+    glint.scale.set(0.4);
+    cell.addChild(glint);
+    const restY = cell.y;
+    void this.animateCell(cell, COCKTAIL_IDLE_MS, (progress) => {
+      const wave = Math.sin(progress * Math.PI * 4);
+      const envelope = Math.sin(progress * Math.PI);
+      cell.rotation = wave * envelope * 0.055;
+      cell.y = restY - envelope * 3;
+      cell.scale.set(1 + envelope * 0.018, 1 - envelope * 0.012);
+      glint.alpha = Math.max(0, Math.sin(progress * Math.PI * 2)) * 0.95;
+      glint.scale.set(0.4 + envelope * 0.85);
+      glint.rotation = progress * Math.PI * 0.8;
+    }).finally(() => this.markCocktailActivity());
+  }
+
+  private playCocktailWins(positions: Array<{ reel: number; row: number }>) {
+    const cocktails = positions
+      .filter((pos) => COCKTAIL_NAMES.has(this.visible[pos.reel]?.[pos.row]))
+      .map((pos) => this.sheenCell(pos))
+      .filter((cell): cell is Container => Boolean(cell));
+    if (!cocktails.length) return Promise.resolve();
+    return Promise.all(
+      cocktails.map((cell, index) => {
+        this.cellAnimations.get(cell)?.finish();
+        this.clearCellEffects(cell);
+        const celebration = new Graphics();
+        celebration.label = "cocktail-fx-win";
+        celebration.circle(CELL / 2, CELL / 2, CELL * 0.39).stroke({
+          color: 0xffd060,
+          width: 4,
+          alpha: 0.95,
+        });
+        const bubbles = [
+          { x: 21, y: 62, r: 3 },
+          { x: 68, y: 60, r: 4 },
+          { x: 28, y: 29, r: 2.5 },
+          { x: 73, y: 28, r: 2.5 },
+        ];
+        bubbles.forEach((bubble) => {
+          celebration.circle(bubble.x, bubble.y, bubble.r).stroke({
+            color: 0xfff2b0,
+            width: 2,
+            alpha: 0.9,
+          });
+        });
+        celebration.blendMode = "add";
+        celebration.alpha = 0;
+        celebration.scale.set(0.72);
+        cell.addChild(celebration);
+        const restY = cell.y;
+        return this.animateCell(cell, COCKTAIL_WIN_MS + index * 25, (progress) => {
+          const entrance = easeOutCubic(Math.min(progress / 0.22, 1));
+          const exit = progress > 0.78 ? 1 - easeOutQuad((progress - 0.78) / 0.22) : 1;
+          const energy = entrance * exit;
+          cell.y = restY - Math.sin(progress * Math.PI * 2) * 5 * energy;
+          cell.rotation = Math.sin(progress * Math.PI * 6) * 0.075 * energy;
+          const pulse = 1 + Math.sin(progress * Math.PI * 4) * 0.1 * energy;
+          cell.scale.set(pulse);
+          celebration.alpha = energy * (0.58 + Math.sin(progress * Math.PI * 4) * 0.32);
+          celebration.scale.set(0.72 + entrance * 0.5 + progress * 0.18);
+          celebration.rotation = progress * Math.PI * 1.5;
+        });
+      }),
+    ).then(() => undefined);
   }
 
   private async nudgePush(reel: number, names: string[], expandRow: number) {
