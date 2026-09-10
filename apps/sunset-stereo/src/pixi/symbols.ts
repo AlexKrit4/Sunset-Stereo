@@ -1,17 +1,17 @@
-import { Assets, Container, Graphics, Texture, Text } from "pixi.js";
+import { Assets, Container, Graphics, Sprite, Texture, Text } from "pixi.js";
 import type { RawSymbol } from "../game/typesBookEvent";
-import vinylUrl from "../assets/symbols/vinyl.jpg";
-import headphonesUrl from "../assets/symbols/headphones.jpg";
-import cassetteUrl from "../assets/symbols/cassette.jpg";
-import microphoneUrl from "../assets/symbols/microphone.jpg";
-import ampUrl from "../assets/symbols/amp.jpg";
-import speakerUrl from "../assets/symbols/speaker.jpg";
-import noteUrl from "../assets/symbols/note.jpg";
-import equalizerUrl from "../assets/symbols/equalizer.jpg";
-import palmUrl from "../assets/symbols/palm.jpg";
-import cocktailUrl from "../assets/symbols/cocktail.jpg";
-import mixerUrl from "../assets/symbols/mixer.jpg";
-import sunsetUrl from "../assets/symbols/sunset.jpg";
+import vinylUrl from "../assets/symbols/vinyl.png";
+import headphonesUrl from "../assets/symbols/headphones.png";
+import cassetteUrl from "../assets/symbols/cassette.png";
+import microphoneUrl from "../assets/symbols/microphone.png";
+import ampUrl from "../assets/symbols/amp.png";
+import speakerUrl from "../assets/symbols/speaker.png";
+import noteUrl from "../assets/symbols/note.png";
+import equalizerUrl from "../assets/symbols/equalizer.png";
+import palmUrl from "../assets/symbols/palm.png";
+import cocktailUrl from "../assets/symbols/cocktail.png";
+import mixerUrl from "../assets/symbols/mixer.png";
+import sunsetUrl from "../assets/symbols/sunset.png";
 
 const ART: Partial<Record<string, Texture>> = {};
 
@@ -101,9 +101,11 @@ export function createSymbolView(symbol: RawSymbol, size: number): Container {
   const art = ART[name];
 
   if (art) {
-    g.roundRect(pad, pad, inner, inner, 10).fill({ texture: art, textureSpace: "local" });
-    g.roundRect(pad, pad, inner, inner, 10).stroke({ color: 0x000000, width: 1, alpha: 0.28 });
-    root.addChild(g);
+    const image = new Sprite(art);
+    image.position.set(pad, pad);
+    image.width = inner;
+    image.height = inner;
+    root.addChild(image);
   } else {
   fillRound(g, pad, pad, inner, inner, 10, colors.wood);
   g.roundRect(pad, pad, inner, inner, 10).stroke({ color: 0x000000, width: 1, alpha: 0.45 });
