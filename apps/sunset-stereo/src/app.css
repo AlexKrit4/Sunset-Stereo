@@ -60,8 +60,6 @@ h1 {
 
 .frame {
   position: relative;
-  border: 14px solid #c4a574;
-  box-shadow: 0 18px 40px rgba(20, 10, 0, 0.45);
   background: transparent;
 }
 
