@@ -735,8 +735,10 @@ export class BoardController {
   private traceSymbolAnimation(phase: "land" | "idle" | "win", name: string) {
     if (typeof document === "undefined") return;
     const count = Number(document.body.dataset.symbolAnimationCount ?? 0) + 1;
+    const phaseKey = `symbolAnimation${phase[0].toUpperCase()}${phase.slice(1)}Count`;
     document.body.dataset.symbolAnimation = `${phase}:${name}`;
     document.body.dataset.symbolAnimationCount = String(count);
+    document.body.dataset[phaseKey] = String(Number(document.body.dataset[phaseKey] ?? 0) + 1);
   }
 
   private markSymbolActivity() {
