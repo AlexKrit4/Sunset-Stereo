@@ -122,32 +122,35 @@ export function createSymbolView(symbol: RawSymbol, size: number): Container {
 
   if (name === "L4" && PART_ART["palm-trunk"] && PART_ART["palm-crown"]) {
     for (const partName of ["palm-trunk", "palm-crown"]) {
+      const part = new Container();
+      part.label = `symbol-part:${partName}`;
       const image = new Sprite(PART_ART[partName]);
-      image.label = `symbol-part:${partName}`;
       image.width = inner;
       image.height = inner;
       if (partName === "palm-crown") {
-        image.anchor.set(0.5, 0.55);
-        image.position.set(pad + inner / 2, pad + inner * 0.55);
+        part.position.set(pad + inner / 2, pad + inner * 0.55);
+        image.position.set(-inner / 2, -inner * 0.55);
       } else {
-        image.position.set(pad, pad);
+        part.position.set(pad, pad);
       }
-      root.addChild(image);
+      part.addChild(image);
+      root.addChild(part);
     }
   } else if (name === "L3" && PART_ART["equalizer-bar-1"]) {
     for (let index = 1; index <= 4; index += 1) {
       const partName = `equalizer-bar-${index}`;
+      const part = new Container();
+      part.label = `symbol-part:${partName}`;
+      part.position.set(pad + inner / 2, pad + inner);
       const image = new Sprite(PART_ART[partName]);
-      image.label = `symbol-part:${partName}`;
       image.width = inner;
       image.height = inner;
-      image.anchor.set(0.5, 1);
-      image.position.set(pad + inner / 2, pad + inner);
-      root.addChild(image);
+      image.position.set(-inner / 2, -inner);
+      part.addChild(image);
+      root.addChild(part);
     }
   } else if (art) {
     const image = new Sprite(art);
-    image.label = "symbol-part:art";
     image.position.set(pad, pad);
     image.width = inner;
     image.height = inner;
