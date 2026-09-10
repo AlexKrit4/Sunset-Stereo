@@ -113,6 +113,7 @@ type SpinJob = {
   col: number;
   strip: Container;
   outgoing: Container;
+  outgoingBlur: BlurFilter;
   blur: BlurFilter;
   startAt: number;
   restOffset: number;
@@ -298,9 +299,12 @@ export class BoardController {
     const hold = this.holds[col];
     const outgoing = new Container();
     outgoing.eventMode = "none";
+    const outgoingBlur = new BlurFilter({ strength: 0, quality: 3 });
+    outgoingBlur.strengthX = 0;
+    outgoingBlur.strengthY = 0;
     this.cells[col]?.forEach((cell) => outgoing.addChild(cell));
     if (host && hold) host.addChildAt(outgoing, host.getChildIndex(hold));
-    return outgoing;
+    return { outgoing, outgoingBlur };
   }
 
   private positionOutgoingReel(job: SpinJob) {
@@ -311,6 +315,8 @@ export class BoardController {
     job.outgoing.children.slice().forEach((child) => {
       if (child instanceof Container) this.cellAnimations.get(child)?.finish();
     });
+    job.outgoing.filters = [];
+    job.outgoingBlur.destroy();
     job.outgoing.destroy({ children: true });
   }
 
@@ -525,7 +531,7 @@ export class BoardController {
       const fillers = pickStripItems(rng, col, plan.fillers);
       const restOffset = (rows + plan.fillers) * CELL;
       const below = pickStripItems(rng, col, SPIN_BELOW_ROWS);
-      const outgoing = this.makeOutgoingReel(col);
+      const { outgoing, outgoingBlur } = this.makeOutgoingReel(col);
       this.paintStrip(strip, [...finals, ...fillers, ...this.visible[col], ...below]);
       for (let index = rows + plan.fillers; index < rows * 2 + plan.fillers; index += 1) {
         strip.children[index].visible = false;
@@ -536,6 +542,7 @@ export class BoardController {
         col,
         strip,
         outgoing,
+        outgoingBlur,
         blur,
         startAt: now + plan.delay,
         restOffset,
@@ -697,6 +704,7 @@ export class BoardController {
         job.strip.y = -(job.restOffset + tossed);
         this.positionOutgoingReel(job);
         applySpinBlur(job.strip, job.blur, 0);
+        applySpinBlur(job.outgoing, job.outgoingBlur, 0);
         continue;
       }
       const fallMs = elapsed - job.windupMs;
@@ -709,6 +717,7 @@ export class BoardController {
       this.positionOutgoingReel(job);
       const spinBlur = BLUR_MAX * Math.min(1, this.fallSpeed(job, fallMs) / job.velocity);
       applySpinBlur(job.strip, job.blur, offset < CELL ? spinBlur * (offset / CELL) : spinBlur);
+      applySpinBlur(job.outgoing, job.outgoingBlur, spinBlur);
     }
   }
 
