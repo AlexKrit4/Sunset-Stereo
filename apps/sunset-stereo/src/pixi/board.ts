@@ -128,7 +128,6 @@ type SpinJob = {
   rows: number;
   done: boolean;
   settled: boolean;
-  landingAnimation?: Promise<void>;
 };
 
 export type HoldStep = {
@@ -579,14 +578,12 @@ export class BoardController {
         this.tickSpins();
         if (this.jobs.every((job) => job.done)) {
           this.app.ticker.remove(this.boundTick);
-          void Promise.all(this.jobs.map((job) => job.landingAnimation)).then(() => {
-            this.teaseOverlay.clear();
-            this.scatterOverlay.clear();
-            this.teaseOverlay.alpha = 1;
-            this.spinning = false;
-            this.onSettled = null;
-            resolve();
-          });
+          this.teaseOverlay.clear();
+          this.scatterOverlay.clear();
+          this.teaseOverlay.alpha = 1;
+          this.spinning = false;
+          this.onSettled = null;
+          resolve();
         }
       };
       this.app.ticker.add(this.boundTick);
@@ -745,7 +742,7 @@ export class BoardController {
     job.outgoing.y = job.restOffset;
     this.removeOutgoingReel(job);
     this.landStatic(job.col, job.finals);
-    job.landingAnimation = this.playSymbolLanding(job.col);
+    void this.playSymbolLanding(job.col);
     job.strip.y = 0;
     if (!job.settled) {
       job.settled = true;
