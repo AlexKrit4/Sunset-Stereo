@@ -63,10 +63,15 @@ class GameExecutables(GameCalculations):
         """Respin cells that are not part of a held winning combination."""
         reelstrip_id = get_random_outcome(self.get_current_distribution_conditions()["reel_weights"][self.gametype])
         reelstrip = self.config.reels[reelstrip_id]
+        force_wincap = bool(self.get_current_distribution_conditions().get("force_wincap"))
         for reel in range(self.config.num_reels):
             strip = [symbol for symbol in reelstrip[reel] if symbol != "S"]
             if not strip:
                 strip = list(reelstrip[reel])
+            if force_wincap:
+                highs = [symbol for symbol in strip if symbol in {"H1", "H2"}]
+                if highs:
+                    strip = highs + strip
             for row in range(self.config.num_rows[reel]):
                 if (reel, row) in locked:
                     continue
@@ -79,8 +84,8 @@ class GameExecutables(GameCalculations):
         self.get_special_symbols_on_board()
         self.anticipation = [0] * self.config.num_reels
 
-    def play_hold_respin_spin(self) -> None:
-        """One extra play: pay only after hold-respins stop adding winning cells."""
+    def _hold_respin_body(self) -> None:
+        """One extra play: lock winning cells and respin the rest until growth stops."""
         self.draw_board()
         locked: set[tuple[int, int]] = set()
         total_cells = sum(self.config.num_rows)
@@ -107,4 +112,47 @@ class GameExecutables(GameCalculations):
             if step < MAX_HOLD_RESPINS:
                 hold_respin_event(self, locked, continuing=True)
 
+        self.pay_current_board()
+
+    def play_hold_respin_spin(self) -> None:
+        """One extra play. Dead buys may redraw the extra play so the book stays under 95×."""
+        if self.betmode != "bonus" or self.criteria != "dead":
+            self._hold_respin_body()
+            return
+        for _ in range(50):
+            events_len = len(self.book.events)
+            running = self.win_manager.running_bet_win
+            spin = self.win_manager.spin_win
+            tumble = self.win_manager.tumble_win
+            cap = self.wincap_triggered
+            self._hold_respin_body()
+            if self.win_manager.running_bet_win < 95:
+                return
+            self.book.events = self.book.events[:events_len]
+            self.win_manager.running_bet_win = running
+            self.win_manager.spin_win = spin
+            self.win_manager.tumble_win = tumble
+            self.wincap_triggered = cap
+        self._hold_respin_zero()
+
+    def _hold_respin_zero(self) -> None:
+        """Last-resort extra play that does not recoup the 95× buy."""
+        mix = ["H1", "H2", "H3", "H4", "H5", "L1", "L2", "L3", "L4", "L5"]
+        for _ in range(40):
+            self.draw_board(emit_event=False)
+            for reel in range(self.config.num_reels):
+                for row in range(self.config.num_rows[reel]):
+                    self.board[reel][row] = self.create_symbol(random.choice(mix))
+                if self.config.include_padding:
+                    self.top_symbols[reel] = self.create_symbol(random.choice(mix))
+                    self.bottom_symbols[reel] = self.create_symbol(random.choice(mix))
+            self.get_special_symbols_on_board()
+            self.evaluate_ways_board(emit_events=False)
+            if self.win_manager.running_bet_win + self.win_data["totalWin"] < 95:
+                reveal_event(self)
+                self.pay_current_board()
+                return
+        self.draw_board(emit_event=False)
+        reveal_event(self)
+        self.win_data = {"totalWin": 0, "wins": []}
         self.pay_current_board()

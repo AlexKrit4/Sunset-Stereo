@@ -3,12 +3,12 @@ Sunset Stereo
 
 PRODUCTION math package for Stake Engine.
 
-6-reel, 4-row, left-to-right ways. No wilds, no xWays / xNudge,
-no bonus buy.
+6-reel, 4-row, left-to-right ways. No wilds, no xWays / xNudge.
+Buy bonus: 3 scatters for 95x the selected 1x stake.
 
 3 scatters on reels 2-5 start 10 extra plays. Base game plus those
 10 extra plays is one book / one bet. Live scatter chance is tuned
-near 1 in 150-180.
+near 1 in 150-180. The 95x buy always starts with exactly 3 scatters.
 
 During an extra play, a winning ways combo is not paid yet. Winning
 cells hold and unlocked cells respin (the respin does not consume one
@@ -41,4 +41,13 @@ Target RTP
 ----------
 95.00%, high volatility.
 Bonus fence ~0.560 at ~1/180, basegame ~0.380 at ~1/5, wincap ~0.010.
-`run.py` emits 1,000,000 compressed books and runs optimization.
+`run.py` emits 1,000,000 compressed base books and runs optimization.
+
+Buy bonus
+---------
+Mode name `bonus`, cost 95.0, is_buybonus=True, is_feature=False.
+50,000 unique books. LUT weights lock 75% below 95x and 25% at/above 95x,
+RTP 95% of the 95x cost (payouts still counted in 1x units). Max-win
+15000x of 1x is extremely rare. Generate with:
+
+SUNSET_SIM_MODE=bonus python3 games/sunset_stereo/run.py

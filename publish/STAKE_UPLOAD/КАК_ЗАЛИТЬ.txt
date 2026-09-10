@@ -1,16 +1,18 @@
 Sunset Stereo — что заливать в Stake Engine ACP
 ==============================================
 
-MATH: 1 000 000 книг, ~95% RTP, потолок 15000×.
+MATH: 1 000 000 base books + 50 000 buy-bonus books, ~95% RTP, потолок 15000×.
 FRONTEND: статический Vite-билд (base="./"), без внешних шрифтов.
 
 1) MATH
    Скачай: http://13.143.132.112:1337/Sunset-Stereo-math.zip
    Распакуй в Z:\ — получится Z:\Sunset Stereo\math
-   В ACP выбери папку math. В ней ровно три файла:
+   В ACP выбери папку math. В ней:
      index.json
      books_base.jsonl.zst
      lookUpTable_base_0.csv
+     books_bonus.jsonl.zst
+     lookUpTable_bonus_0.csv
 
 2) FRONTEND
    Скачай: http://13.143.132.112:1337/Sunset-Stereo-frontend.zip
@@ -36,4 +38,3 @@ FRONTEND: статический Vite-билд (base="./"), без внешни�
 Не лей:
   games/_inactive_sunset_stereo_5x3
   frontend/  (старый 5x3 DOM)
-  lookUpTable_bonus_*

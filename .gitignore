@@ -32,6 +32,8 @@ dist/
 .svelte-kit/
 publish/sunset_stereo/books_base.jsonl.zst
 publish/sunset_stereo/lookUpTable_base_0.csv
+publish/sunset_stereo/books_bonus.jsonl.zst
+publish/sunset_stereo/lookUpTable_bonus_0.csv
 publish/Sunset-Stereo-Stake.zip
 publish/Sunset-Stereo-frontend.zip
 publish/STAKE_UPLOAD/frontend/audio/

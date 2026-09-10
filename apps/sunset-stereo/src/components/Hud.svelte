@@ -11,6 +11,7 @@
   } = $props();
 
   const locked = $derived(ui.busy || !ui.ready);
+  const showBuy = $derived(!ui.replay && !ui.disableBuyFeature);
 </script>
 
 <div class="bar">
@@ -46,6 +47,17 @@
   <button id="spinBtn" class="spin" type="button" disabled={locked} onclick={onSpin}>
     {ui.replay && ui.winMicro ? "Play again" : labels.spin()}
   </button>
+  {#if showBuy}
+    <button
+      id="bonusBtn"
+      class="buy"
+      type="button"
+      disabled={locked}
+      onclick={() => (ui.buyMenuOpen = true)}
+    >
+      {labels.buy()}
+    </button>
+  {/if}
   <button class="ghost" type="button" onclick={() => (ui.rulesOpen = true)}>Rules</button>
   <button
     id="musicBtn"
@@ -111,6 +123,15 @@
   .spin {
     min-width: 120px;
     background: #7a3218;
+    border-color: #c4a574;
+    color: #f8ece0;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .buy {
+    min-width: 96px;
+    background: #5a2a48;
     border-color: #c4a574;
     color: #f8ece0;
     letter-spacing: 0.12em;

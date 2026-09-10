@@ -4,7 +4,7 @@ Reviewed against `docs/ENGINE_DOCUMENTATION.md` (engine.io Math, Frontend, RGS, 
 
 **Current status: first Engine *test* version is ready to upload.** This is not a production math pack and is not ready for Stake review.
 
-**Production (locked):** 6×4 left-to-right ways. 3 scatters → 10 hold-respin extra plays. No wilds, no xWays/xNudge, no Golden Hour, no buy bonus.
+**Production (locked):** 6×4 left-to-right ways. 3 scatters → 10 hold-respin extra plays. No wilds, no xWays/xNudge, no Golden Hour. Buy bonus: 95× for 3 scatters.
 
 | Surface | Role |
 | --- | --- |

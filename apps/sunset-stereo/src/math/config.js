@@ -57,3 +57,10 @@ export const SYMBOLS = [
 ];
 
 export const BETS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 25];
+
+export const BUY_BONUS = {
+  mode: "bonus",
+  cost: 95,
+  label: "3 scatters",
+  spins: BONUS_SPINS,
+};
