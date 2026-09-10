@@ -65,7 +65,6 @@ const THEMED_WIN_MS = 1800;
 type CellAnimation = {
   tick: () => void;
   finish: () => void;
-  promise: Promise<void>;
 };
 
 function spinRng() {
@@ -462,18 +461,12 @@ export class BoardController {
   }
 
   async presentNewBonusWins(fresh: Position[], allWins: Position[], firstCombo: boolean) {
-    if (firstCombo) {
-      if (fresh.length) {
-        await wait(80);
-        await this.flashBonusWins(fresh);
-      }
-      this.lockBonusWinners(allWins);
-      if (fresh.length) await wait(140);
-      return;
+    if (fresh.length) {
+      if (firstCombo) await wait(80);
+      await this.flashBonusWins(fresh);
     }
     this.lockBonusWinners(allWins);
-    if (!fresh.length) return;
-    await this.flashBonusWins(fresh);
+    if (fresh.length && firstCombo) await wait(140);
   }
 
   async showBookWins(positions: Position[]) {
@@ -487,15 +480,7 @@ export class BoardController {
       this.dimNonWinners(cells, COLS - 1);
     }
     this.markSymbolActivity();
-    const sheen = this.playWinSheen(cells);
-    const waitForLandings = Promise.all(
-      cells
-        .map((pos) => this.sheenCell(pos))
-        .filter((cell): cell is Container => Boolean(cell))
-        .map((cell) => this.cellAnimations.get(cell)?.promise ?? Promise.resolve()),
-    );
-    const wins = waitForLandings.then(() => this.playSymbolWins(cells));
-    await Promise.all([sheen, wins]);
+    await Promise.all([this.playWinSheen(cells), this.playSymbolWins(cells)]);
   }
 
   showBookScatters(_board: RawSymbol[][]) {}
@@ -634,6 +619,20 @@ export class BoardController {
   }
 
   private makeHoldView(name: string, pos: { reel: number; row: number }) {
+    const live = this.cells[pos.reel]?.[pos.row];
+    const strip = this.reels[pos.reel];
+    if (live && strip && live.parent === strip) {
+      const index = strip.getChildIndex(live);
+      live.label = this.holdLabel(pos.reel, pos.row);
+      live.eventMode = "none";
+      const placeholder = new Container();
+      placeholder.eventMode = "none";
+      this.setCellRestPosition(placeholder, pos.row);
+      placeholder.alpha = 0;
+      strip.addChildAt(placeholder, index);
+      this.cells[pos.reel][pos.row] = placeholder;
+      return live;
+    }
     const view = asView(name);
     view.label = this.holdLabel(pos.reel, pos.row);
     view.eventMode = "none";
@@ -875,7 +874,7 @@ export class BoardController {
       render(progress, elapsed);
       if (progress >= 1) finish();
     };
-    this.cellAnimations.set(cell, { tick, finish, promise });
+    this.cellAnimations.set(cell, { tick, finish });
     render(0, 0);
     this.app.ticker.add(tick);
     return promise;
