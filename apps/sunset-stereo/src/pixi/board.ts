@@ -746,12 +746,6 @@ export class BoardController {
     this.nextSymbolIdleAt = performance.now() + SYMBOL_IDLE_MIN_MS + Math.random() * spread;
   }
 
-  private clearCellEffects(cell: Container) {
-    cell.children
-      .filter((child) => child.label?.startsWith("symbol-fx"))
-      .forEach((child) => child.destroy());
-  }
-
   private finishCellAnimations() {
     [...this.cellAnimations.values()].forEach((animation) => animation.finish());
   }
@@ -773,7 +767,6 @@ export class BoardController {
       cell.scale.set(1);
       cell.rotation = 0;
       this.resetSymbolParts(cell);
-      this.clearCellEffects(cell);
     };
     const finish = () => {
       if (settled) return;
@@ -812,22 +805,6 @@ export class BoardController {
         return;
       }
       this.cellAnimations.get(cell)?.finish();
-      this.clearCellEffects(cell);
-      const splash = new Graphics();
-      splash.label = "symbol-fx-cocktail-land";
-      splash.ellipse(CELL / 2, CELL * 0.8, CELL * 0.28, 5).stroke({
-        color: 0xffd37a,
-        width: 3,
-        alpha: 0.9,
-      });
-      [-1, 0, 1].forEach((offset) => {
-        splash.circle(CELL / 2 + offset * 15, CELL * 0.72 - Math.abs(offset) * 3, 2.5).fill({
-          color: offset === 0 ? 0xfff2be : 0xffa85c,
-          alpha: 0.92,
-        });
-      });
-      splash.alpha = 0;
-      cell.addChild(splash);
       const restY = cell.y;
       void this.animateCell(cell, COCKTAIL_LAND_MS, (progress) => {
         if (progress < 0.2) {
@@ -835,21 +812,16 @@ export class BoardController {
           cell.y = restY - 16 + 22 * u;
           cell.scale.set(0.82 + 0.36 * u, 1.2 - 0.42 * u);
           cell.rotation = -0.09 + 0.16 * u;
-          splash.alpha = u;
-          splash.scale.set(0.7 + u * 0.35);
         } else if (progress < 0.58) {
           const u = easeOutCubic((progress - 0.2) / 0.38);
           cell.y = restY + 6 - 10 * u;
           cell.scale.set(1.18 - 0.22 * u, 0.78 + 0.32 * u);
           cell.rotation = 0.07 - 0.11 * u;
-          splash.alpha = 1 - u;
-          splash.scale.set(1.05 + u * 0.35);
         } else {
           const u = easeOutCubic((progress - 0.58) / 0.42);
           cell.y = restY - 4 + 4 * u;
           cell.scale.set(0.96 + 0.04 * u, 1.1 - 0.1 * u);
           cell.rotation = -0.04 * (1 - u);
-          splash.alpha = 0;
         }
       });
     });
@@ -885,18 +857,6 @@ export class BoardController {
       return;
     }
     this.cellAnimations.get(cell)?.finish();
-    this.clearCellEffects(cell);
-    const glint = new Graphics();
-    glint.label = "symbol-fx-cocktail-idle";
-    glint
-      .moveTo(CELL * 0.7, CELL * 0.19)
-      .lineTo(CELL * 0.7, CELL * 0.33)
-      .moveTo(CELL * 0.63, CELL * 0.26)
-      .lineTo(CELL * 0.77, CELL * 0.26)
-      .stroke({ color: 0xfff7d0, width: 2.5, alpha: 0.95 });
-    glint.alpha = 0;
-    glint.scale.set(0.4);
-    cell.addChild(glint);
     const restY = cell.y;
     void this.animateCell(cell, COCKTAIL_IDLE_MS, (progress) => {
       const wave = Math.sin(progress * Math.PI * 4);
@@ -904,9 +864,6 @@ export class BoardController {
       cell.rotation = wave * envelope * 0.12;
       cell.y = restY - envelope * 8;
       cell.scale.set(1 + envelope * 0.06, 1 - envelope * 0.035);
-      glint.alpha = Math.max(0, Math.sin(progress * Math.PI * 2)) * 0.95;
-      glint.scale.set(0.4 + envelope * 0.85);
-      glint.rotation = progress * Math.PI * 0.8;
     }).finally(() => this.markSymbolActivity());
   }
 
@@ -928,31 +885,6 @@ export class BoardController {
       symbols.map(({ cell, name }, index) => {
         if (!COCKTAIL_NAMES.has(name)) return this.playThemedWin(cell, name, index);
         this.cellAnimations.get(cell)?.finish();
-        this.clearCellEffects(cell);
-        const celebration = new Graphics();
-        celebration.label = "symbol-fx-cocktail-win";
-        celebration.circle(CELL / 2, CELL / 2, CELL * 0.39).stroke({
-          color: 0xffd060,
-          width: 4,
-          alpha: 0.95,
-        });
-        const bubbles = [
-          { x: 21, y: 62, r: 3 },
-          { x: 68, y: 60, r: 4 },
-          { x: 28, y: 29, r: 2.5 },
-          { x: 73, y: 28, r: 2.5 },
-        ];
-        bubbles.forEach((bubble) => {
-          celebration.circle(bubble.x, bubble.y, bubble.r).stroke({
-            color: 0xfff2b0,
-            width: 2,
-            alpha: 0.9,
-          });
-        });
-        celebration.blendMode = "add";
-        celebration.alpha = 0;
-        celebration.scale.set(0.72);
-        cell.addChild(celebration);
         const restY = cell.y;
         return this.animateCell(cell, COCKTAIL_WIN_MS + index * 25, (progress) => {
           const entrance = easeOutCubic(Math.min(progress / 0.22, 1));
@@ -962,9 +894,6 @@ export class BoardController {
           cell.rotation = Math.sin(progress * Math.PI * 6) * 0.13 * energy;
           const pulse = 1 + Math.sin(progress * Math.PI * 4) * 0.17 * energy;
           cell.scale.set(pulse);
-          celebration.alpha = energy * (0.58 + Math.sin(progress * Math.PI * 4) * 0.32);
-          celebration.scale.set(0.72 + entrance * 0.5 + progress * 0.18);
-          celebration.rotation = progress * Math.PI * 1.5;
         });
       }),
     ).then(() => undefined);
@@ -993,20 +922,11 @@ export class BoardController {
 
   private prepareThemedAnimation(cell: Container) {
     this.cellAnimations.get(cell)?.finish();
-    this.clearCellEffects(cell);
     this.resetSymbolParts(cell);
   }
 
   private playThemedLanding(cell: Container, name: string) {
     this.prepareThemedAnimation(cell);
-    const impact = new Graphics();
-    impact.label = "symbol-fx-land";
-    impact.ellipse(CELL / 2, CELL * 0.82, CELL * 0.3, 4).fill({
-      color: name === "L4" ? 0x8cff9d : 0xffc064,
-      alpha: 0.75,
-    });
-    impact.alpha = 0;
-    cell.addChild(impact);
     const crown = this.symbolPart(cell, "palm-crown");
     const bars = this.equalizerParts(cell);
     const restY = cell.y;
@@ -1015,14 +935,11 @@ export class BoardController {
         const u = easeOutQuad(progress / 0.26);
         cell.y = restY - 18 + u * 24;
         cell.scale.set(0.9 + u * 0.18, 1.12 - u * 0.3);
-        impact.alpha = u;
-        impact.scale.set(0.55 + u * 0.65, 0.7 + u * 0.35);
       } else {
         const u = (progress - 0.26) / 0.74;
         const damping = 1 - u;
         cell.y = restY + Math.cos(u * Math.PI * 3) * 6 * damping;
         cell.scale.set(1 + Math.sin(u * Math.PI * 3) * 0.08 * damping, 1 - Math.sin(u * Math.PI * 3) * 0.1 * damping);
-        impact.alpha = Math.max(0, 1 - u * 2.4);
       }
 
       if (name === "L4" && crown) {
@@ -1045,38 +962,14 @@ export class BoardController {
 
   private playThemedIdle(cell: Container, name: string) {
     this.prepareThemedAnimation(cell);
-    const fx = new Graphics();
-    fx.label = "symbol-fx-idle";
     const crown = this.symbolPart(cell, "palm-crown");
     const bars = this.equalizerParts(cell);
     const restX = cell.x;
     const restY = cell.y;
 
-    if (name === "L2") {
-      fx.circle(67, 27, 3).fill({ color: 0xffed9a, alpha: 0.95 });
-      fx.circle(73, 16, 2).fill({ color: 0xff9bd2, alpha: 0.9 });
-    } else if (name === "L1" || name === "H2" || name === "H4") {
-      [18, 27, 36].forEach((radius) =>
-        fx.circle(CELL / 2, CELL / 2, radius).stroke({ color: 0xffc86b, width: 2, alpha: 0.55 }),
-      );
-    } else if (name === "H3") {
-      [31, 59].forEach((x) => {
-        fx.circle(x, 45, 8).stroke({ color: 0xffee9a, width: 2, alpha: 0.9 });
-        fx.moveTo(x, 37).lineTo(x, 53).stroke({ color: 0xffee9a, width: 1.5, alpha: 0.8 });
-      });
-    } else if (name === "H5") {
-      [27, 38, 49, 60].forEach((x) => fx.circle(x, 25, 2.5).fill({ color: 0xffd060, alpha: 0.95 }));
-    } else if (name === "H1") {
-      fx.circle(CELL / 2, CELL / 2, 8).stroke({ color: 0xffe2a0, width: 2, alpha: 0.85 });
-      fx.moveTo(CELL / 2, CELL / 2).lineTo(66, 35).stroke({ color: 0xffe2a0, width: 2, alpha: 0.85 });
-    }
-    fx.alpha = 0;
-    cell.addChild(fx);
-
     return this.animateCell(cell, THEMED_IDLE_MS, (progress) => {
       const envelope = Math.sin(progress * Math.PI);
       const wave = Math.sin(progress * Math.PI * 4);
-      fx.alpha = envelope * 0.85;
 
       if (name === "L4") {
         cell.rotation = wave * envelope * 0.055;
@@ -1089,150 +982,64 @@ export class BoardController {
       } else if (name === "L2") {
         cell.y = restY - envelope * 7;
         cell.rotation = wave * envelope * 0.055;
-        fx.y = -envelope * 8;
       } else if (name === "L1") {
         const pulse = 1 + envelope * (0.025 + 0.025 * Math.sin(progress * Math.PI * 8));
         cell.scale.set(pulse);
-        fx.scale.set(0.75 + progress * 0.7);
-        fx.alpha *= 1 - progress;
       } else if (name === "H1") {
         cell.rotation = easeInOutQuad(progress) * Math.PI * 0.7;
-        fx.rotation = -cell.rotation;
       } else if (name === "H2") {
         const beat = Math.max(0, Math.sin(progress * Math.PI * 6)) * envelope;
         cell.scale.set(1 + beat * 0.06);
-        fx.scale.set(0.75 + progress * 0.55);
-        fx.alpha *= 1 - progress;
       } else if (name === "H3") {
         cell.rotation = wave * envelope * 0.025;
-        fx.rotation = progress * Math.PI * 2;
       } else if (name === "H4") {
         cell.rotation = wave * envelope * 0.07;
-        fx.x = wave * 3;
-        fx.scale.set(0.8 + progress * 0.45);
       } else if (name === "H5") {
         cell.x = restX + wave * envelope * 0.5;
-        fx.alpha = (0.3 + 0.7 * Math.max(0, Math.sin(progress * Math.PI * 8))) * envelope;
       }
     });
   }
 
   private playThemedWin(cell: Container, name: string, index: number) {
     this.prepareThemedAnimation(cell);
-    const fx = new Container();
-    fx.label = "symbol-fx-win";
-    const drawing = new Graphics();
-    fx.addChild(drawing);
     const crown = this.symbolPart(cell, "palm-crown");
     const bars = this.equalizerParts(cell);
-    const equalizerCells: Graphics[] = [];
     const restX = cell.x;
     const restY = cell.y;
-
-    if (name === "L1") {
-      [18, 28, 38].forEach((radius) =>
-        drawing.circle(CELL / 2, CELL / 2, radius).stroke({ color: 0xffd060, width: 3, alpha: 0.9 }),
-      );
-    } else if (name === "L3") {
-      const heights = [4, 6, 3, 5];
-      heights.forEach((height, column) => {
-        for (let row = 0; row < height; row += 1) {
-          const cellBar = new Graphics();
-          cellBar.roundRect(21 + column * 13, 66 - row * 10, 9, 7, 2).fill({
-            color: row > 3 ? 0xff6b5c : 0xffd45c,
-            alpha: 0.95,
-          });
-          cellBar.alpha = 0;
-          fx.addChild(cellBar);
-          equalizerCells.push(cellBar);
-        }
-      });
-    } else if (name === "L4") {
-      [[18, 25], [72, 22], [14, 56], [76, 58], [46, 12]].forEach(([x, y], particle) =>
-        drawing.circle(x, y, 2 + (particle % 2)).fill({ color: particle % 2 ? 0x7dff9b : 0xffe27a, alpha: 0.95 }),
-      );
-    } else if (name === "H1") {
-      drawing.circle(45, 45, 39).stroke({ color: 0xffca62, width: 3, alpha: 0.95 });
-      drawing.moveTo(45, 45).lineTo(70, 24).stroke({ color: 0xffffff, width: 2, alpha: 0.9 });
-    } else if (name === "H2") {
-      [22, 32, 42].forEach((radius) =>
-        drawing.circle(45, 45, radius).stroke({ color: 0xffc45c, width: 2.5, alpha: 0.8 }),
-      );
-    } else if (name === "H3") {
-      [31, 59].forEach((x) => {
-        drawing.circle(x, 45, 10).stroke({ color: 0xffeea0, width: 2.5, alpha: 0.95 });
-        drawing.moveTo(x, 35).lineTo(x, 55).stroke({ color: 0xffeea0, width: 2, alpha: 0.95 });
-      });
-      drawing.moveTo(31, 45).bezierCurveTo(41, 26, 49, 64, 59, 45).stroke({ color: 0xff8fbc, width: 2, alpha: 0.85 });
-    } else if (name === "H4") {
-      [20, 31, 42].forEach((radius) =>
-        drawing.circle(45, 39, radius).stroke({ color: 0xffd978, width: 2.5, alpha: 0.82 }),
-      );
-    } else if (name === "H5") {
-      drawing
-        .moveTo(16, 60)
-        .lineTo(31, 42)
-        .lineTo(40, 52)
-        .lineTo(56, 30)
-        .lineTo(73, 48)
-        .stroke({ color: 0xffed72, width: 3, alpha: 0.95 });
-    } else if (name === "L2") {
-      drawing.circle(45, 45, 39).stroke({ color: 0xffd66b, width: 3, alpha: 0.9 });
-      drawing.circle(45, 45, 33).stroke({ color: 0xff79d9, width: 2, alpha: 0.75 });
-    }
-    drawing.blendMode = "add";
-    fx.alpha = 0;
-    cell.addChild(fx);
 
     return this.animateCell(cell, THEMED_WIN_MS + index * 20, (progress) => {
       const entrance = easeOutCubic(Math.min(progress / 0.2, 1));
       const exit = progress > 0.82 ? 1 - easeOutQuad((progress - 0.82) / 0.18) : 1;
       const energy = entrance * exit;
-      fx.alpha = energy;
 
       if (name === "L2") {
         cell.rotation = easeInOutQuad(progress) * Math.PI * 2;
         cell.scale.set(1 + Math.sin(progress * Math.PI * 4) * energy * 0.08);
-        fx.rotation = -cell.rotation * 0.35;
       } else if (name === "L1") {
         const kick = Math.max(0, Math.sin(progress * Math.PI * 8)) * energy;
-        cell.scale.set(1 + kick * 0.1);
-        fx.scale.set(0.55 + progress * 1.2);
-        fx.alpha *= 1 - progress * 0.85;
+        cell.scale.set(1 + kick * 0.13, 1 - kick * 0.07);
       } else if (name === "L3") {
         bars.forEach((bar, barIndex) => {
-          const local = Math.min(Math.max(progress * 2.2 - barIndex * 0.1, 0), 1);
-          bar.scale.y = 0.28 + easeOutCubic(local) * 0.72;
-        });
-        equalizerCells.forEach((barCell, cellIndex) => {
-          const local = Math.min(Math.max(progress * 2.4 - cellIndex * 0.035, 0), 1);
-          barCell.alpha = local * exit;
+          const beat = Math.max(0, Math.sin(progress * Math.PI * 8 - barIndex * 0.8)) * energy;
+          bar.scale.y = 0.45 + beat * 0.55;
         });
         cell.scale.set(1 + Math.sin(progress * Math.PI * 6) * energy * 0.04);
       } else if (name === "L4") {
         if (crown) crown.rotation = Math.sin(progress * Math.PI * 12) * energy * 0.13;
         cell.scale.set(1 + Math.sin(progress * Math.PI * 4) * energy * 0.07);
-        drawing.rotation = progress * Math.PI * 2;
       } else if (name === "H1") {
         cell.rotation = progress * Math.PI * 4;
-        fx.rotation = -progress * Math.PI * 2;
         cell.scale.set(1 + energy * 0.08);
       } else if (name === "H2") {
         const beat = Math.max(0, Math.sin(progress * Math.PI * 8)) * energy;
         cell.scale.set(1 + beat * 0.12);
-        fx.scale.set(0.6 + progress * 1.15);
-        fx.alpha *= 1 - progress * 0.75;
       } else if (name === "H3") {
         cell.rotation = Math.sin(progress * Math.PI * 8) * energy * 0.04;
-        drawing.rotation = progress * Math.PI * 4;
       } else if (name === "H4") {
         cell.rotation = Math.sin(progress * Math.PI * 6) * energy * 0.08;
-        fx.scale.set(0.65 + progress * 1.1);
-        fx.alpha *= 1 - progress * 0.78;
       } else if (name === "H5") {
         cell.x = restX + Math.sin(progress * Math.PI * 14) * energy * 2;
         cell.scale.set(1 + Math.sin(progress * Math.PI * 6) * energy * 0.06);
-        drawing.alpha = 0.45 + Math.max(0, Math.sin(progress * Math.PI * 10)) * 0.55;
       }
       cell.y = restY - Math.sin(progress * Math.PI * 2) * energy * 4;
     });
