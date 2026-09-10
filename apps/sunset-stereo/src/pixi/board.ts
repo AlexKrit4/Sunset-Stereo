@@ -65,6 +65,7 @@ const THEMED_WIN_MS = 1800;
 type CellAnimation = {
   tick: () => void;
   finish: () => void;
+  promise: Promise<void>;
 };
 
 function spinRng() {
@@ -486,7 +487,15 @@ export class BoardController {
       this.dimNonWinners(cells, COLS - 1);
     }
     this.markSymbolActivity();
-    await Promise.all([this.playWinSheen(cells), this.playSymbolWins(cells)]);
+    const sheen = this.playWinSheen(cells);
+    const waitForLandings = Promise.all(
+      cells
+        .map((pos) => this.sheenCell(pos))
+        .filter((cell): cell is Container => Boolean(cell))
+        .map((cell) => this.cellAnimations.get(cell)?.promise ?? Promise.resolve()),
+    );
+    const wins = waitForLandings.then(() => this.playSymbolWins(cells));
+    await Promise.all([sheen, wins]);
   }
 
   showBookScatters(_board: RawSymbol[][]) {}
@@ -866,7 +875,7 @@ export class BoardController {
       render(progress, elapsed);
       if (progress >= 1) finish();
     };
-    this.cellAnimations.set(cell, { tick, finish });
+    this.cellAnimations.set(cell, { tick, finish, promise });
     render(0, 0);
     this.app.ticker.add(tick);
     return promise;
