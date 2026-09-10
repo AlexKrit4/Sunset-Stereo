@@ -39,8 +39,20 @@ const WIN_DIM_ALPHA = 0.38;
 const WIN_DIM_FROM_REEL = 2;
 const WIN_SHEEN_MS = 640;
 const WIN_SHEEN_STAGGER_MS = 36;
-const COCKTAIL_NAMES = new Set(["L5", "low5"]);
+const COCKTAIL_NAMES = new Set(["L5"]);
 const ANIMATED_SYMBOL_NAMES = new Set(["H1", "H2", "H3", "H4", "H5", "L1", "L2", "L3", "L4", "L5"]);
+const SYMBOL_ANIMATION_ALIASES: Record<string, string> = {
+  high1: "H1",
+  high2: "H2",
+  high3: "H3",
+  high4: "H4",
+  high5: "H5",
+  low1: "L1",
+  low2: "L2",
+  low3: "L3",
+  low4: "L4",
+  low5: "L5",
+};
 const COCKTAIL_LAND_MS = 720;
 const SYMBOL_IDLE_MIN_MS = 2400;
 const SYMBOL_IDLE_MAX_MS = 4400;
@@ -62,6 +74,10 @@ function spinRng() {
       return min + Math.floor(Math.random() * (max - min + 1));
     },
   };
+}
+
+function animationSymbolName(name: string) {
+  return SYMBOL_ANIMATION_ALIASES[name] ?? name;
 }
 
 function applySpinBlur(strip: Container, blur: BlurFilter, strength: number) {
@@ -716,6 +732,13 @@ export class BoardController {
     }
   }
 
+  private traceSymbolAnimation(phase: "land" | "idle" | "win", name: string) {
+    if (typeof document === "undefined") return;
+    const count = Number(document.body.dataset.symbolAnimationCount ?? 0) + 1;
+    document.body.dataset.symbolAnimation = `${phase}:${name}`;
+    document.body.dataset.symbolAnimationCount = String(count);
+  }
+
   private markSymbolActivity() {
     const spread = SYMBOL_IDLE_MAX_MS - SYMBOL_IDLE_MIN_MS;
     this.nextSymbolIdleAt = performance.now() + SYMBOL_IDLE_MIN_MS + Math.random() * spread;
@@ -776,10 +799,12 @@ export class BoardController {
   }
 
   private playSymbolLanding(reel: number) {
-    this.visible[reel]?.forEach((name, row) => {
+    this.visible[reel]?.forEach((rawName, row) => {
+      const name = animationSymbolName(rawName);
       if (!ANIMATED_SYMBOL_NAMES.has(name)) return;
       const cell = this.cells[reel]?.[row];
       if (!cell) return;
+      this.traceSymbolAnimation("land", name);
       if (!COCKTAIL_NAMES.has(name)) {
         void this.playThemedLanding(cell, name);
         return;
@@ -841,7 +866,8 @@ export class BoardController {
     }
     const candidates: Array<{ cell: Container; name: string }> = [];
     this.visible.forEach((names, reel) => {
-      names.forEach((name, row) => {
+      names.forEach((rawName, row) => {
+        const name = animationSymbolName(rawName);
         const cell = this.cells[reel]?.[row];
         if (ANIMATED_SYMBOL_NAMES.has(name) && cell?.parent) candidates.push({ cell, name });
       });
@@ -851,6 +877,7 @@ export class BoardController {
       return;
     }
     const { cell, name } = candidates[Math.floor(Math.random() * candidates.length)];
+    this.traceSymbolAnimation("idle", name);
     if (!COCKTAIL_NAMES.has(name)) {
       void this.playThemedIdle(cell, name).finally(() => this.markSymbolActivity());
       return;
@@ -884,11 +911,16 @@ export class BoardController {
   private playSymbolWins(positions: Array<{ reel: number; row: number }>) {
     const seen = new Set<Container>();
     const symbols = positions
-      .map((pos) => ({ cell: this.sheenCell(pos), name: this.visible[pos.reel]?.[pos.row] }))
-      .filter(
-        (entry): entry is { cell: Container; name: string } =>
-          Boolean(entry.cell) && ANIMATED_SYMBOL_NAMES.has(entry.name) && !seen.has(entry.cell!) && Boolean(seen.add(entry.cell!)),
-      );
+      .map((pos) => ({
+        cell: this.sheenCell(pos),
+        name: animationSymbolName(this.visible[pos.reel]?.[pos.row] ?? ""),
+      }))
+      .filter((entry): entry is { cell: Container; name: string } => {
+        if (!entry.cell || !ANIMATED_SYMBOL_NAMES.has(entry.name) || seen.has(entry.cell)) return false;
+        seen.add(entry.cell);
+        this.traceSymbolAnimation("win", entry.name);
+        return true;
+      });
     if (!symbols.length) return Promise.resolve();
     return Promise.all(
       symbols.map(({ cell, name }, index) => {

@@ -44,16 +44,17 @@ function fadeVolume(target: HTMLAudioElement, next: number, ms = FADE_MS) {
   const prev = fades.get(target);
   if (prev) cancelAnimationFrame(prev);
   const from = target.volume;
+  const safeNext = Math.min(Math.max(next, 0), 1);
   const started = performance.now();
   const tick = (now: number) => {
-    const u = Math.min((now - started) / ms, 1);
-    target.volume = from + (next - from) * u;
+    const u = Math.min(Math.max((now - started) / ms, 0), 1);
+    target.volume = Math.min(Math.max(from + (safeNext - from) * u, 0), 1);
     if (u < 1) {
       fades.set(target, requestAnimationFrame(tick));
       return;
     }
     fades.delete(target);
-    target.volume = next;
+    target.volume = safeNext;
   };
   fades.set(target, requestAnimationFrame(tick));
 }
