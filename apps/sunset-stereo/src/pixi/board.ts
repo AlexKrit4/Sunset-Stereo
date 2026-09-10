@@ -1234,6 +1234,8 @@ export class BoardController {
         const wrap = new Container();
         wrap.label = "sheen";
         wrap.eventMode = "none";
+        wrap.pivot.set(CELL / 2);
+        wrap.position.set(CELL / 2);
         const mask = new Graphics();
         mask.roundRect(pad, pad, inner, inner, 10).fill(0xffffff);
         const pulse = new Graphics();
@@ -1251,8 +1253,13 @@ export class BoardController {
         wrap.mask = mask;
         cell.addChild(wrap);
         return {
+          cell,
+          wrap,
           shine,
           pulse,
+          counterRotate: ["H1", "L2"].includes(
+            animationSymbolName(this.visible[pos.reel]?.[pos.row] ?? ""),
+          ),
           delay: pos.reel * WIN_SHEEN_STAGGER_MS + pos.row * 12,
           fromX: pad - 8,
           fromY: pad - 8,
@@ -1275,6 +1282,7 @@ export class BoardController {
       const tick = () => {
         const elapsed = performance.now() - start;
         for (const job of jobs) {
+          job.wrap.rotation = job.counterRotate ? -job.cell.rotation : 0;
           const local = Math.min(Math.max((elapsed - job.delay) / WIN_SHEEN_MS, 0), 1);
           const u = easeInOutQuad(local);
           job.shine.x = job.fromX + (job.toX - job.fromX) * u;
