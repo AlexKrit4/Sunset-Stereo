@@ -112,6 +112,7 @@ function easeInOutQuad(t: number) {
 type SpinJob = {
   col: number;
   strip: Container;
+  outgoing: Container;
   blur: BlurFilter;
   startAt: number;
   restOffset: number;
@@ -126,6 +127,7 @@ type SpinJob = {
   rows: number;
   done: boolean;
   settled: boolean;
+  landingAnimation?: Promise<void>;
 };
 
 export type HoldStep = {
@@ -288,6 +290,28 @@ export class BoardController {
     strip.y = 0;
     strip.filters = [];
     strip.alpha = this.bonusDim ? WIN_DIM_ALPHA : 1;
+  }
+
+  private makeOutgoingReel(col: number) {
+    const strip = this.reels[col];
+    const host = strip?.parent;
+    const hold = this.holds[col];
+    const outgoing = new Container();
+    outgoing.eventMode = "none";
+    this.cells[col]?.forEach((cell) => outgoing.addChild(cell));
+    if (host && hold) host.addChildAt(outgoing, host.getChildIndex(hold));
+    return outgoing;
+  }
+
+  private positionOutgoingReel(job: SpinJob) {
+    job.outgoing.y = job.restOffset + job.strip.y;
+  }
+
+  private removeOutgoingReel(job: SpinJob) {
+    job.outgoing.children.slice().forEach((child) => {
+      if (child instanceof Container) this.cellAnimations.get(child)?.finish();
+    });
+    job.outgoing.destroy({ children: true });
   }
 
   private landStatic(col: number, names: string[], mults?: number[]) {
@@ -483,7 +507,6 @@ export class BoardController {
     this.teaseOverlay.clear();
     this.scatterOverlay.clear();
     this.teaseOverlay.alpha = 1;
-    const locked = new Set(holds.map((pos) => `${pos.reel}:${pos.row}`));
     if (holds.length) this.syncHolds(raw, holds);
     if (this.bonusDim) this.applyBonusDim();
     const plans = this.planSpin(waysGaps, scatterGaps, pace);
@@ -494,23 +517,23 @@ export class BoardController {
     for (let col = 0; col < COLS; col += 1) {
       const rows = getReelRows(col);
       const finals = raw[col];
-      const reelLocked = Array.from({ length: rows }, (_, row) => locked.has(`${col}:${row}`)).every(Boolean);
       const strip = this.reels[col];
       const blur = this.blurs[col];
-      if (reelLocked) {
-        this.landStatic(col, finals);
-        continue;
-      }
       const plan = plans[col];
       const fillers = pickStripItems(rng, col, plan.fillers);
       const restOffset = (rows + plan.fillers) * CELL;
       const below = pickStripItems(rng, col, SPIN_BELOW_ROWS);
+      const outgoing = this.makeOutgoingReel(col);
       this.paintStrip(strip, [...finals, ...fillers, ...this.visible[col], ...below]);
+      for (let index = rows + plan.fillers; index < rows * 2 + plan.fillers; index += 1) {
+        strip.children[index].visible = false;
+      }
       strip.y = -restOffset;
       applySpinBlur(strip, blur, 0);
       this.jobs.push({
         col,
         strip,
+        outgoing,
         blur,
         startAt: now + plan.delay,
         restOffset,
@@ -547,12 +570,14 @@ export class BoardController {
         this.tickSpins();
         if (this.jobs.every((job) => job.done)) {
           this.app.ticker.remove(this.boundTick);
-          this.teaseOverlay.clear();
-          this.scatterOverlay.clear();
-          this.teaseOverlay.alpha = 1;
-          this.spinning = false;
-          this.onSettled = null;
-          resolve();
+          void Promise.all(this.jobs.map((job) => job.landingAnimation)).then(() => {
+            this.teaseOverlay.clear();
+            this.scatterOverlay.clear();
+            this.teaseOverlay.alpha = 1;
+            this.spinning = false;
+            this.onSettled = null;
+            resolve();
+          });
         }
       };
       this.app.ticker.add(this.boundTick);
@@ -668,6 +693,7 @@ export class BoardController {
       if (elapsed < job.windupMs) {
         const tossed = job.windupPx * easeOutQuad(elapsed / job.windupMs);
         job.strip.y = -(job.restOffset + tossed);
+        this.positionOutgoingReel(job);
         applySpinBlur(job.strip, job.blur, 0);
         continue;
       }
@@ -678,6 +704,7 @@ export class BoardController {
         continue;
       }
       job.strip.y = -offset;
+      this.positionOutgoingReel(job);
       const spinBlur = BLUR_MAX * Math.min(1, this.fallSpeed(job, fallMs) / job.velocity);
       applySpinBlur(job.strip, job.blur, offset < CELL ? spinBlur * (offset / CELL) : spinBlur);
     }
@@ -704,8 +731,10 @@ export class BoardController {
     job.landed = true;
     job.bounceAt = now;
     applySpinBlur(job.strip, job.blur, 0);
+    job.outgoing.y = job.restOffset;
+    this.removeOutgoingReel(job);
     this.landStatic(job.col, job.finals);
-    this.playSymbolLanding(job.col);
+    job.landingAnimation = this.playSymbolLanding(job.col);
     job.strip.y = 0;
     if (!job.settled) {
       job.settled = true;
@@ -836,6 +865,7 @@ export class BoardController {
   }
 
   private playSymbolLanding(reel: number) {
+    const animations: Promise<void>[] = [];
     this.visible[reel]?.forEach((rawName, row) => {
       const name = animationSymbolName(rawName);
       if (!ANIMATED_SYMBOL_NAMES.has(name)) return;
@@ -843,12 +873,12 @@ export class BoardController {
       if (!cell || this.heldCells.has(`${reel}:${row}`)) return;
       this.traceSymbolAnimation("land", name);
       if (!COCKTAIL_NAMES.has(name)) {
-        void this.playThemedLanding(cell, name);
+        animations.push(this.playThemedLanding(cell, name));
         return;
       }
       this.cellAnimations.get(cell)?.finish();
       const restY = cell.y;
-      void this.animateCell(cell, COCKTAIL_LAND_MS, (progress) => {
+      animations.push(this.animateCell(cell, COCKTAIL_LAND_MS, (progress) => {
         if (progress < 0.2) {
           const u = easeOutQuad(progress / 0.2);
           cell.y = restY - 8 + 11 * u;
@@ -865,8 +895,9 @@ export class BoardController {
           cell.scale.set(0.99 + 0.01 * u, 1.03 - 0.03 * u);
           cell.rotation = -0.012 * (1 - u);
         }
-      });
+      }));
     });
+    return Promise.all(animations).then(() => undefined);
   }
 
   private tickSymbolIdle() {
