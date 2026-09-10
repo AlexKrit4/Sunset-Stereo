@@ -184,6 +184,8 @@ export class BoardController {
   reels: Container[] = [];
   cells: Container[][] = [];
   private holds: Container[] = [];
+  private reelMasks: Graphics[] = [];
+  private heldCells = new Set<string>();
   private blurs: BlurFilter[] = [];
   private badges: Text[] = [];
   private visible: string[][] = [];
@@ -218,13 +220,16 @@ export class BoardController {
       glass.roundRect(0, 0, CELL, rows * CELL, 6).fill({ color: 0x14081c, alpha: 0.28 });
       const mask = new Graphics();
       mask.rect(0, 0, CELL, rows * CELL).fill(0xffffff);
+      const reelMask = new Graphics();
+      reelMask.rect(0, 0, CELL, rows * CELL).fill(0xffffff);
       const host = new Container();
       host.x = col * CELL;
       host.y = (MAX_ROWS - rows) * CELL;
-      host.addChild(glass, mask);
+      host.addChild(glass, mask, reelMask);
       host.mask = mask;
 
       const strip = new Container();
+      strip.mask = reelMask;
       const hold = new Container();
       hold.eventMode = "none";
       const blur = new BlurFilter({ strength: 0, quality: 3 });
@@ -237,6 +242,7 @@ export class BoardController {
       window.addChild(host);
       this.reels.push(strip);
       this.holds.push(hold);
+      this.reelMasks.push(reelMask);
       this.blurs.push(blur);
       this.visible.push(seed);
       this.cellMults.push(Array.from({ length: rows }, () => 1));
@@ -295,6 +301,7 @@ export class BoardController {
     this.cells[col].forEach((cell) => {
       cell.alpha = 1;
     });
+    this.applyHeldCellVisibility();
   }
 
   private planSpin(waysGaps: number[], scatterGaps: number[], pace: "base" | "bonus" | "respin" = "base") {
@@ -563,6 +570,13 @@ export class BoardController {
 
   private syncHolds(board: string[][], positions: Array<{ reel: number; row: number }>) {
     const wanted = new Set(positions.map((pos) => this.holdLabel(pos.reel, pos.row)));
+    const previous = this.heldCells;
+    previous.forEach((key) => {
+      const [reel, row] = key.split(":").map(Number);
+      const cell = this.cells[reel]?.[row];
+      if (cell) cell.alpha = 1;
+    });
+    this.heldCells = new Set(positions.map((pos) => `${pos.reel}:${pos.row}`));
     this.holds.forEach((layer) => {
       layer.children.slice().forEach((child) => {
         if (!wanted.has(child.label)) child.destroy();
@@ -576,6 +590,8 @@ export class BoardController {
       if (layer.children.some((child) => child.label === label)) return;
       layer.addChild(this.makeHoldView(name, pos));
     });
+    this.syncHeldReelMasks();
+    this.applyHeldCellVisibility();
   }
 
   private makeHoldView(name: string, pos: { reel: number; row: number }) {
@@ -589,7 +605,41 @@ export class BoardController {
   }
 
   private clearHolds() {
+    const previous = this.heldCells;
+    this.heldCells = new Set();
     this.holds.forEach((layer) => layer.removeChildren());
+    this.syncHeldReelMasks();
+    previous.forEach((key) => {
+      const [reel, row] = key.split(":").map(Number);
+      const cell = this.cells[reel]?.[row];
+      if (cell) cell.alpha = 1;
+    });
+    this.syncHeldVisibilityFlag();
+  }
+
+  private syncHeldReelMasks() {
+    this.reelMasks.forEach((mask, reel) => {
+      mask.clear();
+      const rows = getReelRows(reel);
+      for (let row = 0; row < rows; row += 1) {
+        if (this.heldCells.has(`${reel}:${row}`)) continue;
+        mask.rect(0, row * CELL, CELL, CELL).fill(0xffffff);
+      }
+    });
+  }
+
+  private applyHeldCellVisibility() {
+    this.heldCells.forEach((key) => {
+      const [reel, row] = key.split(":").map(Number);
+      const cell = this.cells[reel]?.[row];
+      if (cell) cell.alpha = 0;
+    });
+    this.syncHeldVisibilityFlag();
+  }
+
+  private syncHeldVisibilityFlag() {
+    if (typeof document === "undefined") return;
+    document.body.dataset.hiddenHeldSymbols = String(this.heldCells.size);
   }
 
   private fallOffset(job: SpinJob, fallMs: number) {
@@ -798,7 +848,7 @@ export class BoardController {
       const name = animationSymbolName(rawName);
       if (!ANIMATED_SYMBOL_NAMES.has(name)) return;
       const cell = this.cells[reel]?.[row];
-      if (!cell) return;
+      if (!cell || this.heldCells.has(`${reel}:${row}`)) return;
       this.traceSymbolAnimation("land", name);
       if (!COCKTAIL_NAMES.has(name)) {
         void this.playThemedLanding(cell, name);
@@ -1099,7 +1149,8 @@ export class BoardController {
       const strip = this.reels[reel];
       if (strip) strip.alpha = 1;
       this.cells[reel]?.forEach((cell, row) => {
-        cell.alpha = hits.has(`${reel}:${row}`) ? 1 : WIN_DIM_ALPHA;
+        const key = `${reel}:${row}`;
+        cell.alpha = this.heldCells.has(key) ? 0 : hits.has(key) ? 1 : WIN_DIM_ALPHA;
       });
     }
     for (let reel = upTo + 1; reel < COLS; reel += 1) {
@@ -1123,7 +1174,8 @@ export class BoardController {
       }
       strip.alpha = 1;
       this.cells[reel]?.forEach((cell, row) => {
-        cell.alpha = bright.has(`${reel}:${row}`) ? 1 : WIN_DIM_ALPHA;
+        const key = `${reel}:${row}`;
+        cell.alpha = this.heldCells.has(key) ? 0 : bright.has(key) ? 1 : WIN_DIM_ALPHA;
       });
     }
     this.syncBonusDimFlag();
@@ -1249,6 +1301,7 @@ export class BoardController {
         cell.alpha = 1;
       });
     });
+    this.applyHeldCellVisibility();
   }
 
   layout(viewWidth: number, viewHeight = 0) {
