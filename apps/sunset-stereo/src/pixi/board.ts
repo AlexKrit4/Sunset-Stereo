@@ -40,11 +40,11 @@ const WIN_DIM_FROM_REEL = 2;
 const WIN_SHEEN_MS = 640;
 const WIN_SHEEN_STAGGER_MS = 36;
 const COCKTAIL_NAMES = new Set(["L5", "low5"]);
-const COCKTAIL_LAND_MS = 430;
-const COCKTAIL_IDLE_MIN_MS = 4200;
-const COCKTAIL_IDLE_MAX_MS = 7800;
-const COCKTAIL_IDLE_MS = 1250;
-const COCKTAIL_WIN_MS = 980;
+const COCKTAIL_LAND_MS = 720;
+const COCKTAIL_IDLE_MIN_MS = 2600;
+const COCKTAIL_IDLE_MAX_MS = 4800;
+const COCKTAIL_IDLE_MS = 2400;
+const COCKTAIL_WIN_MS = 1800;
 
 type CellAnimation = {
   tick: () => void;
@@ -796,23 +796,23 @@ export class BoardController {
       void this.animateCell(cell, COCKTAIL_LAND_MS, (progress) => {
         if (progress < 0.2) {
           const u = easeOutQuad(progress / 0.2);
-          cell.y = restY - 10 + 13 * u;
-          cell.scale.set(0.9 + 0.22 * u, 1.12 - 0.3 * u);
-          cell.rotation = -0.045 + 0.08 * u;
+          cell.y = restY - 16 + 22 * u;
+          cell.scale.set(0.82 + 0.36 * u, 1.2 - 0.42 * u);
+          cell.rotation = -0.09 + 0.16 * u;
           splash.alpha = u;
           splash.scale.set(0.7 + u * 0.35);
         } else if (progress < 0.58) {
           const u = easeOutCubic((progress - 0.2) / 0.38);
-          cell.y = restY + 3 - 5 * u;
-          cell.scale.set(1.12 - 0.15 * u, 0.82 + 0.24 * u);
-          cell.rotation = 0.035 - 0.055 * u;
+          cell.y = restY + 6 - 10 * u;
+          cell.scale.set(1.18 - 0.22 * u, 0.78 + 0.32 * u);
+          cell.rotation = 0.07 - 0.11 * u;
           splash.alpha = 1 - u;
           splash.scale.set(1.05 + u * 0.35);
         } else {
           const u = easeOutCubic((progress - 0.58) / 0.42);
-          cell.y = restY - 2 + 2 * u;
-          cell.scale.set(0.97 + 0.03 * u, 1.06 - 0.06 * u);
-          cell.rotation = -0.02 * (1 - u);
+          cell.y = restY - 4 + 4 * u;
+          cell.scale.set(0.96 + 0.04 * u, 1.1 - 0.1 * u);
+          cell.rotation = -0.04 * (1 - u);
           splash.alpha = 0;
         }
       });
@@ -859,9 +859,9 @@ export class BoardController {
     void this.animateCell(cell, COCKTAIL_IDLE_MS, (progress) => {
       const wave = Math.sin(progress * Math.PI * 4);
       const envelope = Math.sin(progress * Math.PI);
-      cell.rotation = wave * envelope * 0.055;
-      cell.y = restY - envelope * 3;
-      cell.scale.set(1 + envelope * 0.018, 1 - envelope * 0.012);
+      cell.rotation = wave * envelope * 0.12;
+      cell.y = restY - envelope * 8;
+      cell.scale.set(1 + envelope * 0.06, 1 - envelope * 0.035);
       glint.alpha = Math.max(0, Math.sin(progress * Math.PI * 2)) * 0.95;
       glint.scale.set(0.4 + envelope * 0.85);
       glint.rotation = progress * Math.PI * 0.8;
@@ -869,10 +869,10 @@ export class BoardController {
   }
 
   private playCocktailWins(positions: Array<{ reel: number; row: number }>) {
-    const cocktails = positions
+    const cocktails = [...new Set(positions
       .filter((pos) => COCKTAIL_NAMES.has(this.visible[pos.reel]?.[pos.row]))
       .map((pos) => this.sheenCell(pos))
-      .filter((cell): cell is Container => Boolean(cell));
+      .filter((cell): cell is Container => Boolean(cell)))];
     if (!cocktails.length) return Promise.resolve();
     return Promise.all(
       cocktails.map((cell, index) => {
@@ -907,9 +907,9 @@ export class BoardController {
           const entrance = easeOutCubic(Math.min(progress / 0.22, 1));
           const exit = progress > 0.78 ? 1 - easeOutQuad((progress - 0.78) / 0.22) : 1;
           const energy = entrance * exit;
-          cell.y = restY - Math.sin(progress * Math.PI * 2) * 5 * energy;
-          cell.rotation = Math.sin(progress * Math.PI * 6) * 0.075 * energy;
-          const pulse = 1 + Math.sin(progress * Math.PI * 4) * 0.1 * energy;
+          cell.y = restY - Math.sin(progress * Math.PI * 2) * 9 * energy;
+          cell.rotation = Math.sin(progress * Math.PI * 6) * 0.13 * energy;
+          const pulse = 1 + Math.sin(progress * Math.PI * 4) * 0.17 * energy;
           cell.scale.set(pulse);
           celebration.alpha = energy * (0.58 + Math.sin(progress * Math.PI * 4) * 0.32);
           celebration.scale.set(0.72 + entrance * 0.5 + progress * 0.18);
