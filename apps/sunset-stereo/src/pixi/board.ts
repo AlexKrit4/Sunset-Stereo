@@ -27,11 +27,9 @@ const SPIN_WINDUP_PX = 30;
 const SPIN_WINDUP_MS = 160;
 const SPIN_GRAVITY_MS = 110;
 const BLUR_MAX = 12;
-const REEL_BRAKE_PX = 135;
-const REEL_BRAKE_MS = 240;
-const LAND_BOUNCE_PX = 6;
-const LAND_BOUNCE_DOWN_MS = 80;
-const LAND_BOUNCE_UP_MS = 200;
+const LAND_BOUNCE_PX = 9;
+const LAND_BOUNCE_DOWN_MS = 52;
+const LAND_BOUNCE_UP_MS = 150;
 const SPIN_BELOW_ROWS = 4;
 const NUDGE_WINDUP_MS = 100;
 const NUDGE_PUSH_MS = 340;
@@ -55,12 +53,12 @@ const SYMBOL_ANIMATION_ALIASES: Record<string, string> = {
   low4: "L4",
   low5: "L5",
 };
-const COCKTAIL_LAND_MS = 720;
+const COCKTAIL_LAND_MS = 920;
 const SYMBOL_IDLE_MIN_MS = 2400;
 const SYMBOL_IDLE_MAX_MS = 4400;
 const COCKTAIL_IDLE_MS = 2400;
 const COCKTAIL_WIN_MS = 1800;
-const THEMED_LAND_MS = 900;
+const THEMED_LAND_MS = 1050;
 const THEMED_IDLE_MS = 2400;
 const THEMED_WIN_MS = 1800;
 
@@ -121,9 +119,6 @@ type SpinJob = {
   windupMs: number;
   gravityMs: number;
   velocity: number;
-  braking: boolean;
-  brakeAt: number;
-  brakeFrom: number;
   bouncePx: number;
   bounceAt: number;
   landed: boolean;
@@ -524,9 +519,6 @@ export class BoardController {
         windupMs: SPIN_WINDUP_MS,
         gravityMs: SPIN_GRAVITY_MS,
         velocity: plan.velocity * (0.97 + col * 0.012),
-        braking: false,
-        brakeAt: 0,
-        brakeFrom: 0,
         bouncePx: LAND_BOUNCE_PX + (col % 3) - 1,
         bounceAt: 0,
         landed: false,
@@ -683,32 +675,16 @@ export class BoardController {
         applySpinBlur(job.strip, job.blur, 0);
         continue;
       }
-      if (job.braking) {
-        this.tickReelBrake(job, now);
-        continue;
-      }
       const fallMs = elapsed - job.windupMs;
       const offset = this.fallOffset(job, fallMs);
-      if (offset <= REEL_BRAKE_PX) {
-        job.braking = true;
-        job.brakeAt = now;
-        job.brakeFrom =
-          offset > 0 ? offset : Math.min(REEL_BRAKE_PX, Math.max(-job.strip.y, job.velocity * 16));
-        this.tickReelBrake(job, now);
+      if (offset <= 0) {
+        this.landReel(job, now);
         continue;
       }
       job.strip.y = -offset;
       const spinBlur = BLUR_MAX * Math.min(1, this.fallSpeed(job, fallMs) / job.velocity);
       applySpinBlur(job.strip, job.blur, offset < CELL ? spinBlur * (offset / CELL) : spinBlur);
     }
-  }
-
-  private tickReelBrake(job: SpinJob, now: number) {
-    const progress = Math.min(Math.max((now - job.brakeAt) / REEL_BRAKE_MS, 0), 1);
-    const remaining = job.brakeFrom * (1 - easeOutCubic(progress));
-    job.strip.y = -remaining;
-    applySpinBlur(job.strip, job.blur, BLUR_MAX * 0.32 * (1 - progress));
-    if (progress >= 1) this.landReel(job, now);
   }
 
   private tickLandBounce(job: SpinJob, now: number) {
@@ -883,19 +859,19 @@ export class BoardController {
       void this.animateCell(cell, COCKTAIL_LAND_MS, (progress) => {
         if (progress < 0.2) {
           const u = easeOutQuad(progress / 0.2);
-          cell.y = restY - 16 + 22 * u;
-          cell.scale.set(0.82 + 0.36 * u, 1.2 - 0.42 * u);
-          cell.rotation = -0.09 + 0.16 * u;
+          cell.y = restY - 8 + 11 * u;
+          cell.scale.set(0.96 + 0.1 * u, 1.04 - 0.1 * u);
+          cell.rotation = -0.025 + 0.05 * u;
         } else if (progress < 0.58) {
           const u = easeOutCubic((progress - 0.2) / 0.38);
-          cell.y = restY + 6 - 10 * u;
-          cell.scale.set(1.18 - 0.22 * u, 0.78 + 0.32 * u);
-          cell.rotation = 0.07 - 0.11 * u;
+          cell.y = restY + 3 - 5 * u;
+          cell.scale.set(1.06 - 0.07 * u, 0.94 + 0.09 * u);
+          cell.rotation = 0.025 - 0.037 * u;
         } else {
           const u = easeOutCubic((progress - 0.58) / 0.42);
-          cell.y = restY - 4 + 4 * u;
-          cell.scale.set(0.96 + 0.04 * u, 1.1 - 0.1 * u);
-          cell.rotation = -0.04 * (1 - u);
+          cell.y = restY - 2 + 2 * u;
+          cell.scale.set(0.99 + 0.01 * u, 1.03 - 0.03 * u);
+          cell.rotation = -0.012 * (1 - u);
         }
       });
     });
@@ -935,9 +911,9 @@ export class BoardController {
     void this.animateCell(cell, COCKTAIL_IDLE_MS, (progress) => {
       const wave = Math.sin(progress * Math.PI * 4);
       const envelope = Math.sin(progress * Math.PI);
-      cell.rotation = wave * envelope * 0.12;
-      cell.y = restY - envelope * 8;
-      cell.scale.set(1 + envelope * 0.06, 1 - envelope * 0.035);
+      cell.rotation = wave * envelope * 0.04;
+      cell.y = restY - envelope * 3;
+      cell.scale.set(1 + envelope * 0.02, 1 - envelope * 0.012);
     }).finally(() => this.markSymbolActivity());
   }
 
@@ -964,9 +940,9 @@ export class BoardController {
           const entrance = easeOutCubic(Math.min(progress / 0.22, 1));
           const exit = progress > 0.78 ? 1 - easeOutQuad((progress - 0.78) / 0.22) : 1;
           const energy = entrance * exit;
-          cell.y = restY - Math.sin(progress * Math.PI * 2) * 9 * energy;
-          cell.rotation = Math.sin(progress * Math.PI * 6) * 0.13 * energy;
-          const pulse = 1 + Math.sin(progress * Math.PI * 4) * 0.17 * energy;
+          cell.y = restY - Math.sin(progress * Math.PI * 2) * 4 * energy;
+          cell.rotation = Math.sin(progress * Math.PI * 6) * 0.045 * energy;
+          const pulse = 1 + Math.sin(progress * Math.PI * 4) * 0.07 * energy;
           cell.scale.set(pulse);
         });
       }),
@@ -1007,29 +983,29 @@ export class BoardController {
     return this.animateCell(cell, THEMED_LAND_MS, (progress) => {
       if (progress < 0.26) {
         const u = easeOutQuad(progress / 0.26);
-        cell.y = restY - 18 + u * 24;
-        cell.scale.set(0.9 + u * 0.18, 1.12 - u * 0.3);
+        cell.y = restY - 10 + u * 13;
+        cell.scale.set(0.97 + u * 0.07, 1.04 - u * 0.1);
       } else {
         const u = (progress - 0.26) / 0.74;
         const damping = 1 - u;
-        cell.y = restY + Math.cos(u * Math.PI * 3) * 6 * damping;
-        cell.scale.set(1 + Math.sin(u * Math.PI * 3) * 0.08 * damping, 1 - Math.sin(u * Math.PI * 3) * 0.1 * damping);
+        cell.y = restY + Math.cos(u * Math.PI * 3) * 3 * damping;
+        cell.scale.set(1 + Math.sin(u * Math.PI * 3) * 0.035 * damping, 1 - Math.sin(u * Math.PI * 3) * 0.04 * damping);
       }
 
       if (name === "L4" && crown) {
-        crown.rotation = Math.sin(progress * Math.PI * 5) * (1 - progress) * 0.25;
-        crown.scale.set(1 + Math.sin(progress * Math.PI * 4) * (1 - progress) * 0.06);
+        crown.rotation = Math.sin(progress * Math.PI * 4) * (1 - progress) * 0.08;
+        crown.scale.set(1 + Math.sin(progress * Math.PI * 3) * (1 - progress) * 0.025);
       } else if (name === "L3" && bars.length) {
         bars.forEach((bar, index) => {
           const phase = Math.min(Math.max((progress - index * 0.07) / 0.72, 0), 1);
           bar.scale.y = 1 - Math.sin(phase * Math.PI) * 0.5;
         });
       } else if (name === "H3") {
-        cell.rotation = Math.sin(progress * Math.PI * 4) * (1 - progress) * 0.08;
+        cell.rotation = Math.sin(progress * Math.PI * 4) * (1 - progress) * 0.03;
       } else if (name === "H4") {
-        cell.rotation = Math.sin(progress * Math.PI * 3) * (1 - progress) * 0.07;
+        cell.rotation = Math.sin(progress * Math.PI * 3) * (1 - progress) * 0.025;
       } else if (name === "H5") {
-        cell.scale.x *= 1 - Math.sin(progress * Math.PI) * 0.04;
+        cell.scale.x *= 1 - Math.sin(progress * Math.PI) * 0.02;
       }
     });
   }
@@ -1046,28 +1022,28 @@ export class BoardController {
       const wave = Math.sin(progress * Math.PI * 4);
 
       if (name === "L4") {
-        cell.rotation = wave * envelope * 0.055;
-        cell.y = restY - envelope * 4;
-        if (crown) crown.rotation = Math.sin(progress * Math.PI * 6) * envelope * 0.09;
+        cell.rotation = wave * envelope * 0.025;
+        cell.y = restY - envelope * 2;
+        if (crown) crown.rotation = Math.sin(progress * Math.PI * 5) * envelope * 0.045;
       } else if (name === "L3" && bars.length) {
         bars.forEach((bar, index) => {
           bar.scale.y = 1 - (0.1 + index * 0.035) * envelope * (0.5 + 0.5 * Math.sin(progress * Math.PI * 6 + index));
         });
       } else if (name === "L2") {
-        cell.y = restY - envelope * 7;
-        cell.rotation = wave * envelope * 0.055;
+        cell.y = restY - envelope * 3;
+        cell.rotation = wave * envelope * 0.025;
       } else if (name === "L1") {
-        const pulse = 1 + envelope * (0.025 + 0.025 * Math.sin(progress * Math.PI * 8));
+        const pulse = 1 + envelope * (0.012 + 0.012 * Math.sin(progress * Math.PI * 7));
         cell.scale.set(pulse);
       } else if (name === "H1") {
-        cell.rotation = easeInOutQuad(progress) * Math.PI * 0.7;
+        cell.rotation = easeInOutQuad(progress) * Math.PI * 0.3;
       } else if (name === "H2") {
         const beat = Math.max(0, Math.sin(progress * Math.PI * 6)) * envelope;
-        cell.scale.set(1 + beat * 0.06);
+        cell.scale.set(1 + beat * 0.03);
       } else if (name === "H3") {
         cell.rotation = wave * envelope * 0.025;
       } else if (name === "H4") {
-        cell.rotation = wave * envelope * 0.07;
+        cell.rotation = wave * envelope * 0.03;
       } else if (name === "H5") {
         cell.x = restX + wave * envelope * 0.5;
       }
@@ -1088,34 +1064,34 @@ export class BoardController {
 
       if (name === "L2") {
         cell.rotation = easeInOutQuad(progress) * Math.PI * 2;
-        cell.scale.set(1 + Math.sin(progress * Math.PI * 4) * energy * 0.08);
+        cell.scale.set(1 + Math.sin(progress * Math.PI * 4) * energy * 0.035);
       } else if (name === "L1") {
         const kick = Math.max(0, Math.sin(progress * Math.PI * 8)) * energy;
-        cell.scale.set(1 + kick * 0.13, 1 - kick * 0.07);
+        cell.scale.set(1 + kick * 0.06, 1 - kick * 0.03);
       } else if (name === "L3") {
         bars.forEach((bar, barIndex) => {
-          const beat = Math.max(0, Math.sin(progress * Math.PI * 8 - barIndex * 0.8)) * energy;
-          bar.scale.y = 0.45 + beat * 0.55;
+          const wave = Math.sin(progress * Math.PI * 7 - barIndex * 0.7) * energy;
+          bar.scale.y = 1 + wave * 0.12;
         });
-        cell.scale.set(1 + Math.sin(progress * Math.PI * 6) * energy * 0.04);
+        cell.scale.set(1 + Math.sin(progress * Math.PI * 5) * energy * 0.02);
       } else if (name === "L4") {
-        if (crown) crown.rotation = Math.sin(progress * Math.PI * 12) * energy * 0.13;
-        cell.scale.set(1 + Math.sin(progress * Math.PI * 4) * energy * 0.07);
+        if (crown) crown.rotation = Math.sin(progress * Math.PI * 8) * energy * 0.05;
+        cell.scale.set(1 + Math.sin(progress * Math.PI * 4) * energy * 0.03);
       } else if (name === "H1") {
-        cell.rotation = progress * Math.PI * 4;
-        cell.scale.set(1 + energy * 0.08);
+        cell.rotation = easeInOutQuad(progress) * Math.PI * 2;
+        cell.scale.set(1 + energy * 0.035);
       } else if (name === "H2") {
         const beat = Math.max(0, Math.sin(progress * Math.PI * 8)) * energy;
-        cell.scale.set(1 + beat * 0.12);
+        cell.scale.set(1 + beat * 0.05);
       } else if (name === "H3") {
-        cell.rotation = Math.sin(progress * Math.PI * 8) * energy * 0.04;
+        cell.rotation = Math.sin(progress * Math.PI * 7) * energy * 0.025;
       } else if (name === "H4") {
-        cell.rotation = Math.sin(progress * Math.PI * 6) * energy * 0.08;
+        cell.rotation = Math.sin(progress * Math.PI * 5) * energy * 0.035;
       } else if (name === "H5") {
-        cell.x = restX + Math.sin(progress * Math.PI * 14) * energy * 2;
-        cell.scale.set(1 + Math.sin(progress * Math.PI * 6) * energy * 0.06);
+        cell.x = restX + Math.sin(progress * Math.PI * 10) * energy;
+        cell.scale.set(1 + Math.sin(progress * Math.PI * 5) * energy * 0.03);
       }
-      cell.y = restY - Math.sin(progress * Math.PI * 2) * energy * 4;
+      cell.y = restY - Math.sin(progress * Math.PI * 2) * energy * 2;
     });
   }
 
