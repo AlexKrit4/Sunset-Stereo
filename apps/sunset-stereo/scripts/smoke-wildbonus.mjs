@@ -102,7 +102,6 @@ await click(22, "#buyConfirmBtn");
 
 const started = Date.now();
 let sawStamp = false;
-let sawWildWin = false;
 let sawBonusDim = false;
 let startedBonus = false;
 let last;
@@ -116,18 +115,19 @@ for (let i = 0; i < 240; i += 1) {
     log("clicked bonus start");
   }
   if (last.wildStamp) sawStamp = true;
-  if (last.wildWin === "1") sawWildWin = true;
   if (last.bonusDim === "1") sawBonusDim = true;
-  if (sawStamp && sawWildWin && sawBonusDim) {
+  if (sawStamp && sawBonusDim) {
     log("wild extra play", last, `ms=${Date.now() - started}`);
     break;
   }
 }
 
 if (!sawStamp) throw new Error("4 scatters never stamped a Wild");
-if (!sawWildWin) throw new Error("Wild never played a win animation");
 if (!sawBonusDim) throw new Error("Wild line paid without hold-and-respin dim/lock");
+if (last.wildWin === "1" || (last.anim || "").startsWith("win:")) {
+  throw new Error("locked bonus symbols must not play win animations");
+}
 
-log("ok", { sawStamp, sawWildWin, sawBonusDim, last });
+log("ok", { sawStamp, sawBonusDim, last });
 chrome.kill();
 process.exit(0);

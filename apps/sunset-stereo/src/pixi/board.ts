@@ -530,7 +530,7 @@ export class BoardController {
     const cells = positions.map(unpadPosition);
     if (!cells.length) return;
     this.markSymbolActivity();
-    await Promise.all([this.playWinSheen(cells), this.playSymbolWins(cells)]);
+    await this.playWinSheen(cells);
     await wait(220);
   }
 
@@ -555,6 +555,10 @@ export class BoardController {
       this.dimNonWinners(cells, COLS - 1);
     }
     this.markSymbolActivity();
+    if (this.bonusDim) {
+      await this.playWinSheen(cells);
+      return;
+    }
     await Promise.all([this.playWinSheen(cells), this.playSymbolWins(cells)]);
   }
 
