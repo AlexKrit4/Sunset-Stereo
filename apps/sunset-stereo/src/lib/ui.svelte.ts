@@ -30,7 +30,7 @@ export const ui = $state({
   musicMuted: false,
   buyMenuOpen: false,
   scatterBuyOn: false,
-  scatterConfirmOpen: false,
+  buyConfirm: "" as "" | "scatter" | "bonus",
   trayOpen: false,
   autoplayOn: false,
   disableAutoplay: false,

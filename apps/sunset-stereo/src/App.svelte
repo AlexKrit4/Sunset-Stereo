@@ -27,7 +27,7 @@
       ui.buyMenuOpen ||
       ui.rulesOpen ||
       ui.bonusIntroOpen ||
-      ui.scatterConfirmOpen ||
+      ui.buyConfirm ||
       ui.trayOpen ||
       ui.error
     ) {
@@ -48,9 +48,9 @@
     });
     const onKey = (event: KeyboardEvent) => {
       if (event.code === "Escape") {
-        if (ui.scatterConfirmOpen) {
+        if (ui.buyConfirm) {
           event.preventDefault();
-          ui.scatterConfirmOpen = false;
+          ui.buyConfirm = "";
           return;
         }
         if (ui.buyMenuOpen) {
@@ -69,7 +69,7 @@
         ui.disableSpacebar ||
         ui.rulesOpen ||
         ui.buyMenuOpen ||
-        ui.scatterConfirmOpen ||
+        ui.buyConfirm ||
         ui.trayOpen
       ) {
         return;

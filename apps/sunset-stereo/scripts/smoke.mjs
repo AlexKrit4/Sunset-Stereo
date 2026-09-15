@@ -146,9 +146,9 @@ await click(641, "#buyReel2Btn");
 await new Promise((r) => setTimeout(r, 200));
 const confirmOpen = await send(6415, "Runtime.evaluate", {
   expression: `JSON.stringify({
-    open: Boolean(document.getElementById('scatterConfirmBtn')),
+    open: Boolean(document.getElementById('buyConfirmBtn')),
     pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
-    text: document.querySelector('[aria-label="Confirm extra bet"]')?.innerText || ''
+    text: document.querySelector('[aria-label="Confirm buy"]')?.innerText || ''
   })`,
   returnByValue: true,
 });
@@ -158,13 +158,15 @@ if (!confirmState.open) throw new Error("extra bet must ask for confirm");
 if (confirmState.pressed === "true") throw new Error("extra bet must wait for confirm");
 if (!/1\.5|reel 2/i.test(confirmState.text)) throw new Error("confirm must describe the extra bet");
 
-await click(6416, "#scatterConfirmBtn");
+await click(6416, "#buyConfirmBtn");
 await new Promise((r) => setTimeout(r, 200));
 const scatterOn = await send(642, "Runtime.evaluate", {
   expression: `JSON.stringify({
     pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
     text: document.getElementById('buyReel2Btn')?.textContent || '',
-    confirm: Boolean(document.getElementById('scatterConfirmBtn'))
+    confirm: Boolean(document.getElementById('buyConfirmBtn')),
+    stakeLabel: document.getElementById('stakeLabel')?.textContent || '',
+    bet: document.getElementById('betValue')?.textContent || ''
   })`,
   returnByValue: true,
 });
@@ -174,21 +176,42 @@ if (scatterOnState.pressed !== "true" || !/^active$/i.test(scatterOnState.text.t
   throw new Error("reel-2 sun activate must stay on");
 }
 if (scatterOnState.confirm) throw new Error("confirm must close after extra bet is armed");
+if (!/sun on reel 2/i.test(scatterOnState.stakeLabel)) {
+  throw new Error("stake readout must show the extra bet");
+}
 
 await click(643, "#buyReel2Btn");
 const scatterOff = await send(644, "Runtime.evaluate", {
   expression: `JSON.stringify({
     pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
-    text: document.getElementById('buyReel2Btn')?.textContent || ''
+    text: document.getElementById('buyReel2Btn')?.textContent || '',
+    stakeLabel: document.getElementById('stakeLabel')?.textContent || ''
   })`,
   returnByValue: true,
 });
 log("scatter deactivate", scatterOff.result.value);
-if (JSON.parse(scatterOff.result.value).pressed === "true") {
+const scatterOffState = JSON.parse(scatterOff.result.value);
+if (scatterOffState.pressed === "true") {
   throw new Error("reel-2 sun activate must turn off");
+}
+if (/sun on reel 2/i.test(scatterOffState.stakeLabel)) {
+  throw new Error("stake readout must return to the base stake");
 }
 
 await click(67, "#buyScatterBtn");
+await new Promise((r) => setTimeout(r, 200));
+const bonusConfirm = await send(671, "Runtime.evaluate", {
+  expression: `JSON.stringify({
+    open: Boolean(document.getElementById('buyConfirmBtn')),
+    text: document.querySelector('[aria-label="Confirm buy"]')?.innerText || ''
+  })`,
+  returnByValue: true,
+});
+log("bonus confirm", bonusConfirm.result.value);
+const bonusConfirmState = JSON.parse(bonusConfirm.result.value);
+if (!bonusConfirmState.open) throw new Error("3 scatters must ask for confirm");
+if (!/95|3 scatters/i.test(bonusConfirmState.text)) throw new Error("confirm must describe 3 scatters");
+await click(672, "#buyConfirmBtn");
 const buyStarted = Date.now();
 let buyHud;
 let startedBonus = false;

@@ -30,6 +30,8 @@
       <p>
         Spin / Play starts a round. The lightning control opens the feature shop.
         Activate asks for a confirm, then keeps the 1.5× reel-2 sun armed until you switch it off.
+        Buy 3 scatters also asks for a confirm. While the extra bet is on, the stake readout shows
+        that feature and the 1.5× spin cost.
         + / – change the stake using bet levels from the game server.
         Spacebar also starts a round unless the operator disables it. Credit / Balance is the wallet.
         Paid / Won is the last round result. Extra plays shows the bonus counter.

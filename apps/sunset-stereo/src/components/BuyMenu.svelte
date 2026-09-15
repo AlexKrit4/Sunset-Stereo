@@ -15,29 +15,51 @@
 
   function close() {
     ui.buyMenuOpen = false;
-    ui.scatterConfirmOpen = false;
+    ui.buyConfirm = "";
   }
 
   function requestScatter() {
     if (ui.busy) return;
     if (ui.scatterBuyOn) {
       ui.scatterBuyOn = false;
-      ui.scatterConfirmOpen = false;
+      ui.buyConfirm = "";
       return;
     }
     if (ui.balanceMicro < scatterPrice) return;
-    ui.scatterConfirmOpen = true;
+    ui.buyConfirm = "scatter";
   }
 
-  function confirmScatter() {
-    if (ui.busy || ui.balanceMicro < scatterPrice) return;
-    ui.scatterBuyOn = true;
-    ui.scatterConfirmOpen = false;
+  function requestBonus() {
+    if (ui.busy || ui.balanceMicro < bonusPrice) return;
+    ui.buyConfirm = "bonus";
   }
 
-  function cancelScatter() {
-    ui.scatterConfirmOpen = false;
+  function confirmBuy() {
+    if (ui.buyConfirm === "scatter") {
+      if (ui.busy || ui.balanceMicro < scatterPrice) return;
+      ui.scatterBuyOn = true;
+      ui.buyConfirm = "";
+      return;
+    }
+    if (ui.buyConfirm === "bonus") {
+      if (ui.busy || ui.balanceMicro < bonusPrice) return;
+      ui.buyConfirm = "";
+      onBuyBonus();
+    }
   }
+
+  function cancelBuy() {
+    ui.buyConfirm = "";
+  }
+
+  const confirmTitle = $derived(
+    ui.buyConfirm === "bonus" ? `Buy ${BUY_BONUS.label}?` : "Activate extra bet?",
+  );
+  const confirmCopy = $derived(
+    ui.buyConfirm === "bonus"
+      ? `${BUY_BONUS.label} costs ${BUY_BONUS.cost}× the stake (${moneyHud(bonusPrice)}) and starts ${BUY_BONUS.spins} extra plays.`
+      : `${BUY_SCATTER.label} costs ${BUY_SCATTER.cost}× the stake (${moneyHud(scatterPrice)}) on every spin and always lands a sun on reel ${BUY_SCATTER.reel}.`,
+  );
 </script>
 
 {#if ui.buyMenuOpen}
@@ -91,7 +113,7 @@
               class="purchase"
               type="button"
               disabled={ui.busy || ui.balanceMicro < bonusPrice}
-              onclick={onBuyBonus}
+              onclick={requestBonus}
             >
               {labels.buyNow()}
             </button>
@@ -102,25 +124,22 @@
   </div>
 {/if}
 
-{#if ui.scatterConfirmOpen}
+{#if ui.buyConfirm}
   <div
     class="confirm-scrim"
     onclick={(event) => {
-      if (event.currentTarget === event.target) cancelScatter();
+      if (event.currentTarget === event.target) cancelBuy();
     }}
     role="presentation"
   >
-    <div class="confirm" role="dialog" aria-label="Confirm extra bet" aria-modal="true">
-      <h2>Activate extra bet?</h2>
-      <p>
-        {BUY_SCATTER.label} costs {BUY_SCATTER.cost}× the stake ({moneyHud(scatterPrice)}) on every
-        spin and always lands a sun on reel {BUY_SCATTER.reel}.
-      </p>
+    <div class="confirm" role="dialog" aria-label="Confirm buy" aria-modal="true">
+      <h2>{confirmTitle}</h2>
+      <p>{confirmCopy}</p>
       <div class="actions">
-        <button id="scatterCancelBtn" class="ghost" type="button" onclick={cancelScatter}>
+        <button id="buyCancelBtn" class="ghost" type="button" onclick={cancelBuy}>
           {labels.cancel()}
         </button>
-        <button id="scatterConfirmBtn" class="go" type="button" onclick={confirmScatter}>
+        <button id="buyConfirmBtn" class="go" type="button" onclick={confirmBuy}>
           {labels.confirm()}
         </button>
       </div>

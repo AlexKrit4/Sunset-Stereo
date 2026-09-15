@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { BUY_SCATTER } from "../math/config.js";
   import { moneyHud, labels, ui } from "../lib/ui.svelte";
   import { toggleMusicMute } from "../lib/music";
 
@@ -13,6 +14,8 @@
   const locked = $derived(ui.busy || !ui.ready);
   const showBuy = $derived(!ui.replay && !ui.disableBuyFeature);
   const showAutoplay = $derived(!ui.replay && !ui.disableAutoplay);
+  const spinCost = $derived(Math.round(ui.betMicro * (ui.scatterBuyOn ? BUY_SCATTER.cost : 1)));
+  const stakeLabel = $derived(ui.scatterBuyOn ? BUY_SCATTER.label : labels.stake());
 
   function toggleTray() {
     ui.trayOpen = !ui.trayOpen;
@@ -22,7 +25,7 @@
   function toggleBuy() {
     ui.buyMenuOpen = !ui.buyMenuOpen;
     ui.trayOpen = false;
-    ui.scatterConfirmOpen = false;
+    ui.buyConfirm = "";
   }
 
   function toggleAutoplay() {
@@ -72,10 +75,10 @@
   <div class="spacer"></div>
 
   {#if !ui.replay}
-    <div class="stake">
+    <div class="stake" class:extra={ui.scatterBuyOn}>
       <div class="stake-read">
-        <span>{labels.stake()}</span>
-        <strong id="betValue">{moneyHud(ui.betMicro)}</strong>
+        <span id="stakeLabel">{stakeLabel}</span>
+        <strong id="betValue">{moneyHud(spinCost)}</strong>
       </div>
       <div class="chevrons">
         <button id="betUp" type="button" disabled={locked} aria-label="Increase stake" onclick={() => onBet(1)}>
@@ -254,12 +257,22 @@
     background: #0d0b09;
     overflow: hidden;
   }
+  .stake.extra {
+    min-width: 168px;
+  }
   .stake-read {
     padding: 8px 12px 6px;
   }
   .stake-read strong {
     padding-bottom: 4px;
     border-bottom: 2px solid #f4efe6;
+  }
+  .stake.extra .stake-read span,
+  .stake.extra .stake-read strong {
+    color: #3ec8f0;
+  }
+  .stake.extra .stake-read strong {
+    border-bottom-color: #3ec8f0;
   }
   .chevrons {
     display: grid;

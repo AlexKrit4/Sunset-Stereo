@@ -119,7 +119,7 @@ export async function playBet(mode = "base") {
   ui.fsTotal = 0;
   ui.winMicro = 0;
   ui.buyMenuOpen = false;
-  ui.scatterConfirmOpen = false;
+  ui.buyConfirm = "";
   ui.trayOpen = false;
   hideSpinWin();
   cancelBonusIntro();
