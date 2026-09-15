@@ -139,8 +139,12 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       await waitForTimeout(60);
       return;
     }
-    if (ui.feature || !roundWinBeatsStake(roundWin)) {
+    if (ui.feature) {
       await waitForTimeout(60);
+      return;
+    }
+    if (!roundWinBeatsStake(roundWin)) {
+      await waitForTimeout(500);
       return;
     }
     await waitForTimeout(640);
