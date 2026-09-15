@@ -78,7 +78,7 @@
     ui.buyConfirm === "bonus"
       ? `${BUY_BONUS.label} costs ${BUY_BONUS.cost}× the stake (${moneyHud(bonusPrice)}) and starts ${BUY_BONUS.spins} extra plays.`
       : ui.buyConfirm === "wildbonus"
-        ? `${BUY_WILD_BONUS.label} costs ${BUY_WILD_BONUS.cost}× the stake (${moneyHud(wildBonusPrice)}) and starts ${BUY_WILD_BONUS.spins} extra plays. A Wild is placed on a random cell before each extra play.`
+        ? `${BUY_WILD_BONUS.label} costs ${BUY_WILD_BONUS.cost}× the stake (${moneyHud(wildBonusPrice)}) and starts ${BUY_WILD_BONUS.spins} extra plays. A Wild is placed on a random cell before each extra play, substitutes for paying symbols, and stays locked while that extra play holds and respins.`
         : `${BUY_SCATTER.label} costs ${BUY_SCATTER.cost}× the stake (${moneyHud(scatterPrice)}) on every spin and always lands a sun on reel ${BUY_SCATTER.reel}.`,
   );
 </script>

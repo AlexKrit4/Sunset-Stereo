@@ -215,6 +215,7 @@ log("wild bonus confirm", wildConfirm.result.value);
 const wildConfirmState = JSON.parse(wildConfirm.result.value);
 if (!wildConfirmState.open) throw new Error("4 scatters must ask for confirm");
 if (!/225|4 scatters|wild/i.test(wildConfirmState.text)) throw new Error("confirm must describe 4 scatters");
+if (!/substitut|lock/i.test(wildConfirmState.text)) throw new Error("confirm must say the wild substitutes and stays locked");
 await click(670, "#buyCancelBtn");
 await new Promise((r) => setTimeout(r, 150));
 const wildConfirmClosed = await send(6705, "Runtime.evaluate", {

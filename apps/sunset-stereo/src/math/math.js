@@ -190,18 +190,20 @@ function calculateWaysWin(bet, b, m, reelNudgeMult) {
     const payMult = PAYOUTS[sym][reelsMatched] ?? PAYOUTS[sym][6] ?? 0;
     const win = bet * payMult * ways * nudgeLineMult;
     if (win <= 0) continue;
-    wins.push({ sym, reelsMatched, ways, nudgeLineMult, win });
-    totalWin += win;
-    totalWays += ways;
+    const positions = [];
     for (let r = 0; r < reelsMatched; r += 1) {
       for (let row = 0; row < getReelRows(r); row += 1) {
         if (!cellMatches(sym, b[r][row])) continue;
+        positions.push({ reel: r, row });
         const key = `${r}:${row}`;
         if (highlightKeys.has(key)) continue;
         highlightKeys.add(key);
         highlights.push({ reel: r, row });
       }
     }
+    wins.push({ sym, reelsMatched, ways, nudgeLineMult, win, positions });
+    totalWin += win;
+    totalWays += ways;
   }
   const cap = bet * GAME.wincap;
   if (totalWin > cap) totalWin = cap;
@@ -430,4 +432,13 @@ export function playRound({ seed = Date.now(), bet = 1 } = {}) {
   };
 }
 
-export { BETS, getWaysTeaseSymbol, reelMatchesWaysTease, XNUDGE_REELS, XWAYS_REELS, SCATTER_REELS, BONUS_SPINS };
+export {
+  BETS,
+  calculateWaysWin,
+  getWaysTeaseSymbol,
+  reelMatchesWaysTease,
+  XNUDGE_REELS,
+  XWAYS_REELS,
+  SCATTER_REELS,
+  BONUS_SPINS,
+};

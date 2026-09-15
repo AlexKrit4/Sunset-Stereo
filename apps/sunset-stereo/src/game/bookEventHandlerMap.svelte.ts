@@ -7,11 +7,23 @@ import type { BookEvent, BookEventHandlerMap, Position, RawSymbol } from "./type
 
 let lastBoard: RawSymbol[][] = [];
 let pendingHolds: Position[] = [];
+let lockedWilds: Position[] = [];
 let pendingWinLines = 0;
 
 function cellKey(pos: Position) {
   const cell = unpadPosition(pos);
   return `${cell.reel}:${cell.row}`;
+}
+
+function withLockedWilds(positions: Position[]) {
+  if (!lockedWilds.length) return positions;
+  const seen = new Set(positions.map(cellKey));
+  const extra = lockedWilds.filter((pos) => !seen.has(cellKey(pos)));
+  return extra.length ? [...positions, ...extra] : positions;
+}
+
+function clearLockedWilds() {
+  lockedWilds = [];
 }
 
 function nextBonusWin(
@@ -50,35 +62,39 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       ui.fsCurrent = 0;
       ui.fsTotal = 0;
       pendingHolds = [];
+      clearLockedWilds();
       board.clearBookVisuals();
     }
     const upcoming = bookEvent.gameType === "freegame" ? nextBonusWin(context.bookEvents, bookEvent) : null;
-    const already = new Set(pendingHolds.map(cellKey));
-    const fresh = upcoming?.positions.filter((pos) => !already.has(cellKey(pos))) ?? [];
+    const holdCells = withLockedWilds(pendingHolds);
+    const upcomingPositions = upcoming ? withLockedWilds(upcoming.positions) : [];
+    const already = new Set(holdCells.map(cellKey));
+    const fresh = upcomingPositions.filter((pos) => !already.has(cellKey(pos)));
     await board.playBookReveal(bookEvent.board, {
       pace,
       anticipation: bookEvent.anticipation,
-      holds: pendingHolds,
+      holds: holdCells,
       upcomingWins: fresh,
     });
-    if (pendingHolds.length && !upcoming?.beforeRespin) {
-      board.applyBookHolds(bookEvent.board, pendingHolds);
+    if (holdCells.length && !upcoming?.beforeRespin) {
+      board.applyBookHolds(bookEvent.board, holdCells);
     }
     if (upcoming?.beforeRespin) {
-      await board.presentNewBonusWins(fresh, upcoming.positions, pendingHolds.length === 0);
+      await board.presentNewBonusWins(fresh, upcomingPositions, pendingHolds.length === 0);
     }
   },
 
   holdRespin: async (bookEvent) => {
-    pendingHolds = bookEvent.positions;
-    runtime.board?.lockBonusWinners(bookEvent.positions);
+    pendingHolds = withLockedWilds(bookEvent.positions);
+    runtime.board?.lockBonusWinners(pendingHolds);
     await waitForTimeout(80);
   },
 
   placeWild: async (bookEvent) => {
     const board = runtime.board;
     if (!board) return;
-    pendingHolds = [{ reel: bookEvent.reel, row: bookEvent.row }];
+    lockedWilds = [{ reel: bookEvent.reel, row: bookEvent.row }];
+    pendingHolds = withLockedWilds([]);
     await board.placeWildFromCamera({ reel: bookEvent.reel, row: bookEvent.row });
   },
 
@@ -124,6 +140,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   updateFreeSpin: async (bookEvent) => {
     hideSpinWin();
     pendingHolds = [];
+    clearLockedWilds();
     runtime.board?.clearBookVisuals();
     ui.fsCurrent = bookEvent.amount + 1;
     ui.fsTotal = bookEvent.total;
@@ -142,6 +159,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
 
   freeSpinEnd: async () => {
     pendingHolds = [];
+    clearLockedWilds();
     runtime.board?.clearBookVisuals();
     ui.feature = false;
     ui.wildBonus = false;

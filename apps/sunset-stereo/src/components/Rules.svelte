@@ -25,7 +25,8 @@
         Buy / Get bonus opens the shop. Activate Sun on reel 2 after a confirm to keep spinning at
         1.5× with a sun locked on reel 2; turn it off from the same card. Buy / Get purchases
         3 scatters for 95× the selected stake and starts 10 extra plays, or 4 scatters for 225×
-        with a Wild placed on a random cell before each extra play.
+        with a Wild placed on a random cell before each extra play. That Wild substitutes for
+        paying symbols and stays locked while the extra play holds and respins.
       </p>
       <p>RTP {(GAME.rtp * 100).toFixed(0)}%. Max win {GAME.wincap.toLocaleString()}× of the 1× stake.</p>
       <p>
@@ -52,7 +53,7 @@
         </li>
         <li>
           <img src={SYMBOL_PAY_ART.wild} alt="" />
-          <span>Wild substitutes for paying symbols. 4-scatter extra plays place one before each spin.</span>
+          <span>Wild substitutes for paying symbols and stays locked during a 4-scatter extra play.</span>
         </li>
       </ul>
 
