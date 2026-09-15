@@ -125,14 +125,18 @@ await click(65, "#bonusBtn");
 await new Promise((r) => setTimeout(r, 200));
 const menu = await send(66, "Runtime.evaluate", {
   expression: `JSON.stringify({
-    offer: document.getElementById('buyScatterBtn')?.textContent || '',
+    bonus: document.getElementById('buyScatterBtn')?.textContent || '',
+    scatter: document.getElementById('buyReel2Btn')?.textContent || '',
     title: document.querySelector('[aria-label="Buy bonus"], [aria-label="Get bonus"]') ? true : false
   })`,
   returnByValue: true,
 });
 log("buy menu", menu.result.value);
 const menuState = JSON.parse(menu.result.value);
-if (!/3 scatters/i.test(menuState.offer)) throw new Error("buy menu must list 3 scatters");
+if (!/sun on reel 2/i.test(menuState.scatter) || !/1\.5/i.test(menuState.scatter)) {
+  throw new Error("buy menu must list 1.5x sun on reel 2");
+}
+if (!/3 scatters/i.test(menuState.bonus)) throw new Error("buy menu must list 3 scatters");
 
 await click(67, "#buyScatterBtn");
 const buyStarted = Date.now();

@@ -134,7 +134,7 @@ export async function playBet(mode = "base") {
     return true;
   } catch (error) {
     console.error(error);
-    ui.banner = errorMessage(error, mode === "bonus" ? "Buy failed." : "Spin failed.");
+    ui.banner = errorMessage(error, mode === "base" ? "Spin failed." : "Buy failed.");
     ui.feature = false;
     return false;
   } finally {
@@ -145,6 +145,10 @@ export async function playBet(mode = "base") {
 
 export async function playBuyBonus() {
   return playBet("bonus");
+}
+
+export async function playBuyScatter() {
+  return playBet("scatter");
 }
 
 export async function playReplay() {

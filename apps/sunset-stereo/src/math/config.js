@@ -64,3 +64,10 @@ export const BUY_BONUS = {
   label: "3 scatters",
   spins: BONUS_SPINS,
 };
+
+export const BUY_SCATTER = {
+  mode: "scatter",
+  cost: 1.5,
+  reel: 2,
+  label: "Sun on reel 2",
+};

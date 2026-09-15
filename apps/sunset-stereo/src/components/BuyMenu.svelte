@@ -1,11 +1,17 @@
 <script lang="ts">
-  import { BUY_BONUS } from "../math/config.js";
+  import { BUY_BONUS, BUY_SCATTER } from "../math/config.js";
   import { labels, moneyHud, ui } from "../lib/ui.svelte";
 
-  let { onBuy }: { onBuy: () => void } = $props();
+  let {
+    onBuyBonus,
+    onBuyScatter,
+  }: {
+    onBuyBonus: () => void;
+    onBuyScatter: () => void;
+  } = $props();
 
-  const priceMicro = $derived(ui.betMicro * BUY_BONUS.cost);
-  const canAfford = $derived(ui.balanceMicro >= priceMicro);
+  const bonusPrice = $derived(Math.round(ui.betMicro * BUY_BONUS.cost));
+  const scatterPrice = $derived(Math.round(ui.betMicro * BUY_SCATTER.cost));
 
   function close() {
     ui.buyMenuOpen = false;
@@ -23,21 +29,32 @@
     <div class="sheet" role="dialog" aria-label={labels.buyBonus()} aria-modal="true">
       <h2>{labels.buyBonus()}</h2>
       <p>
-        One feature: {BUY_BONUS.label}. Starts 10 extra plays at {BUY_BONUS.cost}× the selected
-        {ui.social ? "play amount" : "stake"}.
+        Two features. {BUY_SCATTER.label} is a regular spin at {BUY_SCATTER.cost}× with a sun locked
+        on reel {BUY_SCATTER.reel}. {BUY_BONUS.label} starts 10 extra plays at {BUY_BONUS.cost}×.
       </p>
+      <button
+        id="buyReel2Btn"
+        class="offer"
+        type="button"
+        disabled={ui.busy || ui.balanceMicro < scatterPrice}
+        onclick={onBuyScatter}
+      >
+        <span class="name">{BUY_SCATTER.label}</span>
+        <span class="meta">Guaranteed sun on reel {BUY_SCATTER.reel} · {BUY_SCATTER.cost}×</span>
+        <strong>{moneyHud(scatterPrice)}</strong>
+      </button>
       <button
         id="buyScatterBtn"
         class="offer"
         type="button"
-        disabled={ui.busy || !canAfford}
-        onclick={onBuy}
+        disabled={ui.busy || ui.balanceMicro < bonusPrice}
+        onclick={onBuyBonus}
       >
         <span class="name">{BUY_BONUS.label}</span>
         <span class="meta">10 extra plays · {BUY_BONUS.cost}×</span>
-        <strong>{moneyHud(priceMicro)}</strong>
+        <strong>{moneyHud(bonusPrice)}</strong>
       </button>
-      {#if !canAfford}
+      {#if ui.balanceMicro < scatterPrice}
         <p class="note">Not enough {ui.social ? "balance" : "credit"} for this {ui.social ? "play" : "buy"}.</p>
       {/if}
       <button class="ghost" type="button" onclick={close}>Close</button>
