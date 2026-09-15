@@ -156,17 +156,15 @@ export async function playBigWin(micro: number) {
   if (!stages.length) return;
 
   beginBigWinIntro();
-  ui.bigWinOpen = true;
-  ui.bigWinExplode = false;
-  ui.bigWinLeft = "";
-  ui.bigWinRight = "";
-  ui.bigWinOutgoingLeft = "";
-  ui.bigWinOutgoingRight = "";
-  ui.bigWinDisplayMicro = 0;
 
   try {
     await startFinished;
     if (!introActive) return;
+
+    ui.bigWinOpen = true;
+    ui.bigWinExplode = false;
+    ui.bigWinOutgoingLeft = "";
+    ui.bigWinOutgoingRight = "";
 
     for (const stage of stages) {
       showStageTitle(stage.left, stage.right);

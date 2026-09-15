@@ -31,7 +31,9 @@
         {/key}
       {/if}
     </div>
-    <p id="bigWinValue" class="amount" aria-live="polite">{moneyHud(ui.bigWinDisplayMicro)}</p>
+    {#if ui.bigWinLeft}
+      <p id="bigWinValue" class="amount" aria-live="polite">{moneyHud(ui.bigWinDisplayMicro)}</p>
+    {/if}
   </div>
 {/if}
 
@@ -44,6 +46,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 0;
+    padding-bottom: 8vh;
     pointer-events: auto;
     background:
       radial-gradient(ellipse at 50% 42%, rgba(48, 18, 8, 0.18) 0%, rgba(8, 2, 16, 0.78) 72%);
@@ -52,9 +56,10 @@
   }
   .titles {
     position: relative;
-    height: 1.15em;
+    font-size: clamp(34px, 7vw, 72px);
+    height: 1.2em;
     min-width: min(90vw, 920px);
-    margin-bottom: 18px;
+    margin-bottom: 52px;
     overflow: visible;
   }
   .title {
@@ -62,12 +67,13 @@
     inset: 0;
     display: flex;
     justify-content: center;
+    align-items: center;
     gap: 0.28em;
     margin: 0;
-    font-size: clamp(34px, 7vw, 72px);
+    font-size: 1em;
     font-weight: 800;
     letter-spacing: 0.12em;
-    line-height: 1.1;
+    line-height: 1;
     white-space: nowrap;
     text-transform: uppercase;
     text-shadow:
