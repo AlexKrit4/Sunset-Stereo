@@ -121,21 +121,47 @@ const hasBonus = await send(64, "Runtime.evaluate", {
 log("bonusBtn", hasBonus.result.value);
 if (!hasBonus.result.value) throw new Error("bonus buy control must exist");
 
+const readScatterToggle = async (id) => {
+  const res = await send(id, "Runtime.evaluate", {
+    expression: `JSON.stringify({
+      exists: Boolean(document.getElementById('buyReel2Btn')),
+      pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
+      text: document.getElementById('buyReel2Btn')?.textContent || ''
+    })`,
+    returnByValue: true,
+  });
+  return JSON.parse(res.result.value);
+};
+
+const scatterOff = await readScatterToggle(640);
+log("scatter toggle off", scatterOff);
+if (!scatterOff.exists) throw new Error("reel-2 scatter toggle must exist");
+if (scatterOff.pressed === "true") throw new Error("reel-2 scatter toggle must start off");
+if (!/sun 2/i.test(scatterOff.text) || !/1\.5/i.test(scatterOff.text)) {
+  throw new Error("reel-2 scatter toggle must show 1.5x sun 2");
+}
+
+await click(641, "#buyReel2Btn");
+const scatterOn = await readScatterToggle(642);
+log("scatter toggle on", scatterOn);
+if (scatterOn.pressed !== "true") throw new Error("reel-2 scatter toggle must stay on");
+
+await click(643, "#buyReel2Btn");
+const scatterReset = await readScatterToggle(644);
+log("scatter toggle reset", scatterReset);
+if (scatterReset.pressed === "true") throw new Error("reel-2 scatter toggle must turn off");
+
 await click(65, "#bonusBtn");
 await new Promise((r) => setTimeout(r, 200));
 const menu = await send(66, "Runtime.evaluate", {
   expression: `JSON.stringify({
     bonus: document.getElementById('buyScatterBtn')?.textContent || '',
-    scatter: document.getElementById('buyReel2Btn')?.textContent || '',
     title: document.querySelector('[aria-label="Buy bonus"], [aria-label="Get bonus"]') ? true : false
   })`,
   returnByValue: true,
 });
 log("buy menu", menu.result.value);
 const menuState = JSON.parse(menu.result.value);
-if (!/sun on reel 2/i.test(menuState.scatter) || !/1\.5/i.test(menuState.scatter)) {
-  throw new Error("buy menu must list 1.5x sun on reel 2");
-}
 if (!/3 scatters/i.test(menuState.bonus)) throw new Error("buy menu must list 3 scatters");
 
 await click(67, "#buyScatterBtn");

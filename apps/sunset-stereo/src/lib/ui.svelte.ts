@@ -29,6 +29,7 @@ export const ui = $state({
   disableBuyFeature: false,
   musicMuted: false,
   buyMenuOpen: false,
+  scatterBuyOn: false,
 });
 
 let bonusIntroResolve: (() => void) | null = null;
@@ -99,4 +100,5 @@ export const labels = {
   spin: () => (ui.replay ? "Play" : ui.social ? "Play" : "Spin"),
   buy: () => (ui.social ? "Bonus" : "Buy"),
   buyBonus: () => (ui.social ? "Get bonus" : "Buy bonus"),
+  scatterBuy: () => "Sun 2",
 };
