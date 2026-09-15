@@ -1,0 +1,41 @@
+import { BIG_WIN_STAGES, isBigWin, stagesForWin } from "../src/lib/bigWinStages.js";
+
+function assert(cond, message) {
+  if (!cond) throw new Error(message);
+}
+
+const bet = 1_000_000;
+
+assert(BIG_WIN_STAGES.map((stage) => stage.id).join(",") === "win1,win2,win3,win4,win5", "five stages");
+assert(!isBigWin(20 * bet, bet), "exactly 20x is not a big win");
+assert(isBigWin(20 * bet + 1, bet), "just over 20x is a big win");
+
+function ids(micro) {
+  return stagesForWin(micro, bet).map((stage) => stage.id).join(",");
+}
+
+assert(ids(20 * bet) === "", "20x has no stages");
+assert(ids(30 * bet) === "win1", "30x stays on win1 then end");
+assert(ids(40 * bet) === "win1", "40x is the top of win1");
+assert(ids(40 * bet + 1) === "win1,win2", "just over 40x enters win2");
+assert(ids(50 * bet) === "win1,win2", "50x uses win1 then win2");
+assert(ids(60 * bet) === "win1,win2", "60x is the top of win2");
+assert(ids(80 * bet) === "win1,win2,win3", "80x is the top of win3");
+assert(ids(200 * bet) === "win1,win2,win3,win4", "200x is the top of win4");
+assert(ids(201 * bet) === "win1,win2,win3,win4,win5", "over 200x reaches sunset");
+
+const win1 = stagesForWin(30 * bet, bet)[0];
+assert(win1.fromMicro === 20 * bet, "win1 counter starts at 20x");
+assert(win1.toMicro === 30 * bet, "30x counts only to the actual win");
+
+const mid = stagesForWin(50 * bet, bet);
+assert(mid[0].toMicro === 40 * bet, "win1 fills to its 40x cap");
+assert(mid[1].fromMicro === 40 * bet, "win2 restarts the counter at 40x");
+assert(mid[1].toMicro === 50 * bet, "win2 stops at the actual win");
+
+const sunset = stagesForWin(250 * bet, bet);
+assert(sunset.at(-1).id === "win5", "final stage is sunset");
+assert(sunset.at(-1).fromMicro === 200 * bet, "win5 starts at 200x");
+assert(sunset.at(-1).toMicro === 250 * bet, "win5 counts through to the actual win");
+
+console.log("bigwin stages ok");

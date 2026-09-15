@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "smoke:math": "node scripts/smoke-math.mjs",
+    "smoke:bigwin": "node scripts/smoke-bigwin.mjs",
     "smoke": "node scripts/smoke.mjs",
     "smoke:wild": "node scripts/smoke-wildbonus.mjs"
   },

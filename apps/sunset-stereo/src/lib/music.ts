@@ -72,7 +72,7 @@ function stopFades() {
   }
 }
 
-function applyBedVolumes(immediate = false) {
+export function applyBedVolumes(immediate = false) {
   if (!base || !bonus) return;
   const next = current === "bonus" ? bonus : base;
   const prev = current === "bonus" ? base : bonus;
@@ -136,6 +136,17 @@ export function toggleMusicMute() {
   }
   startBoth();
   applyBedVolumes(true);
+}
+
+export function duckMusicBed() {
+  if (!base || !bonus) return;
+  fadeVolume(base, 0, 220);
+  fadeVolume(bonus, 0, 220);
+}
+
+export function restoreMusicBed() {
+  if (!base || !bonus || ui.musicMuted) return;
+  applyBedVolumes();
 }
 
 export function musicBedFromUi() {

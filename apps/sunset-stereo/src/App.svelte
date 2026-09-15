@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import Game from "./components/Game.svelte";
   import Hud from "./components/Hud.svelte";
+  import BigWin from "./components/BigWin.svelte";
   import Rules from "./components/Rules.svelte";
   import BonusIntro from "./components/BonusIntro.svelte";
   import BuyMenu from "./components/BuyMenu.svelte";
@@ -27,6 +28,7 @@
       ui.buyMenuOpen ||
       ui.rulesOpen ||
       ui.bonusIntroOpen ||
+      ui.bigWinOpen ||
       ui.buyConfirm ||
       ui.trayOpen ||
       ui.error
@@ -70,7 +72,8 @@
         ui.rulesOpen ||
         ui.buyMenuOpen ||
         ui.buyConfirm ||
-        ui.trayOpen
+        ui.trayOpen ||
+        ui.bigWinOpen
       ) {
         return;
       }
@@ -112,6 +115,7 @@
   <p id="mixValue" class="sr-only">1×</p>
 
   <Hud onSpin={() => spin()} onBet={changeBet} />
+  <BigWin />
   <BuyMenu onBuyBonus={() => playBuyBonus()} onBuyWildBonus={() => playBuyWildBonus()} />
   <Rules />
 </div>

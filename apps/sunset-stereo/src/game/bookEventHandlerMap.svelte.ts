@@ -1,4 +1,5 @@
 import { hideSpinWin, roundWinBeatsStake, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelte";
+import { isBigWin, playBigWin } from "../lib/bigWin";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { runtime } from "./context";
 import { unpadPosition, winningWays } from "../rgs/bookView";
@@ -139,6 +140,10 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       await waitForTimeout(60);
       return;
     }
+    if (isBigWin(micro)) {
+      await playBigWin(micro);
+      return;
+    }
     if (ui.feature) {
       await waitForTimeout(60);
       return;
@@ -201,7 +206,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     ui.wildBonus = false;
     ui.fsCurrent = 0;
     ui.fsTotal = 0;
-    if (roundWinBeatsStake(total)) {
+    if (roundWinBeatsStake(total) && !isBigWin(total)) {
       showSpinWin(total, pendingWinLines);
       await waitForTimeout(1100);
     } else {

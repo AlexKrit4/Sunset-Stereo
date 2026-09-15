@@ -58,7 +58,7 @@
 </script>
 
 <div class="viewport" bind:this={host}>
-  {#if ui.spinWinVisible && ui.spinWinMicro > 0}
+  {#if ui.spinWinVisible && ui.spinWinMicro > 0 && !ui.bigWinOpen}
     {#key ui.spinWinKey}
       <div class="spin-win" class:feature={ui.feature}>
         <p id="spinWinOverlay" class="amount">{moneyHud(ui.spinWinMicro)}</p>

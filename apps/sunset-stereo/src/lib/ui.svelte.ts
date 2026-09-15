@@ -35,6 +35,15 @@ export const ui = $state({
   trayOpen: false,
   autoplayOn: false,
   disableAutoplay: false,
+  bigWinOpen: false,
+  bigWinDisplayMicro: 0,
+  bigWinLeft: "",
+  bigWinRight: "",
+  bigWinTitleKey: 0,
+  bigWinOutgoingLeft: "",
+  bigWinOutgoingRight: "",
+  bigWinOutgoingKey: 0,
+  bigWinExplode: false,
 });
 
 let bonusIntroResolve: (() => void) | null = null;
