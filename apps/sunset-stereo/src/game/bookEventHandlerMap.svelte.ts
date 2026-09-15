@@ -140,7 +140,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       await waitForTimeout(60);
       return;
     }
-    if (isBigWin(micro)) {
+    if (isBigWin(micro, ui.betMicro)) {
       await playBigWin(micro);
       return;
     }
@@ -206,7 +206,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     ui.wildBonus = false;
     ui.fsCurrent = 0;
     ui.fsTotal = 0;
-    if (roundWinBeatsStake(total) && !isBigWin(total)) {
+    if (roundWinBeatsStake(total) && !isBigWin(total, ui.betMicro)) {
       showSpinWin(total, pendingWinLines);
       await waitForTimeout(1100);
     } else {

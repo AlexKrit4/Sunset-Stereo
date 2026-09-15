@@ -1,9 +1,22 @@
 import { duckMusicBed, restoreMusicBed } from "./music";
 import { ui } from "./ui.svelte";
 import { waitForTimeout } from "../utils/waitForTimeout";
-import { stagesForWin } from "./bigWinStages.js";
+import {
+  BIG_WIN_MULT,
+  BIG_WIN_STAGES,
+  isBigWin as isBigWinAt,
+  stagesForWin as stagesForWinAt,
+} from "./bigWinStages.js";
 
-export { BIG_WIN_MULT, BIG_WIN_STAGES, isBigWin, stagesForWin } from "./bigWinStages.js";
+export { BIG_WIN_MULT, BIG_WIN_STAGES };
+
+export function isBigWin(micro: number, betMicro = ui.betMicro) {
+  return isBigWinAt(micro, betMicro);
+}
+
+export function stagesForWin(micro: number, betMicro = ui.betMicro) {
+  return stagesForWinAt(micro, betMicro);
+}
 
 const STAGE_MS = 8000;
 const BZZZ_TO_START_MS = 2500;
@@ -114,7 +127,7 @@ function resetOverlay() {
 }
 
 export async function playBigWin(micro: number) {
-  const stages = stagesForWin(micro);
+  const stages = stagesForWin(micro, ui.betMicro);
   if (!stages.length) return;
 
   duckMusicBed();
