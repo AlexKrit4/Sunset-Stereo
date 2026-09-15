@@ -78,6 +78,7 @@ export async function bootEngine() {
   ui.social = auth.jurisdictionFlags.socialCasino || engine.query.social;
   ui.disableSpacebar = auth.jurisdictionFlags.disabledSpacebar;
   ui.disableBuyFeature = Boolean(auth.jurisdictionFlags.disabledBuyFeature);
+  ui.disableAutoplay = Boolean(auth.jurisdictionFlags.disabledAutoplay);
   if (auth.round?.active) {
     ui.ready = true;
     await playEngineRound(auth.round);
@@ -118,6 +119,8 @@ export async function playBet(mode = "base") {
   ui.fsTotal = 0;
   ui.winMicro = 0;
   ui.buyMenuOpen = false;
+  ui.buyConfirm = "";
+  ui.trayOpen = false;
   hideSpinWin();
   cancelBonusIntro();
   betActor.send({ type: "PLAY" });
@@ -136,6 +139,7 @@ export async function playBet(mode = "base") {
     console.error(error);
     ui.banner = errorMessage(error, mode === "bonus" ? "Buy failed." : "Spin failed.");
     ui.feature = false;
+    ui.autoplayOn = false;
     return false;
   } finally {
     ui.busy = false;

@@ -29,11 +29,17 @@ export const ui = $state({
   disableBuyFeature: false,
   musicMuted: false,
   buyMenuOpen: false,
+  scatterBuyOn: false,
+  buyConfirm: "" as "" | "scatter" | "bonus",
+  trayOpen: false,
+  autoplayOn: false,
+  disableAutoplay: false,
 });
 
 let bonusIntroResolve: (() => void) | null = null;
 
 export function waitForBonusStart(totalFs: number) {
+  ui.autoplayOn = false;
   ui.bonusIntroSpins = totalFs;
   ui.bonusIntroOpen = true;
   return new Promise<void>((resolve) => {
@@ -99,4 +105,10 @@ export const labels = {
   spin: () => (ui.replay ? "Play" : ui.social ? "Play" : "Spin"),
   buy: () => (ui.social ? "Bonus" : "Buy"),
   buyBonus: () => (ui.social ? "Get bonus" : "Buy bonus"),
+  buyNow: () => (ui.social ? "Get" : "Buy"),
+  activate: () => "Activate",
+  activated: () => "Active",
+  win: () => (ui.social ? "Won" : "Win"),
+  cancel: () => "Cancel",
+  confirm: () => "Confirm",
 };
