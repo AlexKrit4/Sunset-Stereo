@@ -77,6 +77,12 @@ const log = (...args) =>
   process.stdout.write(args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ") + "\n");
 log("boot", title.result.value);
 
+function assertWinMeter(hud) {
+  const won = !/0[.,]00\s*$/.test(hud.win || "");
+  if (won && hud.winLit !== "1") throw new Error(`WIN plaque must light when there is a win: ${JSON.stringify(hud)}`);
+  if (!won && hud.winLit === "1") throw new Error(`WIN plaque must stay dim at zero: ${JSON.stringify(hud)}`);
+}
+
 const click = async (id, selector) => {
   await send(id, "Runtime.evaluate", {
     expression: `document.querySelector(${JSON.stringify(selector)}).click()`,
@@ -88,6 +94,7 @@ const readHud = async (id) => {
     expression: `JSON.stringify({
       balance: document.getElementById('balanceValue').textContent,
       win: document.getElementById('winValue').textContent,
+      winLit: document.querySelector('.stat.win')?.getAttribute('data-win-lit') || '0',
       bet: document.getElementById('betValue').textContent,
       busy: document.getElementById('spinBtn').disabled,
       mix: document.getElementById('mixValue').textContent
@@ -109,6 +116,7 @@ for (let i = 0; i < 180; i += 1) {
   }
 }
 if (lastHud?.busy) throw new Error(`spin still busy after ${Date.now() - spinStarted}ms`);
+assertWinMeter(lastHud);
 
 await click(60, "#betDown");
 await click(61, "#betDown");
@@ -261,6 +269,7 @@ for (let i = 0; i < 450; i += 1) {
   }
 }
 if (buyHud?.busy) throw new Error(`buy bonus still busy after ${Date.now() - buyStarted}ms`);
+assertWinMeter(buyHud);
 
 await click(66, "#spinBtn");
 const spin2Started = Date.now();
@@ -272,6 +281,7 @@ for (let i = 0; i < 180; i += 1) {
 }
 log("after spin2", spin2Hud, `ms=${Date.now() - spin2Started}`);
 if (spin2Hud?.busy) throw new Error("second spin still busy");
+assertWinMeter(spin2Hud);
 const banner = await send(89, "Runtime.evaluate", {
   expression: "document.querySelector('.banner')?.textContent || ''",
   returnByValue: true,

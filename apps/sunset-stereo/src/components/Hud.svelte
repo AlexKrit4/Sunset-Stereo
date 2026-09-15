@@ -16,6 +16,36 @@
   const showAutoplay = $derived(!ui.replay && !ui.disableAutoplay);
   const spinCost = $derived(Math.round(ui.betMicro * (ui.scatterBuyOn ? BUY_SCATTER.cost : 1)));
   const stakeLabel = $derived(ui.scatterBuyOn ? BUY_SCATTER.label : labels.stake());
+  const WIN_COUNT_MS = 500;
+  let displayedWinMicro = $state(0);
+  let displayedWinHold = 0;
+  const winLit = $derived(ui.winMicro > 0);
+
+  $effect(() => {
+    const target = ui.winMicro;
+    if (target <= 0) {
+      displayedWinHold = 0;
+      displayedWinMicro = 0;
+      return;
+    }
+    const from = displayedWinHold;
+    const started = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const u = Math.min(1, (now - started) / WIN_COUNT_MS);
+      const eased = 1 - (1 - u) ** 3;
+      displayedWinHold = Math.round(from + (target - from) * eased);
+      displayedWinMicro = displayedWinHold;
+      if (u < 1) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+      displayedWinHold = target;
+      displayedWinMicro = target;
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  });
 
   function toggleTray() {
     ui.trayOpen = !ui.trayOpen;
@@ -60,9 +90,9 @@
     </div>
   {/if}
 
-  <div class="stat win">
+  <div class="stat win" class:lit={winLit} data-win-lit={winLit ? "1" : "0"}>
     <span>{labels.win()}</span>
-    <strong id="winValue">{moneyHud(ui.winMicro)}</strong>
+    <strong id="winValue">{moneyHud(displayedWinMicro)}</strong>
   </div>
 
   {#if ui.fsTotal > 0}
@@ -239,8 +269,38 @@
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
   }
+  .win {
+    padding: 2px 8px 2px 0;
+    border-radius: 8px;
+  }
   .win strong {
+    color: #8a7d70;
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+  }
+  .win.lit {
+    background: radial-gradient(ellipse at 30% 80%, rgba(62, 200, 240, 0.28), transparent 72%);
+    box-shadow: 0 0 18px rgba(62, 200, 240, 0.18);
+    animation: win-ignite 0.46s ease-out;
+  }
+  .win.lit span {
+    color: #d7f4ff;
+  }
+  .win.lit strong {
     color: #3ec8f0;
+    text-shadow:
+      0 0 8px rgba(62, 200, 240, 0.95),
+      0 0 18px rgba(62, 200, 240, 0.45);
+  }
+  @keyframes win-ignite {
+    from {
+      filter: brightness(0.7);
+    }
+    40% {
+      filter: brightness(1.35);
+    }
+    to {
+      filter: brightness(1);
+    }
   }
   .extra strong {
     color: #ffb070;

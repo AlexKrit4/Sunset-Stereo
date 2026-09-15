@@ -26,6 +26,25 @@ function clearLockedWilds() {
   lockedWilds = [];
 }
 
+function upcomingTotalWinCents(events: BookEvent[], current: BookEvent) {
+  let start = events.indexOf(current);
+  if (start < 0) start = events.findIndex((event) => event.index === current.index);
+  if (start < 0) return null;
+  for (let index = start + 1; index < events.length; index += 1) {
+    const event = events[index];
+    if (event.type === "setTotalWin") return event.amount;
+    if (
+      event.type === "reveal" ||
+      event.type === "updateFreeSpin" ||
+      event.type === "freeSpinEnd" ||
+      event.type === "finalWin"
+    ) {
+      return null;
+    }
+  }
+  return null;
+}
+
 function nextBonusWin(
   events: BookEvent[],
   current: BookEvent,
@@ -110,9 +129,10 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     await waitForTimeout(120);
   },
 
-  setWin: async (bookEvent) => {
+  setWin: async (bookEvent, context) => {
     const micro = multiplierCentsToMicro(bookEvent.amount);
-    ui.winMicro = micro;
+    const totalCents = upcomingTotalWinCents(context.bookEvents, bookEvent);
+    ui.winMicro = totalCents != null ? multiplierCentsToMicro(totalCents) : micro;
     if (micro <= 0) {
       hideSpinWin();
       await waitForTimeout(60);
