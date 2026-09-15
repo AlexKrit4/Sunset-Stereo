@@ -34,10 +34,10 @@ function audioUrl(file: string) {
   return audioSrc(`audio/bigwin/${file}`);
 }
 
-function easeOutQuart(progress: number) {
+function easeOutCount(progress: number) {
   if (progress >= 1) return 1;
   if (progress <= 0) return 0;
-  return 1 - (1 - progress) ** 4;
+  return 1 - (1 - progress) ** 1.7;
 }
 
 function stopClips() {
@@ -87,7 +87,7 @@ function countStage(fromMicro: number, toMicro: number, ms: number) {
         return;
       }
       const progress = Math.min(1, (now - started) / ms);
-      ui.bigWinDisplayMicro = Math.round(fromMicro + (toMicro - fromMicro) * easeOutQuart(progress));
+      ui.bigWinDisplayMicro = Math.round(fromMicro + (toMicro - fromMicro) * easeOutCount(progress));
       if (progress < 1) {
         requestAnimationFrame(tick);
         return;
