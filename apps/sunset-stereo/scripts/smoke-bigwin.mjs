@@ -14,7 +14,7 @@ function ids(micro) {
   return stagesForWin(micro, bet).map((stage) => stage.id).join(",");
 }
 
-assert(ids(20 * bet) === "", "20x has no stages");
+assert(ids(20 * bet) === "win1", "20x sits inside the 0-40 band");
 assert(ids(30 * bet) === "win1", "30x stays on win1 then end");
 assert(ids(40 * bet) === "win1", "40x is the top of win1");
 assert(ids(40 * bet + 1) === "win1,win2", "just over 40x enters win2");
@@ -25,7 +25,7 @@ assert(ids(200 * bet) === "win1,win2,win3,win4", "200x is the top of win4");
 assert(ids(201 * bet) === "win1,win2,win3,win4,win5", "over 200x reaches sunset");
 
 const win1 = stagesForWin(30 * bet, bet)[0];
-assert(win1.fromMicro === 20 * bet, "win1 counter starts at 20x");
+assert(win1.fromMicro === 0, "win1 counter starts at 0x");
 assert(win1.toMicro === 30 * bet, "30x counts only to the actual win");
 
 const mid = stagesForWin(50 * bet, bet);

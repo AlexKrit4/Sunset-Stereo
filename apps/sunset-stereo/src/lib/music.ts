@@ -72,11 +72,13 @@ function stopFades() {
   }
 }
 
+let bedDucked = false;
+
 export function applyBedVolumes(immediate = false) {
   if (!base || !bonus) return;
   const next = current === "bonus" ? bonus : base;
   const prev = current === "bonus" ? base : bonus;
-  if (ui.musicMuted) {
+  if (ui.musicMuted || bedDucked) {
     next.volume = 0;
     prev.volume = 0;
     return;
@@ -139,12 +141,15 @@ export function toggleMusicMute() {
 }
 
 export function duckMusicBed() {
+  bedDucked = true;
   if (!base || !bonus) return;
-  fadeVolume(base, 0, 220);
-  fadeVolume(bonus, 0, 220);
+  stopFades();
+  base.volume = 0;
+  bonus.volume = 0;
 }
 
 export function restoreMusicBed() {
+  bedDucked = false;
   if (!base || !bonus || ui.musicMuted) return;
   applyBedVolumes();
 }

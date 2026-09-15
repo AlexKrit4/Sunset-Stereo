@@ -26,6 +26,8 @@ const START_FALLBACK_MS = 20000;
 const END_FALLBACK_MS = 8000;
 
 const clips: HTMLAudioElement[] = [];
+let introActive = false;
+let startFinished: Promise<void> = Promise.resolve();
 
 function audioUrl(file: string) {
   return `${import.meta.env.BASE_URL}audio/bigwin/${file}`;
@@ -126,39 +128,59 @@ function resetOverlay() {
   ui.bigWinDisplayMicro = 0;
 }
 
+/** Mute the lounge bed and start bzzz as soon as winning symbols sheen. */
+export function beginBigWinIntro() {
+  if (introActive) return;
+  introActive = true;
+  duckMusicBed();
+  playClip("bzzz.mp3");
+  startFinished = (async () => {
+    await waitForTimeout(BZZZ_TO_START_MS);
+    if (!introActive) return;
+    const start = playClip("start.mp3");
+    await waitForClipEnd(start.clip, start.playing, START_FALLBACK_MS);
+  })();
+}
+
+function finishBigWinAudio() {
+  stopClips();
+  introActive = false;
+  startFinished = Promise.resolve();
+  resetOverlay();
+  restoreMusicBed();
+}
+
 export async function playBigWin(micro: number) {
   const stages = stagesForWin(micro, ui.betMicro);
   if (!stages.length) return;
 
-  duckMusicBed();
+  beginBigWinIntro();
   ui.bigWinOpen = true;
   ui.bigWinExplode = false;
   ui.bigWinLeft = "";
   ui.bigWinRight = "";
   ui.bigWinOutgoingLeft = "";
   ui.bigWinOutgoingRight = "";
-  ui.bigWinDisplayMicro = stages[0].fromMicro;
+  ui.bigWinDisplayMicro = 0;
 
-  playClip("bzzz.mp3");
-  await waitForTimeout(BZZZ_TO_START_MS);
-  const start = playClip("start.mp3");
-  await waitForClipEnd(start.clip, start.playing, START_FALLBACK_MS);
+  try {
+    await startFinished;
+    if (!introActive) return;
 
-  for (const stage of stages) {
-    showStageTitle(stage.left, stage.right);
-    const track = playClip(stage.file);
-    await countStage(stage.fromMicro, stage.toMicro, STAGE_MS);
-    track.clip.pause();
+    for (const stage of stages) {
+      showStageTitle(stage.left, stage.right);
+      const track = playClip(stage.file);
+      await countStage(stage.fromMicro, stage.toMicro, STAGE_MS);
+      track.clip.pause();
+    }
+
+    ui.bigWinExplode = true;
+    const end = playClip("end.mp3");
+    await Promise.all([
+      waitForClipEnd(end.clip, end.playing, END_FALLBACK_MS),
+      waitForTimeout(EXPLODE_MS),
+    ]);
+  } finally {
+    finishBigWinAudio();
   }
-
-  ui.bigWinExplode = true;
-  const end = playClip("end.mp3");
-  await Promise.all([
-    waitForClipEnd(end.clip, end.playing, END_FALLBACK_MS),
-    waitForTimeout(EXPLODE_MS),
-  ]);
-
-  stopClips();
-  resetOverlay();
-  restoreMusicBed();
 }
