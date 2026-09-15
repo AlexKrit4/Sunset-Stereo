@@ -555,10 +555,6 @@ export class BoardController {
       this.dimNonWinners(cells, COLS - 1);
     }
     this.markSymbolActivity();
-    if (this.bonusDim) {
-      await this.playWinSheen(cells);
-      return;
-    }
     await Promise.all([this.playWinSheen(cells), this.playSymbolWins(cells)]);
   }
 
