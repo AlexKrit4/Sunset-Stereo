@@ -269,38 +269,11 @@
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
   }
-  .win {
-    padding: 2px 8px 2px 0;
-    border-radius: 8px;
-  }
   .win strong {
     color: #8a7d70;
-    transition: color 0.2s ease, text-shadow 0.2s ease;
-  }
-  .win.lit {
-    background: radial-gradient(ellipse at 30% 80%, rgba(62, 200, 240, 0.28), transparent 72%);
-    box-shadow: 0 0 18px rgba(62, 200, 240, 0.18);
-    animation: win-ignite 0.46s ease-out;
-  }
-  .win.lit span {
-    color: #d7f4ff;
   }
   .win.lit strong {
     color: #3ec8f0;
-    text-shadow:
-      0 0 8px rgba(62, 200, 240, 0.95),
-      0 0 18px rgba(62, 200, 240, 0.45);
-  }
-  @keyframes win-ignite {
-    from {
-      filter: brightness(0.7);
-    }
-    40% {
-      filter: brightness(1.35);
-    }
-    to {
-      filter: brightness(1);
-    }
   }
   .extra strong {
     color: #ffb070;

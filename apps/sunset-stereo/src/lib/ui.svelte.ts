@@ -63,6 +63,8 @@ export function cancelBonusIntro() {
   resolve?.();
 }
 
+export const WIN_OVERLAY_MULT = 5;
+
 export function showSpinWin(micro: number, lines = 0) {
   if (micro <= 0) {
     hideSpinWin();
@@ -78,6 +80,10 @@ export function hideSpinWin() {
   ui.spinWinVisible = false;
   ui.spinWinMicro = 0;
   ui.spinWinLines = 0;
+}
+
+export function roundWinBeatsStake(micro = ui.winMicro, multiple = WIN_OVERLAY_MULT) {
+  return micro > ui.betMicro * multiple;
 }
 
 export function money(value: number) {

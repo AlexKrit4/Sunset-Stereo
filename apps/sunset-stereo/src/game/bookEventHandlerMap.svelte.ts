@@ -1,4 +1,4 @@
-import { hideSpinWin, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelte";
+import { hideSpinWin, roundWinBeatsStake, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelte";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { runtime } from "./context";
 import { unpadPosition, winningWays } from "../rgs/bookView";
@@ -132,14 +132,19 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   setWin: async (bookEvent, context) => {
     const micro = multiplierCentsToMicro(bookEvent.amount);
     const totalCents = upcomingTotalWinCents(context.bookEvents, bookEvent);
-    ui.winMicro = totalCents != null ? multiplierCentsToMicro(totalCents) : micro;
+    const roundWin = totalCents != null ? multiplierCentsToMicro(totalCents) : micro;
+    ui.winMicro = roundWin;
     if (micro <= 0) {
       hideSpinWin();
       await waitForTimeout(60);
       return;
     }
+    if (ui.feature || !roundWinBeatsStake(roundWin)) {
+      await waitForTimeout(60);
+      return;
+    }
     await waitForTimeout(640);
-    showSpinWin(micro, pendingWinLines);
+    showSpinWin(roundWin, pendingWinLines);
     await waitForTimeout(1100);
   },
 
@@ -182,15 +187,22 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     await waitForTimeout(400);
   },
 
-  freeSpinEnd: async () => {
+  freeSpinEnd: async (bookEvent) => {
     pendingHolds = [];
     clearLockedWilds();
     runtime.board?.clearBookVisuals();
+    const total = multiplierCentsToMicro(bookEvent.amount);
+    ui.winMicro = total;
     ui.feature = false;
     ui.wildBonus = false;
     ui.fsCurrent = 0;
     ui.fsTotal = 0;
-    await waitForTimeout(200);
+    if (roundWinBeatsStake(total)) {
+      showSpinWin(total, pendingWinLines);
+      await waitForTimeout(1100);
+    } else {
+      await waitForTimeout(200);
+    }
   },
 
   finalWin: async (bookEvent) => {
