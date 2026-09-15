@@ -75,6 +75,13 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     await waitForTimeout(80);
   },
 
+  placeWild: async (bookEvent) => {
+    const board = runtime.board;
+    if (!board) return;
+    pendingHolds = [{ reel: bookEvent.reel, row: bookEvent.row }];
+    await board.placeWildFromCamera({ reel: bookEvent.reel, row: bookEvent.row });
+  },
+
   winInfo: async (bookEvent) => {
     pendingWinLines = winningWays(bookEvent.wins);
     const positions = bookEvent.wins.flatMap((win) => win.positions);
@@ -137,6 +144,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     pendingHolds = [];
     runtime.board?.clearBookVisuals();
     ui.feature = false;
+    ui.wildBonus = false;
     ui.fsCurrent = 0;
     ui.fsTotal = 0;
     await waitForTimeout(200);

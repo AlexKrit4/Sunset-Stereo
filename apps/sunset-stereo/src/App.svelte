@@ -5,7 +5,7 @@
   import Rules from "./components/Rules.svelte";
   import BonusIntro from "./components/BonusIntro.svelte";
   import BuyMenu from "./components/BuyMenu.svelte";
-  import { bootEngine, playBet, playBuyBonus } from "./game/betMachine.svelte";
+  import { bootEngine, playBet, playBuyBonus, playBuyWildBonus } from "./game/betMachine.svelte";
   import { changeBet, confirmBonusStart, ui } from "./lib/ui.svelte";
   import { bindMusicUnlock, bootMusic, musicBedFromUi, setMusicBed, unlockMusic } from "./lib/music";
 
@@ -112,6 +112,6 @@
   <p id="mixValue" class="sr-only">1×</p>
 
   <Hud onSpin={() => spin()} onBet={changeBet} />
-  <BuyMenu onBuyBonus={() => playBuyBonus()} />
+  <BuyMenu onBuyBonus={() => playBuyBonus()} onBuyWildBonus={() => playBuyWildBonus()} />
   <Rules />
 </div>

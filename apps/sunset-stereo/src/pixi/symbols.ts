@@ -16,7 +16,7 @@ import equalizerBar2Url from "../assets/symbols/equalizer-bar-2.png";
 import equalizerBar3Url from "../assets/symbols/equalizer-bar-3.png";
 import equalizerBar4Url from "../assets/symbols/equalizer-bar-4.png";
 import cocktailUrl from "../assets/symbols/cocktail.png";
-import mixerUrl from "../assets/symbols/mixer.png";
+import wildHibiscusUrl from "../assets/symbols/wild-hibiscus.png";
 import sunsetUrl from "../assets/symbols/sunset.png";
 
 const ART: Partial<Record<string, Texture>> = {};
@@ -33,7 +33,7 @@ const ART_URLS: Record<string, string> = {
   L3: equalizerUrl,
   L4: palmUrl,
   L5: cocktailUrl,
-  W: mixerUrl,
+  W: wildHibiscusUrl,
   S: sunsetUrl,
 };
 
@@ -58,6 +58,7 @@ export const SYMBOL_PAY_ART: Record<string, string> = {
   low4: palmUrl,
   low5: cocktailUrl,
   scatter: sunsetUrl,
+  wild: wildHibiscusUrl,
 };
 
 export async function loadSymbolArt() {

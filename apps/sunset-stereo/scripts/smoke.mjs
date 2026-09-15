@@ -127,6 +127,8 @@ const menu = await send(66, "Runtime.evaluate", {
   expression: `JSON.stringify({
     bonus: document.getElementById('buyScatterBtn')?.textContent || '',
     bonusCard: document.getElementById('buyBonusCard')?.innerText || '',
+    wildBonus: document.getElementById('buyWildBonusBtn')?.textContent || '',
+    wildBonusCard: document.getElementById('buyWildBonusCard')?.innerText || '',
     scatter: document.getElementById('buyReel2Btn')?.textContent || '',
     scatterCard: document.getElementById('buyReel2Card')?.innerText || '',
     pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
@@ -141,6 +143,8 @@ if (!/activate/i.test(menuState.scatter)) throw new Error("reel-2 sun must use A
 if (menuState.pressed === "true") throw new Error("reel-2 sun must start off");
 if (!/3 scatters/i.test(menuState.bonusCard)) throw new Error("buy shop must list 3 scatters");
 if (!/buy|get/i.test(menuState.bonus)) throw new Error("3 scatters must use Buy");
+if (!/4 scatters/i.test(menuState.wildBonusCard)) throw new Error("buy shop must list 4 scatters");
+if (!/buy|get/i.test(menuState.wildBonus)) throw new Error("4 scatters must use Buy");
 
 await click(641, "#buyReel2Btn");
 await new Promise((r) => setTimeout(r, 200));
@@ -197,6 +201,27 @@ if (scatterOffState.pressed === "true") {
 if (/sun on reel 2/i.test(scatterOffState.stakeLabel)) {
   throw new Error("stake readout must return to the base stake");
 }
+
+await click(668, "#buyWildBonusBtn");
+await new Promise((r) => setTimeout(r, 200));
+const wildConfirm = await send(669, "Runtime.evaluate", {
+  expression: `JSON.stringify({
+    open: Boolean(document.getElementById('buyConfirmBtn')),
+    text: document.querySelector('[aria-label="Confirm buy"]')?.innerText || ''
+  })`,
+  returnByValue: true,
+});
+log("wild bonus confirm", wildConfirm.result.value);
+const wildConfirmState = JSON.parse(wildConfirm.result.value);
+if (!wildConfirmState.open) throw new Error("4 scatters must ask for confirm");
+if (!/225|4 scatters|wild/i.test(wildConfirmState.text)) throw new Error("confirm must describe 4 scatters");
+await click(670, "#buyCancelBtn");
+await new Promise((r) => setTimeout(r, 150));
+const wildConfirmClosed = await send(6705, "Runtime.evaluate", {
+  expression: "Boolean(document.getElementById('buyConfirmBtn'))",
+  returnByValue: true,
+});
+if (wildConfirmClosed.result.value) throw new Error("4 scatters confirm cancel must close");
 
 await click(67, "#buyScatterBtn");
 await new Promise((r) => setTimeout(r, 200));

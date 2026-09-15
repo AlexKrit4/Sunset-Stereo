@@ -115,6 +115,7 @@ export async function playBet(mode = "base") {
   ui.busy = true;
   ui.banner = "";
   ui.feature = false;
+  ui.wildBonus = mode === "wildbonus";
   ui.fsCurrent = 0;
   ui.fsTotal = 0;
   ui.winMicro = 0;
@@ -137,8 +138,9 @@ export async function playBet(mode = "base") {
     return true;
   } catch (error) {
     console.error(error);
-    ui.banner = errorMessage(error, mode === "bonus" ? "Buy failed." : "Spin failed.");
+    ui.banner = errorMessage(error, mode === "bonus" || mode === "wildbonus" ? "Buy failed." : "Spin failed.");
     ui.feature = false;
+    ui.wildBonus = false;
     ui.autoplayOn = false;
     return false;
   } finally {
@@ -149,6 +151,10 @@ export async function playBet(mode = "base") {
 
 export async function playBuyBonus() {
   return playBet("bonus");
+}
+
+export async function playBuyWildBonus() {
+  return playBet("wildbonus");
 }
 
 export async function playReplay() {

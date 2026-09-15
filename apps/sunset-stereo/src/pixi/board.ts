@@ -198,6 +198,7 @@ export class BoardController {
   private onSettled: ((col: number) => void) | null = null;
   private teaseOverlay = new Graphics();
   private scatterOverlay = new Graphics();
+  private wildOverlay = new Container();
   private sheenTick: (() => void) | null = null;
   private sheenResolve: (() => void) | null = null;
   private bonusDim = false;
@@ -264,7 +265,8 @@ export class BoardController {
 
     this.teaseOverlay.eventMode = "none";
     this.scatterOverlay.eventMode = "none";
-    window.addChild(this.teaseOverlay, this.scatterOverlay);
+    this.wildOverlay.eventMode = "none";
+    window.addChild(this.teaseOverlay, this.scatterOverlay, this.wildOverlay);
     this.root.addChild(window);
     this.app.stage.addChild(this.root);
     this.app.ticker.add(this.idleTick);
@@ -439,6 +441,58 @@ export class BoardController {
     await spin;
   }
 
+  async placeWildFromCamera(padded: Position) {
+    const pos = unpadPosition(padded);
+    this.replaceCell(pos.reel, pos.row, "wild");
+    const cell = this.cells[pos.reel]?.[pos.row];
+    if (cell) cell.alpha = 0;
+    const host = this.reels[pos.reel]?.parent;
+    const flyer = asView("wild");
+    flyer.eventMode = "none";
+    flyer.pivot.set(CELL / 2, CELL / 2);
+    flyer.x = (host?.x ?? pos.reel * CELL) + CELL / 2;
+    flyer.y = (host?.y ?? 0) + pos.row * CELL + CELL / 2;
+    this.wildOverlay.addChild(flyer);
+    if (typeof document !== "undefined") {
+      document.body.dataset.wildStamp = `${pos.reel}:${pos.row}`;
+    }
+    await this.tweenWildFromPlayer(flyer);
+    flyer.destroy({ children: true });
+    if (cell) cell.alpha = 1;
+  }
+
+  private tweenWildFromPlayer(view: Container, ms = 620) {
+    const restY = view.y;
+    view.scale.set(2.55);
+    view.alpha = 0.12;
+    view.y = restY - 18;
+    return new Promise<void>((resolve) => {
+      const start = performance.now();
+      const tick = () => {
+        const u = Math.min((performance.now() - start) / ms, 1);
+        if (u < 0.72) {
+          const t = easeOutCubic(u / 0.72);
+          view.scale.set(2.55 - 1.63 * t);
+          view.y = restY - 18 + 22 * t;
+          view.alpha = 0.12 + 0.88 * Math.min(t / 0.35, 1);
+        } else {
+          const t = easeOutCubic((u - 0.72) / 0.28);
+          view.scale.set(0.92 + 0.08 * t);
+          view.y = restY + 4 - 4 * t;
+          view.alpha = 1;
+        }
+        if (u >= 1) {
+          this.app.ticker.remove(tick);
+          view.scale.set(1);
+          view.y = restY;
+          view.alpha = 1;
+          resolve();
+        }
+      };
+      this.app.ticker.add(tick);
+    });
+  }
+
   applyBookHolds(board: RawSymbol[][], positions: Position[]) {
     this.syncHolds(visibleNames(board), positions.map(unpadPosition));
     if (this.bonusDim) this.applyBonusDim();
@@ -489,6 +543,7 @@ export class BoardController {
     this.bonusDim = false;
     this.brightCells.clear();
     this.landingBright.clear();
+    this.wildOverlay.removeChildren().forEach((child) => child.destroy({ children: true }));
     this.clearHolds();
     this.clearWins();
     this.syncBonusDimFlag();

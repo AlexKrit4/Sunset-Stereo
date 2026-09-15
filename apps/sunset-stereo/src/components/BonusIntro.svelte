@@ -10,6 +10,9 @@
       <p>
         Winning extra plays hold and respin until nothing new is built. Then that extra play
         pays.
+        {#if ui.wildBonus}
+          A Wild is placed on a random cell before each extra play.
+        {/if}
       </p>
       <button id="bonusStartBtn" type="button" onclick={confirmBonusStart}>Start</button>
     </div>
