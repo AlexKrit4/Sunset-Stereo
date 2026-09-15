@@ -18,6 +18,27 @@
     setMusicBed(musicBedFromUi());
   });
 
+  $effect(() => {
+    if (
+      !ui.autoplayOn ||
+      ui.busy ||
+      !ui.ready ||
+      ui.replay ||
+      ui.buyMenuOpen ||
+      ui.rulesOpen ||
+      ui.bonusIntroOpen ||
+      ui.scatterConfirmOpen ||
+      ui.trayOpen ||
+      ui.error
+    ) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void spin();
+    }, 280);
+    return () => window.clearTimeout(timer);
+  });
+
   onMount(() => {
     bootMusic();
     const unbindMusic = bindMusicUnlock();
@@ -26,12 +47,33 @@
       ui.ready = true;
     });
     const onKey = (event: KeyboardEvent) => {
-      if (event.code === "Escape" && ui.buyMenuOpen) {
-        event.preventDefault();
-        ui.buyMenuOpen = false;
+      if (event.code === "Escape") {
+        if (ui.scatterConfirmOpen) {
+          event.preventDefault();
+          ui.scatterConfirmOpen = false;
+          return;
+        }
+        if (ui.buyMenuOpen) {
+          event.preventDefault();
+          ui.buyMenuOpen = false;
+          return;
+        }
+        if (ui.trayOpen) {
+          event.preventDefault();
+          ui.trayOpen = false;
+          return;
+        }
+      }
+      if (
+        event.code !== "Space" ||
+        ui.disableSpacebar ||
+        ui.rulesOpen ||
+        ui.buyMenuOpen ||
+        ui.scatterConfirmOpen ||
+        ui.trayOpen
+      ) {
         return;
       }
-      if (event.code !== "Space" || ui.disableSpacebar || ui.rulesOpen || ui.buyMenuOpen) return;
       event.preventDefault();
       unlockMusic();
       if (ui.bonusIntroOpen) {

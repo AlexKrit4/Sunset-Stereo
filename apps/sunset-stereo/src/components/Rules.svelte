@@ -22,14 +22,14 @@
         6×4 left-to-right ways. Three or more matching symbols from the leftmost reel pay.
         Three suns on reels 2–5 start 10 extra plays. A winning extra play holds and respins
         unlocked cells until nothing new is built, then pays. Base game plus extra plays is one bet.
-        Buy / Get bonus opens the shop. Activate Sun on reel 2 to keep spinning at 1.5× with a
-        sun locked on reel 2; turn it off from the same card. Buy / Get purchases 3 scatters
-        for 95× the selected stake and starts 10 extra plays.
+        Buy / Get bonus opens the shop. Activate Sun on reel 2 after a confirm to keep spinning at
+        1.5× with a sun locked on reel 2; turn it off from the same card. Buy / Get purchases
+        3 scatters for 95× the selected stake and starts 10 extra plays.
       </p>
       <p>RTP {(GAME.rtp * 100).toFixed(0)}%. Max win {GAME.wincap.toLocaleString()}× of the 1× stake.</p>
       <p>
-        Spin / Play starts a round. Buy / Get bonus opens the feature shop.
-        Activate keeps the 1.5× reel-2 sun armed until you switch it off.
+        Spin / Play starts a round. The lightning control opens the feature shop.
+        Activate asks for a confirm, then keeps the 1.5× reel-2 sun armed until you switch it off.
         + / – change the stake using bet levels from the game server.
         Spacebar also starts a round unless the operator disables it. Credit / Balance is the wallet.
         Paid / Won is the last round result. Extra plays shows the bonus counter.

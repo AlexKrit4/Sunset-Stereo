@@ -143,10 +143,28 @@ if (!/3 scatters/i.test(menuState.bonusCard)) throw new Error("buy shop must lis
 if (!/buy|get/i.test(menuState.bonus)) throw new Error("3 scatters must use Buy");
 
 await click(641, "#buyReel2Btn");
+await new Promise((r) => setTimeout(r, 200));
+const confirmOpen = await send(6415, "Runtime.evaluate", {
+  expression: `JSON.stringify({
+    open: Boolean(document.getElementById('scatterConfirmBtn')),
+    pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
+    text: document.querySelector('[aria-label="Confirm extra bet"]')?.innerText || ''
+  })`,
+  returnByValue: true,
+});
+log("scatter confirm", confirmOpen.result.value);
+const confirmState = JSON.parse(confirmOpen.result.value);
+if (!confirmState.open) throw new Error("extra bet must ask for confirm");
+if (confirmState.pressed === "true") throw new Error("extra bet must wait for confirm");
+if (!/1\.5|reel 2/i.test(confirmState.text)) throw new Error("confirm must describe the extra bet");
+
+await click(6416, "#scatterConfirmBtn");
+await new Promise((r) => setTimeout(r, 200));
 const scatterOn = await send(642, "Runtime.evaluate", {
   expression: `JSON.stringify({
     pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
-    text: document.getElementById('buyReel2Btn')?.textContent || ''
+    text: document.getElementById('buyReel2Btn')?.textContent || '',
+    confirm: Boolean(document.getElementById('scatterConfirmBtn'))
   })`,
   returnByValue: true,
 });
@@ -155,6 +173,7 @@ const scatterOnState = JSON.parse(scatterOn.result.value);
 if (scatterOnState.pressed !== "true" || !/^active$/i.test(scatterOnState.text.trim())) {
   throw new Error("reel-2 sun activate must stay on");
 }
+if (scatterOnState.confirm) throw new Error("confirm must close after extra bet is armed");
 
 await click(643, "#buyReel2Btn");
 const scatterOff = await send(644, "Runtime.evaluate", {

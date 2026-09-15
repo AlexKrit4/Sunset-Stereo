@@ -15,12 +15,28 @@
 
   function close() {
     ui.buyMenuOpen = false;
+    ui.scatterConfirmOpen = false;
   }
 
-  function toggleScatter() {
+  function requestScatter() {
     if (ui.busy) return;
-    if (!ui.scatterBuyOn && ui.balanceMicro < scatterPrice) return;
-    ui.scatterBuyOn = !ui.scatterBuyOn;
+    if (ui.scatterBuyOn) {
+      ui.scatterBuyOn = false;
+      ui.scatterConfirmOpen = false;
+      return;
+    }
+    if (ui.balanceMicro < scatterPrice) return;
+    ui.scatterConfirmOpen = true;
+  }
+
+  function confirmScatter() {
+    if (ui.busy || ui.balanceMicro < scatterPrice) return;
+    ui.scatterBuyOn = true;
+    ui.scatterConfirmOpen = false;
+  }
+
+  function cancelScatter() {
+    ui.scatterConfirmOpen = false;
   }
 </script>
 
@@ -53,7 +69,7 @@
               type="button"
               disabled={ui.busy || (!ui.scatterBuyOn && ui.balanceMicro < scatterPrice)}
               aria-pressed={ui.scatterBuyOn}
-              onclick={toggleScatter}
+              onclick={requestScatter}
             >
               {ui.scatterBuyOn ? labels.activated() : labels.activate()}
             </button>
@@ -81,6 +97,32 @@
             </button>
           </div>
         </article>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if ui.scatterConfirmOpen}
+  <div
+    class="confirm-scrim"
+    onclick={(event) => {
+      if (event.currentTarget === event.target) cancelScatter();
+    }}
+    role="presentation"
+  >
+    <div class="confirm" role="dialog" aria-label="Confirm extra bet" aria-modal="true">
+      <h2>Activate extra bet?</h2>
+      <p>
+        {BUY_SCATTER.label} costs {BUY_SCATTER.cost}× the stake ({moneyHud(scatterPrice)}) on every
+        spin and always lands a sun on reel {BUY_SCATTER.reel}.
+      </p>
+      <div class="actions">
+        <button id="scatterCancelBtn" class="ghost" type="button" onclick={cancelScatter}>
+          {labels.cancel()}
+        </button>
+        <button id="scatterConfirmBtn" class="go" type="button" onclick={confirmScatter}>
+          {labels.confirm()}
+        </button>
       </div>
     </div>
   </div>
@@ -213,5 +255,55 @@
   .purchase:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+  }
+  .confirm-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(8, 2, 16, 0.72);
+    display: grid;
+    place-items: center;
+    padding: 24px;
+  }
+  .confirm {
+    width: min(420px, 100%);
+    padding: 24px;
+    border-radius: 18px;
+    background: #fff;
+    color: #1b2430;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  }
+  .confirm h2 {
+    margin: 0 0 10px;
+    font-size: 22px;
+  }
+  .confirm p {
+    margin: 0 0 18px;
+    line-height: 1.45;
+    font-size: 15px;
+  }
+  .actions {
+    display: flex;
+    gap: 10px;
+  }
+  .actions button {
+    flex: 1;
+    min-height: 46px;
+    border: 0;
+    border-radius: 10px;
+    font: inherit;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .ghost {
+    background: #e6e0d8;
+    color: #1b2430;
+  }
+  .go {
+    background: #2ee6a0;
+    color: #fff;
   }
 </style>
