@@ -1,4 +1,4 @@
-import { playRound } from "../src/math/math.js";
+import { mulberry32, playHoldRespinSpin, playRound } from "../src/math/math.js";
 import { BONUS_SPINS, SCATTER_REELS, SCATTER_REEL_LAND_CHANCE } from "../src/math/config.js";
 
 function assert(cond, message) {
@@ -81,6 +81,37 @@ for (let i = 0; i < 8000; i += 1) {
   }
 }
 
+let stickyWins = 0;
+let stickyRespins = 0;
+for (let seed = 0; seed < 40; seed += 1) {
+  const rng = mulberry32(92001 + seed);
+  const wild = { reel: rng.randomInt(0, 5), row: rng.randomInt(0, 3) };
+  const spin = playHoldRespinSpin(rng, 1, [wild]);
+  assert(spin.steps.length >= 1, "sticky extra play needs a land");
+  for (const step of spin.steps) {
+    assert(step.board[wild.reel][wild.row] === "wild", `sticky wild must stay on the grid (seed ${seed})`);
+    assert(
+      step.locked.some((pos) => pos.reel === wild.reel && pos.row === wild.row),
+      `sticky wild must stay locked (seed ${seed})`,
+    );
+  }
+  if (spin.paidWin > 0) {
+    stickyWins += 1;
+    if (spin.steps.length >= 2) stickyRespins += 1;
+    const used = spin.wins.some((win) =>
+      (win.positions ?? []).some((pos) => pos.reel === wild.reel && pos.row === wild.row),
+    );
+    if (used) {
+      assert(
+        spin.highlights.some((pos) => pos.reel === wild.reel && pos.row === wild.row),
+        "a line that uses wild must highlight the wild cell",
+      );
+    }
+  }
+}
+assert(stickyWins > 0, "expected some sticky-wild extra play wins");
+assert(stickyRespins === stickyWins, "a sticky-wild line must hold-and-respin before it pays");
+
 assert(SCATTER_REEL_LAND_CHANCE === 0.12, "bonus chance is tuned at p=0.12 (~1/159)");
 const hit = samples / bonusHits;
 assert(bonusHits > 0, "expected some 3-scatter bonus triggers in 8000 spins");
@@ -103,6 +134,8 @@ process.stdout.write(
       bonusHits,
       samples,
       hitRate: bonusHits ? Number((samples / bonusHits).toFixed(1)) : null,
+      stickyWildWins: stickyWins,
+      stickyWildRespins: stickyRespins,
     },
     null,
     2,

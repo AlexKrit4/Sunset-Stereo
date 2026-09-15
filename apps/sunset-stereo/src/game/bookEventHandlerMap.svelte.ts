@@ -40,6 +40,7 @@ function nextBonusWin(
     if (
       event.type === "reveal" ||
       event.type === "updateFreeSpin" ||
+      event.type === "setTotalWin" ||
       event.type === "freeSpinEnd" ||
       event.type === "finalWin"
     ) {
@@ -80,7 +81,11 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       board.applyBookHolds(bookEvent.board, holdCells);
     }
     if (upcoming?.beforeRespin) {
-      await board.presentNewBonusWins(fresh, upcomingPositions, pendingHolds.length === 0);
+      const firstCombo =
+        pendingHolds.length === 0 ||
+        (lockedWilds.length > 0 &&
+          pendingHolds.every((pos) => lockedWilds.some((wild) => cellKey(wild) === cellKey(pos))));
+      await board.presentNewBonusWins(fresh, upcomingPositions, firstCombo);
     }
   },
 

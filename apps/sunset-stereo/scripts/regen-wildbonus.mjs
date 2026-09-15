@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { calculateWaysWin } from "../src/math/math.js";
+import { mulberry32, playHoldRespinSpin } from "../src/math/math.js";
+import { BONUS_SPINS } from "../src/math/config.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const booksPath = join(root, "src/rgs/demoBooks.json");
@@ -24,21 +25,7 @@ const FROM_MATH = {
 const TO_MATH = Object.fromEntries(Object.entries(FROM_MATH).map(([math, name]) => [name, math]));
 const SCATTER_REELS = [1, 2, 3, 4];
 const VISIBLE_ROWS = [1, 2, 3, 4];
-
-function mulberry(seed) {
-  let t = seed >>> 0;
-  return {
-    random() {
-      t += 0x6d2b79f5;
-      let r = Math.imul(t ^ (t >>> 15), 1 | t);
-      r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
-      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
-    },
-    int(min, max) {
-      return min + Math.floor(this.random() * (max - min + 1));
-    },
-  };
-}
+const PAD = ["L5", "L4", "L3", "L2", "L1", "H5"];
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -55,97 +42,79 @@ function scatterPositions(board) {
 }
 
 function addFourthScatter(board, trigger, rng) {
-  const present = new Set(scatterPositions(board).filter((pos) => VISIBLE_ROWS.includes(pos.row)).map((pos) => pos.reel));
+  const present = new Set(
+    scatterPositions(board)
+      .filter((pos) => VISIBLE_ROWS.includes(pos.row))
+      .map((pos) => pos.reel),
+  );
   const missing = SCATTER_REELS.filter((reel) => !present.has(reel));
   if (!missing.length) return;
   const reel = missing[0];
-  const row = VISIBLE_ROWS[rng.int(0, VISIBLE_ROWS.length - 1)];
+  const row = VISIBLE_ROWS[rng.randomInt(0, VISIBLE_ROWS.length - 1)];
   board[reel][row] = { name: "S", scatter: true };
   const positions = [...(trigger.positions ?? [])];
-  if (!positions.some((pos) => pos.reel === reel && pos.row === row)) {
-    positions.push({ reel, row });
-  }
+  if (!positions.some((pos) => pos.reel === reel && pos.row === row)) positions.push({ reel, row });
   trigger.positions = positions;
 }
 
-function stampWild(board, reel, row) {
-  board[reel][row] = { name: "W", wild: true };
+function toBookCell(name) {
+  if (name === "wild") return { name: "W", wild: true };
+  if (name === "scatter") return { name: "S", scatter: true };
+  return { name: TO_MATH[name] ?? name };
 }
 
-function visibleBoard(board) {
-  return board.map((col) => col.slice(1, 5).map((cell) => FROM_MATH[cell.name] ?? cell.name));
+function padBoard(visible) {
+  return visible.map((col, reel) => [toBookCell(PAD[reel]), ...col.map(toBookCell), toBookCell(PAD[(reel + 3) % PAD.length])]);
 }
 
 function padPos(pos) {
   return { reel: pos.reel, row: pos.row + 1 };
 }
 
-function samePos(a, b) {
-  return a.reel === b.reel && a.row === b.row;
+function cents(value) {
+  return Math.round(value * 100);
 }
 
-function unionPositions(list, extra) {
-  const out = [...list];
-  for (const pos of extra) {
-    if (!out.some((item) => samePos(item, pos))) out.push(pos);
-  }
-  return out;
-}
-
-function evaluateBoard(board) {
-  const visible = visibleBoard(board);
-  const mults = visible.map((col) => col.map(() => 1));
-  const info = calculateWaysWin(1, visible, mults, Array(6).fill(1));
-  const cents = Math.round(info.totalWin * 100);
-  return {
-    cents,
-    wins: info.wins.map((win) => ({
-      symbol: TO_MATH[win.sym] ?? win.sym,
-      kind: win.reelsMatched,
-      win: Math.round(win.win * 100),
-      positions: (win.positions ?? []).map(padPos),
-      meta: {
-        ways: win.ways,
-        globalMult: 1,
-        winWithoutMult: Math.round(win.win * 100),
-        symbolMult: 0,
-      },
-    })),
-  };
-}
-
-function lastReveal(slice) {
-  for (let index = slice.length - 1; index >= 0; index -= 1) {
-    if (slice[index].type === "reveal") return slice[index];
-  }
-  return null;
-}
-
-function applyWinToSlice(slice, evaluated) {
-  const winInfo = slice.find((event) => event.type === "winInfo");
-  const setWin = slice.find((event) => event.type === "setWin");
-  const oldCents = setWin?.amount ?? winInfo?.totalWin ?? 0;
-  if (evaluated.cents <= 0) return 0;
-  if (winInfo) {
-    winInfo.totalWin = evaluated.cents;
-    winInfo.wins = evaluated.wins;
-  } else {
-    const revealAt = slice.findIndex((event) => event.type === "reveal");
-    const insertAt = revealAt >= 0 ? revealAt + 1 : 0;
-    slice.splice(insertAt, 0, {
-      type: "winInfo",
-      totalWin: evaluated.cents,
-      wins: evaluated.wins,
+function eventsFromSpin(spin) {
+  const out = [];
+  spin.steps.forEach((step, index) => {
+    out.push({
+      type: "reveal",
+      board: padBoard(step.board),
+      paddingPositions: [0, 0, 0, 0, 0, 0],
+      gameType: "freegame",
+      anticipation: [0, 0, 0, 0, 0, 0],
     });
-  }
-  const nextSetWin = slice.find((event) => event.type === "setWin");
-  if (nextSetWin) {
-    nextSetWin.amount = evaluated.cents;
-  } else {
-    const infoAt = slice.findIndex((event) => event.type === "winInfo");
-    slice.splice(infoAt + 1, 0, { type: "setWin", amount: evaluated.cents, winLevel: 5 });
-  }
-  return evaluated.cents - oldCents;
+    const last = index === spin.steps.length - 1;
+    if (!last) {
+      out.push({
+        type: "holdRespin",
+        positions: step.locked.map(padPos),
+        continuing: true,
+      });
+      return;
+    }
+    if (spin.paidWin > 0) {
+      out.push({
+        type: "winInfo",
+        totalWin: cents(spin.paidWin),
+        wins: spin.wins.map((win) => ({
+          symbol: TO_MATH[win.sym] ?? win.sym,
+          kind: win.reelsMatched,
+          win: cents(win.win),
+          positions: (win.positions ?? []).map(padPos),
+          meta: {
+            ways: win.ways,
+            globalMult: 1,
+            winWithoutMult: cents(win.win),
+            symbolMult: 0,
+          },
+        })),
+      });
+      out.push({ type: "setWin", amount: cents(spin.paidWin), winLevel: 5 });
+    }
+  });
+  return out;
 }
 
 function reindex(events) {
@@ -158,58 +127,44 @@ function buildWildBook(source, id) {
   const book = clone(source);
   book.id = id;
   book.criteria = "wildbonus";
-  const rng = mulberry(id);
-  const events = book.events;
-  addFourthScatter(events[0].board, events.find((event) => event.type === "freeSpinTrigger"), rng);
+  const rng = mulberry32(id);
+  const sourceEvents = book.events;
+  addFourthScatter(sourceEvents[0].board, sourceEvents.find((event) => event.type === "freeSpinTrigger"), rng);
 
-  const next = [];
-  let index = 0;
-  while (index < events.length) {
-    const event = events[index];
-    if (event.type !== "updateFreeSpin") {
-      next.push(event);
-      index += 1;
-      continue;
-    }
-    next.push(event);
-    const slice = [];
-    let cursor = index + 1;
-    while (cursor < events.length && events[cursor].type !== "updateFreeSpin" && events[cursor].type !== "freeSpinEnd") {
-      slice.push(events[cursor]);
-      cursor += 1;
-    }
-    const reel = rng.int(0, 5);
-    const row = VISIBLE_ROWS[rng.int(0, VISIBLE_ROWS.length - 1)];
-    const wildPos = { reel, row };
-    next.push({ type: "placeWild", reel, row });
-    for (const item of slice) {
-      if (item.type === "reveal") stampWild(item.board, reel, row);
-      if (item.type === "holdRespin") item.positions = unionPositions(item.positions ?? [], [wildPos]);
-    }
-    const paidBoard = lastReveal(slice);
-    const delta = paidBoard ? applyWinToSlice(slice, evaluateBoard(paidBoard.board)) : 0;
-    if (delta) {
-      for (const item of slice) {
-        if (item.type === "setTotalWin") item.amount += delta;
-      }
-      for (let later = cursor; later < events.length; later += 1) {
-        if (events[later].type === "setTotalWin" || events[later].type === "finalWin") {
-          events[later].amount += delta;
-        }
-      }
-      book.payoutMultiplier += delta;
-    }
-    next.push(...slice);
-    index = cursor;
+  const head = [];
+  for (const event of sourceEvents) {
+    if (event.type === "updateFreeSpin") break;
+    head.push(event);
   }
-  reindex(next);
-  book.events = next;
-  const finalWin = [...next].reverse().find((event) => event.type === "finalWin");
-  if (finalWin) book.payoutMultiplier = finalWin.amount;
+
+  const extra = [];
+  let total = head.findLast?.((event) => event.type === "setTotalWin")?.amount ?? 0;
+  if (!head.findLast) {
+    const lastTotal = [...head].reverse().find((event) => event.type === "setTotalWin");
+    total = lastTotal?.amount ?? 0;
+  }
+  for (let spinIndex = 0; spinIndex < BONUS_SPINS; spinIndex += 1) {
+    extra.push({ type: "updateFreeSpin", amount: spinIndex, total: BONUS_SPINS });
+    const wild = { reel: rng.randomInt(0, 5), row: rng.randomInt(0, 3) };
+    extra.push({ type: "placeWild", reel: wild.reel, row: wild.row + 1 });
+    const spin = playHoldRespinSpin(rng, 1, [wild]);
+    extra.push(...eventsFromSpin(spin));
+    total += cents(spin.paidWin);
+    extra.push({ type: "setTotalWin", amount: total });
+  }
+
+  const tail = [
+    { type: "freeSpinEnd", amount: total, winLevel: 5 },
+    { type: "finalWin", amount: total },
+  ];
+  const events = [...head, ...extra, ...tail];
+  reindex(events);
+  book.events = events;
+  book.payoutMultiplier = total;
   return book;
 }
 
-const wildBooks = data.bonusBooks.map((book, index) => buildWildBook(book, 92001 + index));
+const wildBooks = [];
 while (wildBooks.length < 20) {
   const src = data.bonusBooks[wildBooks.length % data.bonusBooks.length];
   wildBooks.push(buildWildBook(src, 92001 + wildBooks.length));
@@ -218,26 +173,61 @@ while (wildBooks.length < 20) {
 data.wildBonusBooks = wildBooks;
 writeFileSync(booksPath, JSON.stringify(data));
 
-const sample = wildBooks[0];
-const types = sample.events.map((event) => event.type);
-const wilds = sample.events.filter((event) => event.type === "placeWild");
-const firstWild = wilds[0];
-const held = sample.events.filter((event) => event.type === "holdRespin");
-const missingHold = held.filter((event) => !event.positions.some((pos) => pos.reel === firstWild.reel && pos.row === firstWild.row));
+function extraPlayStats(book) {
+  const stats = { extraPlays: 0, winningPlays: 0, winningWithRespin: 0, winningWithoutRespin: 0, wildInWin: 0 };
+  let i = 0;
+  while (i < book.events.length) {
+    if (book.events[i].type !== "placeWild") {
+      i += 1;
+      continue;
+    }
+    stats.extraPlays += 1;
+    const wild = book.events[i];
+    const slice = [];
+    i += 1;
+    while (i < book.events.length && book.events[i].type !== "placeWild" && book.events[i].type !== "freeSpinEnd") {
+      slice.push(book.events[i]);
+      i += 1;
+    }
+    const hasWin = slice.some((event) => event.type === "winInfo");
+    const hasRespin = slice.some((event) => event.type === "holdRespin");
+    if (hasWin) {
+      stats.winningPlays += 1;
+      if (hasRespin) stats.winningWithRespin += 1;
+      else stats.winningWithoutRespin += 1;
+      const win = slice.find((event) => event.type === "winInfo");
+      if (
+        win.wins.some((item) =>
+          item.positions.some((pos) => pos.reel === wild.reel && pos.row === wild.row),
+        )
+      ) {
+        stats.wildInWin += 1;
+      }
+    }
+  }
+  return stats;
+}
+
+const sample = extraPlayStats(wildBooks[0]);
+const all = wildBooks.reduce(
+  (acc, book) => {
+    const next = extraPlayStats(book);
+    acc.winningPlays += next.winningPlays;
+    acc.winningWithRespin += next.winningWithRespin;
+    acc.winningWithoutRespin += next.winningWithoutRespin;
+    acc.wildInWin += next.wildInWin;
+    return acc;
+  },
+  { winningPlays: 0, winningWithRespin: 0, winningWithoutRespin: 0, wildInWin: 0 },
+);
+
 process.stdout.write(
   JSON.stringify(
     {
       count: wildBooks.length,
-      placeWild: types.filter((type) => type === "placeWild").length,
-      payout: sample.payoutMultiplier,
-      firstWild,
-      holdRespinsKeepWild: held.length - missingHold.length,
-      holdRespins: held.length,
-      winHasWild: sample.events.some(
-        (event) =>
-          event.type === "winInfo" &&
-          event.wins.some((win) => win.positions.some((pos) => pos.reel === firstWild.reel && pos.row === firstWild.row)),
-      ),
+      payout0: wildBooks[0].payoutMultiplier,
+      sample,
+      all,
     },
     null,
     2,
