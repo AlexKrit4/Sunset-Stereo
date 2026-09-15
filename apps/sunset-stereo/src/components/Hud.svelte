@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { BUY_SCATTER } from "../math/config.js";
   import { moneyHud, labels, ui } from "../lib/ui.svelte";
   import { toggleMusicMute } from "../lib/music";
 
@@ -13,12 +12,6 @@
 
   const locked = $derived(ui.busy || !ui.ready);
   const showBuy = $derived(!ui.replay && !ui.disableBuyFeature);
-  const scatterPrice = $derived(Math.round(ui.betMicro * BUY_SCATTER.cost));
-
-  function toggleScatterBuy() {
-    if (locked) return;
-    ui.scatterBuyOn = !ui.scatterBuyOn;
-  }
 </script>
 
 <div class="bar">
@@ -56,24 +49,14 @@
   </button>
   {#if showBuy}
     <button
-      id="buyReel2Btn"
-      class="buy scatter"
-      class:on={ui.scatterBuyOn}
-      type="button"
-      disabled={locked}
-      aria-pressed={ui.scatterBuyOn}
-      aria-label={`${BUY_SCATTER.label}, ${BUY_SCATTER.cost}×`}
-      onclick={toggleScatterBuy}
-    >
-      <span class="name">{labels.scatterBuy()}</span>
-      <span class="meta">{BUY_SCATTER.cost}× · {moneyHud(scatterPrice)}</span>
-    </button>
-    <button
       id="bonusBtn"
       class="buy"
+      class:on={ui.buyMenuOpen}
+      class:armed={ui.scatterBuyOn}
       type="button"
-      disabled={locked}
-      onclick={() => (ui.buyMenuOpen = true)}
+      disabled={locked && !ui.buyMenuOpen}
+      aria-pressed={ui.buyMenuOpen || ui.scatterBuyOn}
+      onclick={() => (ui.buyMenuOpen = !ui.buyMenuOpen)}
     >
       {labels.buy()}
     </button>
@@ -92,6 +75,8 @@
 
 <style>
   .bar {
+    position: relative;
+    z-index: 50;
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
@@ -158,33 +143,11 @@
     text-transform: uppercase;
     font-weight: 700;
   }
-  .scatter {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
-    min-width: 118px;
-    padding: 6px 14px;
-    background: #3a2418;
-  }
-  .scatter .name {
-    line-height: 1.1;
-  }
-  .scatter .meta {
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    font-weight: 600;
-    opacity: 0.82;
-    text-transform: none;
-  }
-  .scatter.on {
+  .buy.on,
+  .buy.armed {
     background: #a84818;
     border-color: #ffd080;
-    color: #fff4dc;
     box-shadow: 0 0 16px rgba(255, 140, 40, 0.45);
-  }
-  .scatter.on .meta {
-    opacity: 1;
   }
   .ghost {
     letter-spacing: 0.08em;

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { BUY_BONUS, BUY_SCATTER } from "../math/config.js";
   import { labels, moneyHud, ui } from "../lib/ui.svelte";
+  import { SYMBOL_PAY_ART } from "../pixi/symbols";
 
   let {
     onBuyBonus,
@@ -9,9 +10,17 @@
   } = $props();
 
   const bonusPrice = $derived(Math.round(ui.betMicro * BUY_BONUS.cost));
+  const scatterPrice = $derived(Math.round(ui.betMicro * BUY_SCATTER.cost));
+  const sunArt = SYMBOL_PAY_ART.scatter;
 
   function close() {
     ui.buyMenuOpen = false;
+  }
+
+  function toggleScatter() {
+    if (ui.busy) return;
+    if (!ui.scatterBuyOn && ui.balanceMicro < scatterPrice) return;
+    ui.scatterBuyOn = !ui.scatterBuyOn;
   }
 </script>
 
@@ -23,27 +32,56 @@
     }}
     role="presentation"
   >
-    <div class="sheet" role="dialog" aria-label={labels.buyBonus()} aria-modal="true">
-      <h2>{labels.buyBonus()}</h2>
-      <p>
-        {BUY_BONUS.label} starts 10 extra plays at {BUY_BONUS.cost}×. Turn on {BUY_SCATTER.label} in
-        the controls to keep spinning at {BUY_SCATTER.cost}× with a sun locked on reel {BUY_SCATTER.reel}.
-      </p>
-      <button
-        id="buyScatterBtn"
-        class="offer"
-        type="button"
-        disabled={ui.busy || ui.balanceMicro < bonusPrice}
-        onclick={onBuyBonus}
-      >
-        <span class="name">{BUY_BONUS.label}</span>
-        <span class="meta">10 extra plays · {BUY_BONUS.cost}×</span>
-        <strong>{moneyHud(bonusPrice)}</strong>
+    <div class="shop" role="dialog" aria-label={labels.buyBonus()} aria-modal="true">
+      <button id="buyCloseBtn" class="close" type="button" aria-label="Close" onclick={close}>
+        ×
       </button>
-      {#if ui.balanceMicro < bonusPrice}
-        <p class="note">Not enough {ui.social ? "balance" : "credit"} for this {ui.social ? "play" : "buy"}.</p>
-      {/if}
-      <button class="ghost" type="button" onclick={close}>Close</button>
+
+      <div class="grid">
+        <article id="buyReel2Card" class="card" class:live={ui.scatterBuyOn}>
+          <div class="art sun">
+            <img src={sunArt} alt="" />
+          </div>
+          <div class="body">
+            <p class="bolts" aria-hidden="true">⚡⚡</p>
+            <h3>{BUY_SCATTER.label}</h3>
+            <p class="price">{moneyHud(scatterPrice)}</p>
+            <button
+              id="buyReel2Btn"
+              class="activate"
+              class:on={ui.scatterBuyOn}
+              type="button"
+              disabled={ui.busy || (!ui.scatterBuyOn && ui.balanceMicro < scatterPrice)}
+              aria-pressed={ui.scatterBuyOn}
+              onclick={toggleScatter}
+            >
+              {ui.scatterBuyOn ? labels.activated() : labels.activate()}
+            </button>
+          </div>
+        </article>
+
+        <article id="buyBonusCard" class="card">
+          <div class="art bonus">
+            <img src={sunArt} alt="" />
+            <img src={sunArt} alt="" />
+            <img src={sunArt} alt="" />
+          </div>
+          <div class="body">
+            <p class="bolts" aria-hidden="true">⚡⚡⚡⚡</p>
+            <h3>{BUY_BONUS.label}</h3>
+            <p class="price">{moneyHud(bonusPrice)}</p>
+            <button
+              id="buyScatterBtn"
+              class="purchase"
+              type="button"
+              disabled={ui.busy || ui.balanceMicro < bonusPrice}
+              onclick={onBuyBonus}
+            >
+              {labels.buyNow()}
+            </button>
+          </div>
+        </article>
+      </div>
     </div>
   </div>
 {/if}
@@ -53,72 +91,127 @@
     position: fixed;
     inset: 0;
     z-index: 42;
-    background: rgba(8, 2, 16, 0.72);
+    background: rgba(10, 16, 28, 0.72);
     display: grid;
     place-items: center;
-    padding: 24px;
+    padding: 28px 16px 110px;
   }
-  .sheet {
-    width: min(420px, 100%);
-    background: #f3e6d2;
-    color: #2a1c12;
-    padding: 24px;
-    border: 1px solid #c4a574;
+  .shop {
+    position: relative;
+    width: min(720px, 100%);
   }
-  h2 {
-    margin: 0 0 12px;
-  }
-  p {
-    margin: 0 0 16px;
-    line-height: 1.45;
-    font-family: ui-sans-serif, system-ui, sans-serif;
-    font-size: 14px;
-  }
-  .offer {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto;
-    gap: 2px 16px;
-    width: 100%;
-    margin: 0 0 16px;
-    padding: 14px 16px;
-    text-align: left;
-    border: 1px solid #6a5438;
-    background: #7a3218;
-    color: #f8ece0;
+  .close {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 43;
+    width: 48px;
+    height: 48px;
+    border: 0;
+    border-radius: 14px;
+    background: #14181f;
+    color: #fff;
+    font-size: 32px;
+    line-height: 1;
     cursor: pointer;
-    font: inherit;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
   }
-  .offer:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 18px;
   }
-  .name {
-    font-weight: 700;
+  .card {
+    width: min(220px, 100%);
+    overflow: hidden;
+    border-radius: 18px;
+    background: #fff;
+    color: #1b2430;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  }
+  .card.live {
+    outline: 3px solid #2ee6a0;
+    outline-offset: 2px;
+  }
+  .art {
+    height: 118px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .art.sun {
+    background:
+      radial-gradient(circle at 50% 40%, rgba(255, 210, 80, 0.95), transparent 55%),
+      linear-gradient(180deg, #ff8a2a 0%, #c43a7a 100%);
+  }
+  .art.bonus {
+    background:
+      radial-gradient(circle at 50% 30%, rgba(255, 240, 160, 0.85), transparent 50%),
+      linear-gradient(180deg, #7a3cff 0%, #e23a8c 100%);
+  }
+  .art img {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 12px rgba(20, 8, 28, 0.35));
+  }
+  .art.bonus img {
+    width: 56px;
+    height: 56px;
+  }
+  .body {
+    padding: 10px 14px 14px;
+    text-align: center;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  .bolts {
+    margin: 0 0 2px;
+    color: #3cc4ff;
+    letter-spacing: -0.08em;
+    font-size: 14px;
+    line-height: 1;
+  }
+  h3 {
+    margin: 0;
+    font-size: 15px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
-  .meta {
-    grid-column: 1;
-    font-size: 12px;
-    opacity: 0.86;
-    font-family: ui-sans-serif, system-ui, sans-serif;
-  }
-  .offer strong {
-    grid-row: 1 / span 2;
-    align-self: center;
-    font-size: 18px;
+  .price {
+    margin: 4px 0 10px;
+    font-size: 28px;
+    font-weight: 800;
     font-variant-numeric: tabular-nums;
   }
-  .note {
-    font-size: 12px;
-    opacity: 0.86;
-  }
-  .ghost {
-    border: 1px solid #6a5438;
-    background: transparent;
-    color: #2a1c12;
-    padding: 10px 16px;
+  .activate,
+  .purchase {
+    width: 100%;
+    min-height: 42px;
+    border: 0;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     cursor: pointer;
+  }
+  .activate {
+    background: #2ee6a0;
+    color: #fff;
+  }
+  .activate.on {
+    background: #1aae78;
+  }
+  .purchase {
+    background: #3dc6f5;
+    color: #fff;
+  }
+  .activate:disabled,
+  .purchase:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 </style>

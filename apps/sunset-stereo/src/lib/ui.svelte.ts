@@ -100,5 +100,7 @@ export const labels = {
   spin: () => (ui.replay ? "Play" : ui.social ? "Play" : "Spin"),
   buy: () => (ui.social ? "Bonus" : "Buy"),
   buyBonus: () => (ui.social ? "Get bonus" : "Buy bonus"),
-  scatterBuy: () => "Sun 2",
+  buyNow: () => (ui.social ? "Get" : "Buy"),
+  activate: () => "Activate",
+  activated: () => "Active",
 };

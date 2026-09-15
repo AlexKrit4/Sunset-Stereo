@@ -121,48 +121,53 @@ const hasBonus = await send(64, "Runtime.evaluate", {
 log("bonusBtn", hasBonus.result.value);
 if (!hasBonus.result.value) throw new Error("bonus buy control must exist");
 
-const readScatterToggle = async (id) => {
-  const res = await send(id, "Runtime.evaluate", {
-    expression: `JSON.stringify({
-      exists: Boolean(document.getElementById('buyReel2Btn')),
-      pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
-      text: document.getElementById('buyReel2Btn')?.textContent || ''
-    })`,
-    returnByValue: true,
-  });
-  return JSON.parse(res.result.value);
-};
-
-const scatterOff = await readScatterToggle(640);
-log("scatter toggle off", scatterOff);
-if (!scatterOff.exists) throw new Error("reel-2 scatter toggle must exist");
-if (scatterOff.pressed === "true") throw new Error("reel-2 scatter toggle must start off");
-if (!/sun 2/i.test(scatterOff.text) || !/1\.5/i.test(scatterOff.text)) {
-  throw new Error("reel-2 scatter toggle must show 1.5x sun 2");
-}
-
-await click(641, "#buyReel2Btn");
-const scatterOn = await readScatterToggle(642);
-log("scatter toggle on", scatterOn);
-if (scatterOn.pressed !== "true") throw new Error("reel-2 scatter toggle must stay on");
-
-await click(643, "#buyReel2Btn");
-const scatterReset = await readScatterToggle(644);
-log("scatter toggle reset", scatterReset);
-if (scatterReset.pressed === "true") throw new Error("reel-2 scatter toggle must turn off");
-
 await click(65, "#bonusBtn");
 await new Promise((r) => setTimeout(r, 200));
 const menu = await send(66, "Runtime.evaluate", {
   expression: `JSON.stringify({
     bonus: document.getElementById('buyScatterBtn')?.textContent || '',
+    bonusCard: document.getElementById('buyBonusCard')?.innerText || '',
+    scatter: document.getElementById('buyReel2Btn')?.textContent || '',
+    scatterCard: document.getElementById('buyReel2Card')?.innerText || '',
+    pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
     title: document.querySelector('[aria-label="Buy bonus"], [aria-label="Get bonus"]') ? true : false
   })`,
   returnByValue: true,
 });
 log("buy menu", menu.result.value);
 const menuState = JSON.parse(menu.result.value);
-if (!/3 scatters/i.test(menuState.bonus)) throw new Error("buy menu must list 3 scatters");
+if (!/sun on reel 2/i.test(menuState.scatterCard)) throw new Error("buy shop must list sun on reel 2");
+if (!/activate/i.test(menuState.scatter)) throw new Error("reel-2 sun must use Activate");
+if (menuState.pressed === "true") throw new Error("reel-2 sun must start off");
+if (!/3 scatters/i.test(menuState.bonusCard)) throw new Error("buy shop must list 3 scatters");
+if (!/buy|get/i.test(menuState.bonus)) throw new Error("3 scatters must use Buy");
+
+await click(641, "#buyReel2Btn");
+const scatterOn = await send(642, "Runtime.evaluate", {
+  expression: `JSON.stringify({
+    pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
+    text: document.getElementById('buyReel2Btn')?.textContent || ''
+  })`,
+  returnByValue: true,
+});
+log("scatter activate", scatterOn.result.value);
+const scatterOnState = JSON.parse(scatterOn.result.value);
+if (scatterOnState.pressed !== "true" || !/^active$/i.test(scatterOnState.text.trim())) {
+  throw new Error("reel-2 sun activate must stay on");
+}
+
+await click(643, "#buyReel2Btn");
+const scatterOff = await send(644, "Runtime.evaluate", {
+  expression: `JSON.stringify({
+    pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
+    text: document.getElementById('buyReel2Btn')?.textContent || ''
+  })`,
+  returnByValue: true,
+});
+log("scatter deactivate", scatterOff.result.value);
+if (JSON.parse(scatterOff.result.value).pressed === "true") {
+  throw new Error("reel-2 sun activate must turn off");
+}
 
 await click(67, "#buyScatterBtn");
 const buyStarted = Date.now();
