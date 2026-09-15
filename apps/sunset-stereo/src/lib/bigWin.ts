@@ -88,14 +88,17 @@ function countStage(fromMicro: number, toMicro: number, ms: number) {
       }
       const progress = Math.min(1, (now - started) / ms);
       ui.bigWinDisplayMicro = Math.round(fromMicro + (toMicro - fromMicro) * easeOutCount(progress));
+      ui.winMicro = ui.bigWinDisplayMicro;
       if (progress < 1) {
         requestAnimationFrame(tick);
         return;
       }
       ui.bigWinDisplayMicro = toMicro;
+      ui.winMicro = toMicro;
       resolve();
     };
     ui.bigWinDisplayMicro = fromMicro;
+    ui.winMicro = fromMicro;
     requestAnimationFrame(tick);
   });
 }
@@ -133,6 +136,7 @@ function resetOverlay() {
 export function beginBigWinIntro() {
   if (introActive) return;
   introActive = true;
+  ui.bigWinIntro = true;
   duckMusicBed();
   playClip("bzzz.mp3");
   startFinished = (async () => {
@@ -146,6 +150,7 @@ export function beginBigWinIntro() {
 function finishBigWinAudio() {
   stopClips();
   introActive = false;
+  ui.bigWinIntro = false;
   startFinished = Promise.resolve();
   resetOverlay();
   restoreMusicBed();

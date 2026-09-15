@@ -138,16 +138,18 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     const micro = multiplierCentsToMicro(bookEvent.amount);
     const totalCents = upcomingTotalWinCents(context.bookEvents, bookEvent);
     const roundWin = totalCents != null ? multiplierCentsToMicro(totalCents) : micro;
-    ui.winMicro = roundWin;
     if (micro <= 0) {
+      ui.winMicro = roundWin;
       hideSpinWin();
       await waitForTimeout(60);
       return;
     }
     if (isBigWin(micro, ui.betMicro)) {
       await playBigWin(micro);
+      ui.winMicro = roundWin;
       return;
     }
+    ui.winMicro = roundWin;
     if (ui.feature) {
       await waitForTimeout(60);
       return;

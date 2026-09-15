@@ -19,9 +19,17 @@
   const WIN_COUNT_MS = 500;
   let displayedWinMicro = $state(0);
   let displayedWinHold = 0;
-  const winLit = $derived(ui.winMicro > 0);
+  const winLit = $derived(ui.winMicro > 0 || ui.bigWinOpen);
 
   $effect(() => {
+    if (ui.bigWinOpen) {
+      displayedWinHold = ui.bigWinDisplayMicro;
+      displayedWinMicro = ui.bigWinDisplayMicro;
+      return;
+    }
+    if (ui.bigWinIntro) {
+      return;
+    }
     const target = ui.winMicro;
     if (target <= 0) {
       displayedWinHold = 0;
