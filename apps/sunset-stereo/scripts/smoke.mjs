@@ -240,7 +240,7 @@ await click(672, "#buyConfirmBtn");
 const buyStarted = Date.now();
 let buyHud;
 let startedBonus = false;
-for (let i = 0; i < 300; i += 1) {
+for (let i = 0; i < 450; i += 1) {
   await new Promise((r) => setTimeout(r, 400));
   if (!startedBonus) {
     const startBtn = await send(200 + i, "Runtime.evaluate", {
