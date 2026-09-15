@@ -44,6 +44,9 @@ export const ui = $state({
   bigWinOutgoingRight: "",
   bigWinOutgoingKey: 0,
   bigWinExplode: false,
+  bootOpen: true,
+  bootReady: false,
+  bootProgress: 0,
 });
 
 let bonusIntroResolve: (() => void) | null = null;
@@ -108,7 +111,7 @@ export function moneyPlain(micro: number) {
 }
 
 export function changeBet(delta: number) {
-  if (ui.busy || ui.replay) return;
+  if (ui.busy || ui.replay || ui.bootOpen) return;
   const index = ui.betLevels.indexOf(ui.betMicro);
   const next = Math.max(0, Math.min(ui.betLevels.length - 1, (index < 0 ? 0 : index) + delta));
   ui.betMicro = ui.betLevels[next];
@@ -127,4 +130,5 @@ export const labels = {
   win: () => (ui.social ? "Won" : "Win"),
   cancel: () => "Cancel",
   confirm: () => "Confirm",
+  continue: () => "Continue",
 };

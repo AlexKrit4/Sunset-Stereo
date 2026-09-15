@@ -66,9 +66,32 @@ await once(ws, "open");
 await send(1, "Page.enable");
 await send(2, "Runtime.enable");
 await send(3, "Page.navigate", { url: base });
-await new Promise((r) => setTimeout(r, 1800));
+await new Promise((r) => setTimeout(r, 800));
 
-const title = await send(5, "Runtime.evaluate", {
+let continued = false;
+for (let i = 0; i < 90; i += 1) {
+  const boot = await send(4, "Runtime.evaluate", {
+    expression: `JSON.stringify({
+      continue: Boolean(document.getElementById('bootContinueBtn')),
+      ready: document.querySelector('[data-boot]')?.getAttribute('data-boot-ready') || '0',
+      progress: document.getElementById('bootProgress')?.textContent || ''
+    })`,
+    returnByValue: true,
+  });
+  const state = JSON.parse(boot.result.value);
+  if (state.continue) {
+    await send(5, "Runtime.evaluate", {
+      expression: `document.getElementById('bootContinueBtn').click()`,
+    });
+    continued = true;
+    break;
+  }
+  await new Promise((r) => setTimeout(r, 400));
+}
+if (!continued) throw new Error("boot continue never appeared");
+await new Promise((r) => setTimeout(r, 600));
+
+const title = await send(8, "Runtime.evaluate", {
   expression:
     "document.title + '|' + document.querySelector('h1')?.textContent + '|' + document.querySelectorAll('canvas').length + '|' + document.getElementById('balanceValue')?.textContent",
   returnByValue: true,

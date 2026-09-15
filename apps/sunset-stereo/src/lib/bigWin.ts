@@ -1,4 +1,5 @@
 import { duckMusicBed, restoreMusicBed } from "./music";
+import { audioSrc } from "./audioBank";
 import { ui } from "./ui.svelte";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import {
@@ -30,7 +31,7 @@ let introActive = false;
 let startFinished: Promise<void> = Promise.resolve();
 
 function audioUrl(file: string) {
-  return `${import.meta.env.BASE_URL}audio/bigwin/${file}`;
+  return audioSrc(`audio/bigwin/${file}`);
 }
 
 function easeOutQuart(progress: number) {

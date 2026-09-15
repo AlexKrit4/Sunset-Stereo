@@ -6,21 +6,37 @@
   import Rules from "./components/Rules.svelte";
   import BonusIntro from "./components/BonusIntro.svelte";
   import BuyMenu from "./components/BuyMenu.svelte";
-  import { bootEngine, playBet, playBuyBonus, playBuyWildBonus } from "./game/betMachine.svelte";
+  import Loader from "./components/Loader.svelte";
+  import { bootEngine, playBet, playBuyBonus, playBuyWildBonus, playPendingRestore } from "./game/betMachine.svelte";
   import { changeBet, confirmBonusStart, ui } from "./lib/ui.svelte";
   import { bindMusicUnlock, bootMusic, musicBedFromUi, setMusicBed, unlockMusic } from "./lib/music";
+  import { preloadGame } from "./lib/preload";
+
+  let unbindMusic = () => {};
 
   async function spin() {
+    if (ui.bootOpen) return;
     unlockMusic();
     await playBet(ui.scatterBuyOn ? "scatter" : "base");
   }
 
+  function continueBoot() {
+    if (!ui.bootReady && !ui.error) return;
+    ui.bootOpen = false;
+    bootMusic();
+    unlockMusic();
+    unbindMusic = bindMusicUnlock();
+    void playPendingRestore();
+  }
+
   $effect(() => {
+    if (ui.bootOpen) return;
     setMusicBed(musicBedFromUi());
   });
 
   $effect(() => {
     if (
+      ui.bootOpen ||
       !ui.autoplayOn ||
       ui.busy ||
       !ui.ready ||
@@ -42,13 +58,29 @@
   });
 
   onMount(() => {
-    bootMusic();
-    const unbindMusic = bindMusicUnlock();
-    void bootEngine().catch((error) => {
-      ui.error = error instanceof Error ? error.message : "Could not start the engine session.";
-      ui.ready = true;
-    });
+    void (async () => {
+      try {
+        await Promise.all([
+          preloadGame((ratio) => {
+            ui.bootProgress = ratio;
+          }),
+          bootEngine(),
+        ]);
+      } catch (error) {
+        ui.error = error instanceof Error ? error.message : "Could not start the engine session.";
+        ui.ready = true;
+      }
+      ui.bootProgress = 1;
+      ui.bootReady = true;
+    })();
     const onKey = (event: KeyboardEvent) => {
+      if (ui.bootOpen) {
+        if ((event.code === "Space" || event.code === "Enter") && (ui.bootReady || ui.error)) {
+          event.preventDefault();
+          continueBoot();
+        }
+        return;
+      }
       if (event.code === "Escape") {
         if (ui.buyConfirm) {
           event.preventDefault();
@@ -93,7 +125,9 @@
   });
 </script>
 
-<div class="cabinet" class:feature={ui.feature}>
+<Loader onContinue={continueBoot} />
+
+<div class="cabinet" class:feature={ui.feature} class:booting={ui.bootOpen}>
   <header class="masthead">
     <h1>Sunset Stereo</h1>
   </header>
@@ -101,12 +135,12 @@
   <div class="frame">
     <Game />
     <BonusIntro />
-    {#if !ui.ready}
+    {#if !ui.ready && !ui.bootOpen}
       <p class="loading">
         {ui.replay ? "Loading replay…" : ui.source === "live" ? "Connecting to the game server…" : "Loading reels…"}
       </p>
     {/if}
-    {#if ui.error}
+    {#if ui.error && !ui.bootOpen}
       <p class="loading">{ui.error}</p>
     {/if}
   </div>

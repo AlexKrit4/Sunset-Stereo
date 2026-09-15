@@ -20,6 +20,7 @@ export const betActor = createActor(betMachine).start();
 let engine: EngineHandle | null = null;
 let replayBook: BookState | null = null;
 let listening = false;
+let pendingRestore: Round | null = null;
 
 function errorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message && error.message !== "[object Object]") {
@@ -79,13 +80,22 @@ export async function bootEngine() {
   ui.disableSpacebar = auth.jurisdictionFlags.disabledSpacebar;
   ui.disableBuyFeature = Boolean(auth.jurisdictionFlags.disabledBuyFeature);
   ui.disableAutoplay = Boolean(auth.jurisdictionFlags.disabledAutoplay);
-  if (auth.round?.active) {
-    ui.ready = true;
-    await playEngineRound(auth.round);
+  if (auth.round?.active) pendingRestore = auth.round;
+  ui.ready = true;
+}
+
+export async function playPendingRestore() {
+  if (!pendingRestore || !engine) return;
+  const round = pendingRestore;
+  pendingRestore = null;
+  ui.busy = true;
+  try {
+    await playEngineRound(round);
     const ended = await engine.EndRound();
     ui.balanceMicro = ended.balance.amount;
+  } finally {
+    ui.busy = false;
   }
-  ui.ready = true;
 }
 
 async function playEngineRound(round: Round) {
@@ -99,7 +109,7 @@ async function playEngineRound(round: Round) {
 
 export async function playBet(mode = "base") {
   unlockMusic();
-  if (ui.busy || !ui.ready || betActor.getSnapshot().matches("playing")) return false;
+  if (ui.busy || !ui.ready || ui.bootOpen || betActor.getSnapshot().matches("playing")) return false;
   if (!runtime.board) {
     ui.banner = "Reels are still loading.";
     return false;
@@ -159,7 +169,7 @@ export async function playBuyWildBonus() {
 
 export async function playReplay() {
   unlockMusic();
-  if (!replayBook || !runtime.board) return false;
+  if (ui.bootOpen || !replayBook || !runtime.board) return false;
   ui.busy = true;
   ui.winMicro = 0;
   ui.banner = "";

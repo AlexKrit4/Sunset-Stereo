@@ -1,4 +1,5 @@
 import { ui } from "./ui.svelte";
+import { audioSrc } from "./audioBank";
 
 type Bed = "base" | "bonus";
 
@@ -13,7 +14,7 @@ let listening = false;
 const fades = new WeakMap<HTMLAudioElement, number>();
 
 function trackUrl(file: string) {
-  return `${import.meta.env.BASE_URL}audio/${file}`;
+  return audioSrc(`audio/${file}`);
 }
 
 function makeLoop(file: string) {

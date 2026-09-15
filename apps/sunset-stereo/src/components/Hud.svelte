@@ -11,7 +11,7 @@
     onBet: (delta: number) => void;
   } = $props();
 
-  const locked = $derived(ui.busy || !ui.ready);
+  const locked = $derived(ui.busy || !ui.ready || ui.bootOpen);
   const showBuy = $derived(!ui.replay && !ui.disableBuyFeature);
   const showAutoplay = $derived(!ui.replay && !ui.disableAutoplay);
   const spinCost = $derived(Math.round(ui.betMicro * (ui.scatterBuyOn ? BUY_SCATTER.cost : 1)));

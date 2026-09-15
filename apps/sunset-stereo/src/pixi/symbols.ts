@@ -46,6 +46,10 @@ const PART_URLS: Record<string, string> = {
   "equalizer-bar-4": equalizerBar4Url,
 };
 
+export function symbolPreloadUrls() {
+  return [...Object.values(ART_URLS), ...Object.values(PART_URLS)];
+}
+
 export const SYMBOL_PAY_ART: Record<string, string> = {
   high1: vinylUrl,
   high2: headphonesUrl,
