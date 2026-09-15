@@ -127,7 +127,20 @@ if (!sawBonusDim) throw new Error("Wild line paid without hold-and-respin dim/lo
 if (last.wildWin === "1" || (last.anim || "").startsWith("win:")) {
   throw new Error("locked bonus symbols must not play win animations");
 }
+log("locked without win anim", last);
 
-log("ok", { sawStamp, sawBonusDim, last });
+let sawPayoutWin = false;
+for (let i = 0; i < 180; i += 1) {
+  await new Promise((r) => setTimeout(r, 400));
+  last = await readState(300 + i);
+  if (last.wildWin === "1" || (last.anim || "").startsWith("win:")) {
+    sawPayoutWin = true;
+    log("payout win anim", last, `ms=${Date.now() - started}`);
+    break;
+  }
+}
+if (!sawPayoutWin) throw new Error("bonus payout must play symbol win animations");
+
+log("ok", { sawStamp, sawBonusDim, sawPayoutWin, last });
 chrome.kill();
 process.exit(0);
