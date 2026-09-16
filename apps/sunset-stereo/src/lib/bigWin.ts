@@ -27,6 +27,7 @@ const START_FALLBACK_MS = 20000;
 const END_FALLBACK_MS = 8000;
 
 const clips: HTMLAudioElement[] = [];
+const armed = new Map<string, HTMLAudioElement>();
 let introActive = false;
 let startFinished: Promise<void> = Promise.resolve();
 
@@ -45,13 +46,62 @@ function stopClips() {
     clip.pause();
     clip.src = "";
   });
+  armed.clear();
+}
+
+function makeClip(file: string) {
+  const clip = new Audio(audioUrl(file));
+  clip.preload = "auto";
+  clip.volume = 0;
+  clips.push(clip);
+  return clip;
+}
+
+function armFile(file: string) {
+  let clip = armed.get(file);
+  if (clip) return clip;
+  clip = makeClip(file);
+  armed.set(file, clip);
+  return clip;
+}
+
+async function warmFile(file: string) {
+  const clip = armFile(file);
+  try {
+    clip.muted = true;
+    clip.volume = 0;
+    await clip.play();
+    clip.pause();
+    clip.currentTime = 0;
+    clip.muted = false;
+  } catch {
+    /* ignore */
+  }
+  return clip;
+}
+
+function warmStageClips() {
+  return Promise.all([...BIG_WIN_STAGES.map((stage) => stage.file), "end.mp3"].map(warmFile)).then(
+    () => undefined,
+  );
+}
+
+function startArmed(file: string, volume = 1) {
+  const clip = armFile(file);
+  try {
+    clip.currentTime = 0;
+  } catch {
+    /* ignore */
+  }
+  clip.muted = false;
+  clip.volume = ui.musicMuted ? 0 : volume;
+  void clip.play().catch(() => {});
+  return clip;
 }
 
 function playClip(file: string, volume = 1) {
-  const clip = new Audio(audioUrl(file));
-  clip.preload = "auto";
+  const clip = makeClip(file);
   clip.volume = ui.musicMuted ? 0 : volume;
-  clips.push(clip);
   const playing = clip.play().then(() => true).catch(() => false);
   return { clip, playing };
 }
@@ -139,6 +189,7 @@ export function beginBigWinIntro() {
   ui.bigWinIntro = true;
   duckMusicBed();
   playClip("bzzz.mp3");
+  void warmStageClips();
   startFinished = (async () => {
     await waitForTimeout(BZZZ_TO_START_MS);
     if (!introActive) return;
@@ -166,22 +217,34 @@ export async function playBigWin(micro: number) {
     await startFinished;
     if (!introActive) return;
 
+    const first = startArmed(stages[0].file);
+    const startedAt = performance.now();
     ui.bigWinOpen = true;
     ui.bigWinExplode = false;
     ui.bigWinOutgoingLeft = "";
     ui.bigWinOutgoingRight = "";
 
-    for (const stage of stages) {
+    let current = first;
+    for (let index = 0; index < stages.length; index += 1) {
+      const stage = stages[index];
+      if (index > 0) {
+        const wait = startedAt + index * STAGE_MS - performance.now();
+        if (wait > 0) await waitForTimeout(wait);
+        if (!introActive) return;
+        const next = startArmed(stage.file);
+        current.pause();
+        current = next;
+      }
       showStageTitle(stage.left, stage.right);
-      const track = playClip(stage.file);
-      await countStage(stage.fromMicro, stage.toMicro, STAGE_MS);
-      track.clip.pause();
+      const remain = startedAt + (index + 1) * STAGE_MS - performance.now();
+      await countStage(stage.fromMicro, stage.toMicro, Math.max(16, remain));
     }
+    current.pause();
 
     ui.bigWinExplode = true;
-    const end = playClip("end.mp3");
+    const end = startArmed("end.mp3");
     await Promise.all([
-      waitForClipEnd(end.clip, end.playing, END_FALLBACK_MS),
+      waitForClipEnd(end, Promise.resolve(!end.error), END_FALLBACK_MS),
       waitForTimeout(EXPLODE_MS),
     ]);
   } finally {
