@@ -320,7 +320,7 @@ def test_buy_bonus_hold_respin_grows_before_paying():
         assert "reveal" in after
         assert after.index("reveal") < after.index("winInfo") if "winInfo" in after else True
         break
-        assert found, "expected a buy-bonus extra play to hold and respin"
+    assert found, "expected a buy-bonus extra play to hold and respin"
 
 
 def test_left_wild_starts_ways_for_other_symbols():
@@ -342,20 +342,57 @@ def test_left_wild_starts_ways_for_other_symbols():
     assert "L1" in {win["symbol"] for win in state.win_data["wins"]}
 
 
+def test_screenshot_left_wild_speaker_line_pays():
+    """W on reel 0 + speakers on reels 1–2 is a 3-oak L1, same as the frontend."""
+    from gamestate import GameState
+
+    GameConfig._instance = None
+    state = GameState(GameConfig())
+    names = [
+        ["W", "L3", "L5", "H4"],
+        ["L1", "H2", "L4", "L3"],
+        ["L1", "H1", "H3", "L5"],
+        ["H4", "L1", "H3", "H1"],
+        ["L1", "L3", "H2", "L4"],
+        ["H1", "H2", "H3", "L2"],
+    ]
+    state.board = [[state.create_symbol(name) for name in col] for col in names]
+    state.evaluate_ways_board(emit_events=False)
+    assert float(state.win_data["totalWin"]) > 0
+    assert "L1" in {win["symbol"] for win in state.win_data["wins"]}
+
+
+def _extra_play_chunks(types: list[str]) -> list[list[str]]:
+    starts = [index for index, kind in enumerate(types) if kind == "updateFreeSpin"]
+    chunks = []
+    for offset, start in enumerate(starts):
+        end = starts[offset + 1] if offset + 1 < len(starts) else len(types)
+        chunks.append(types[start:end])
+    return chunks
+
+
 def test_bonus_paying_extra_plays_hold_and_respin():
-    for mode, criteria in (("bonus", "dead"), ("wildbonus", "dead"), ("bonus", "recoup"), ("wildbonus", "recoup")):
+    modes = (
+        ("bonus", "dead"),
+        ("wildbonus", "dead"),
+        ("bonus", "recoup"),
+        ("wildbonus", "recoup"),
+        ("wildbonus", "wincap"),
+        ("bonus", "wincap"),
+    )
+    for mode, criteria in modes:
         paid = 0
-        for sim in range(8):
+        for sim in range(12):
             _state, book = _mode_book(mode, criteria, sim)
             types = [event["type"] for event in book["events"]]
-            for index, kind in enumerate(types):
-                if kind != "winInfo":
+            for chunk in _extra_play_chunks(types):
+                if "winInfo" not in chunk:
                     continue
-                if "updateFreeSpin" not in types[:index]:
-                    continue
-                last_fs = max(j for j, item in enumerate(types[:index]) if item == "updateFreeSpin")
-                chunk = types[last_fs:index]
                 assert "holdRespin" in chunk, (mode, criteria, sim, chunk)
+                assert chunk.count("reveal") >= 2, (mode, criteria, sim, chunk)
+                hold_at = max(index for index, kind in enumerate(chunk) if kind == "holdRespin")
+                win_at = chunk.index("winInfo")
+                assert "reveal" in chunk[hold_at + 1 : win_at], (mode, criteria, sim, chunk)
                 paid += 1
         assert paid >= 1, (mode, criteria)
 

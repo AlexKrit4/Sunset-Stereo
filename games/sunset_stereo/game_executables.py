@@ -6,7 +6,15 @@ from game_config import BONUS_PAYING, BUY_BONUS_COST, BUY_WILD_COST, REEL2, SCAT
 from game_events import hold_respin_event, place_wild_event
 from src.calculations.ways import Ways
 from src.events.events import reveal_event, wincap_event
-from ways_paint import paint_hit_fillers, paint_mixed_dead, paint_mixed_pads, plan_payout, payout_target, row_picks
+from ways_paint import (
+    paint_hit_fillers,
+    paint_mixed_dead,
+    paint_mixed_pads,
+    plan_payout,
+    payout_target,
+    row_picks,
+    visible_ways_win,
+)
 
 
 def quantize_win(value: float) -> float:
@@ -269,24 +277,80 @@ class GameExecutables(GameCalculations):
             return None
         return BUY_WILD_COST if self.betmode == "wildbonus" else BUY_BONUS_COST
 
+    def _restore_sticky(self, sticky: set[tuple[int, int]]) -> None:
+        for reel, row in sticky:
+            self.board[reel][row] = self.create_symbol("W")
+        self.get_special_symbols_on_board()
+
+    def _capture_board(self):
+        return (
+            deepcopy(self.board),
+            list(self.top_symbols),
+            list(self.bottom_symbols),
+            list(self.reel_positions),
+        )
+
+    def _restore_board(self, snapshot) -> None:
+        self.board, self.top_symbols, self.bottom_symbols, self.reel_positions = snapshot
+        self.get_special_symbols_on_board()
+
+    def _visible_names(self) -> list[list[str]]:
+        return [[cell.name for cell in column] for column in self.board]
+
+    def _apply_name_grid(self, names: list[list[str]], rng, forbidden: set[str] | None = None) -> None:
+        rows = self.config.num_rows
+        board = [[None] * rows[reel] for reel in range(self.config.num_reels)]
+        for reel in range(self.config.num_reels):
+            for row in range(rows[reel]):
+                board[reel][row] = self.create_symbol(names[reel][row])
+        self.board = board
+        tops, bottoms = paint_mixed_pads(rng, names, forbidden=forbidden)
+        self.top_symbols = [self.create_symbol(name) for name in tops]
+        self.bottom_symbols = [self.create_symbol(name) for name in bottoms]
+        self.reel_positions = [rng.randrange(256) for _ in range(self.config.num_reels)]
+        self.refresh_special_syms()
+        self.get_special_symbols_on_board()
+        self._apply_anticipation()
+
+    def _respin_without_growth(self, locked: set[tuple[int, int]], sticky: set[tuple[int, int]]) -> None:
+        """Respin unlocked cells without adding ways. Locked winners stay put."""
+        occupied: dict[tuple[int, int], str] = {}
+        rows = self.config.num_rows
+        for reel in range(self.config.num_reels):
+            for row in range(rows[reel]):
+                if (reel, row) in sticky:
+                    occupied[(reel, row)] = "W"
+                elif (reel, row) in locked:
+                    occupied[(reel, row)] = self.board[reel][row].name
+        want = visible_ways_win(self._visible_names())
+        keep = {name for name in occupied.values() if name in BONUS_PAYING}
+        names = None
+        rng_used = None
+        salt = (int(getattr(self, "sim", 0)) + 1) * 9176 + int(getattr(self, "fs", 0)) * 131
+        salt += int(getattr(self, "repeat_count", 0)) * 13 + len(locked) * 19
+        for attempt in range(16):
+            rng = random.Random(salt ^ (attempt * 7919))
+            candidate = paint_hit_fillers(occupied, rng)
+            if visible_ways_win(candidate) != want:
+                continue
+            names = candidate
+            rng_used = rng
+            break
+        if names is None:
+            rng_used = random.Random(salt ^ 104729)
+            names = self._visible_names()
+        self._apply_name_grid(names, rng_used, forbidden=keep)
+
     def _hold_respin_loop(self, mix: str, sticky: set[tuple[int, int]]) -> None:
         locked: set[tuple[int, int]] = set(sticky)
-        total_cells = sum(self.config.num_rows)
         last_positive = {"totalWin": 0, "wins": []}
         ceiling = self._dead_ceiling()
         for step in range(MAX_HOLD_RESPINS + 1):
             snapshot = None
             if step > 0:
-                snapshot = (
-                    deepcopy(self.board),
-                    list(self.top_symbols),
-                    list(self.bottom_symbols),
-                    list(self.reel_positions),
-                )
+                snapshot = self._capture_board()
                 self.respin_unlocked_cells(locked, mix=mix)
-                for reel, row in sticky:
-                    self.board[reel][row] = self.create_symbol("W")
-                self.get_special_symbols_on_board()
+                self._restore_sticky(sticky)
             self.evaluate_ways_board(emit_events=False)
             total = float(self.win_data.get("totalWin", 0) or 0)
             projected = self.win_manager.running_bet_win + total
@@ -297,25 +361,29 @@ class GameExecutables(GameCalculations):
                 break
             if step > 0 and over_limit:
                 if snapshot is not None:
-                    self.board, self.top_symbols, self.bottom_symbols, self.reel_positions = snapshot
-                    self.get_special_symbols_on_board()
+                    self._restore_board(snapshot)
+                self._respin_without_growth(locked, sticky)
+                reveal_event(self)
                 self.win_data = last_positive
                 break
             if step > 0:
                 reveal_event(self)
             if total <= 0:
                 break
-            if over_limit:
-                last_positive = deepcopy(self.win_data)
-                break
             keys = self.winning_cell_keys() | sticky
             grown = any(key not in locked for key in keys)
             last_positive = deepcopy(self.win_data)
+            if over_limit:
+                locked = keys
+                if step < MAX_HOLD_RESPINS:
+                    hold_respin_event(self, locked, continuing=True)
+                    self._respin_without_growth(locked, sticky)
+                    reveal_event(self)
+                    self.win_data = last_positive
+                break
             if step > 0 and not grown:
                 break
             locked = keys
-            if len(locked) >= total_cells:
-                break
             if step < MAX_HOLD_RESPINS:
                 hold_respin_event(self, locked, continuing=True)
         self.pay_current_board()
