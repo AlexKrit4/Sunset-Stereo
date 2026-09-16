@@ -230,3 +230,169 @@ def row_picks(count: int, blocked: set[int], rng: random.Random) -> list[int]:
     if len(free) < count:
         return free
     return sorted(free[:count])
+
+
+# Low-pay bias, independent per cell. Same mix the generator uses for dead fills.
+ZERO_WEIGHTS = (4, 5, 6, 7, 8, 14, 15, 16, 17, 18)
+PAYING_SET = set(BONUS_PAYING)
+
+
+def _pick_zero(rng) -> str:
+    return rng.choices(BONUS_PAYING, weights=ZERO_WEIGHTS, k=1)[0]
+
+
+def _paying_names(col: list[str]) -> set[str]:
+    return {name for name in col if name in PAYING_SET}
+
+
+def visible_ways_win(board: list[list[str]]) -> float:
+    """Ways total for a 6×4 name grid. Matches Ways.get_ways_data without Symbol objects."""
+    starters: list[str] = []
+    seen: set[str] = set()
+    for name in board[0]:
+        if name in PAYING_SET and name not in seen:
+            seen.add(name)
+            starters.append(name)
+    total = 0.0
+    n_reels = len(board)
+    for symbol in starters:
+        kind = 0
+        ways = 1
+        for reel in range(n_reels):
+            count = sum(1 for name in board[reel] if name == symbol)
+            wilds = sum(1 for name in board[reel] if name == "W")
+            if count + wilds == 0:
+                break
+            kind += 1
+            ways *= count + wilds
+        pay = WAYS_PAYTABLE.get((kind, symbol))
+        if pay:
+            total += pay * ways
+    return round(total, 2)
+
+
+def is_stacked_column_board(board: list[list[str]]) -> bool:
+    """True when every reel is a 3+ stack of one paying symbol (the old dead-fill look)."""
+    if not board:
+        return False
+    for col in board:
+        paying = [name for name in col if name in PAYING_SET]
+        if len(paying) < 3 or len(set(paying)) != 1:
+            return False
+    return True
+
+
+def _unlocked_rows(reel: int, locked: dict[tuple[int, int], str]) -> list[int]:
+    return [row for row in range(ROWS) if (reel, row) not in locked]
+
+
+def _cap_reel_stacks(board: list[list[str]], reel: int, locked: dict[tuple[int, int], str], rng, forbidden: set[str] | None = None) -> None:
+    """Keep at most two of the same paying symbol on a reel so it does not look like a column."""
+    pool = [symbol for symbol in BONUS_PAYING if symbol not in (forbidden or set())]
+    if not pool:
+        return
+    unlocked = _unlocked_rows(reel, locked)
+    for _ in range(12):
+        counts: dict[str, int] = {}
+        for name in board[reel]:
+            if name in PAYING_SET:
+                counts[name] = counts.get(name, 0) + 1
+        heavy = [symbol for symbol, count in counts.items() if count >= 3]
+        if not heavy:
+            return
+        moved = False
+        for row in unlocked:
+            name = board[reel][row]
+            if name not in heavy:
+                continue
+            alt = [symbol for symbol in pool if symbol != name]
+            if not alt:
+                return
+            board[reel][row] = rng.choice(alt)
+            moved = True
+            break
+        if not moved:
+            return
+
+
+def _blocked_starters(board: list[list[str]]) -> set[str]:
+    """Paying symbols on reel 0 that already continue onto reel 1 (or through a wild)."""
+    starters = _paying_names(board[0])
+    if "W" in board[1]:
+        return set(starters)
+    return starters & _paying_names(board[1])
+
+
+def _break_three_oak(board: list[list[str]], locked: dict[tuple[int, int], str], rng) -> None:
+    """Kill 3-oak ways by replacing reel-2 (or reel-1) cells that would complete a pay."""
+    blocked = _blocked_starters(board)
+    if "W" in board[2] and blocked:
+        forbidden = _paying_names(board[0])
+        pool = [symbol for symbol in BONUS_PAYING if symbol not in forbidden]
+        if pool:
+            for row in _unlocked_rows(1, locked):
+                if board[1][row] in forbidden or board[1][row] == "W":
+                    board[1][row] = rng.choice(pool)
+            _cap_reel_stacks(board, 1, locked, rng, forbidden=forbidden)
+        blocked = _blocked_starters(board)
+
+    if not blocked:
+        return
+    pool = [symbol for symbol in BONUS_PAYING if symbol not in blocked]
+    if not pool:
+        forbidden = _paying_names(board[0])
+        pool = [symbol for symbol in BONUS_PAYING if symbol not in forbidden]
+        if not pool:
+            return
+        for row in _unlocked_rows(1, locked):
+            if board[1][row] in forbidden or board[1][row] == "W":
+                board[1][row] = rng.choice(pool)
+        _cap_reel_stacks(board, 1, locked, rng, forbidden=forbidden)
+        blocked = _blocked_starters(board)
+        pool = [symbol for symbol in BONUS_PAYING if symbol not in blocked]
+        if not pool:
+            return
+
+    for row in _unlocked_rows(2, locked):
+        if board[2][row] in blocked or board[2][row] == "W":
+            board[2][row] = rng.choice(pool)
+    _cap_reel_stacks(board, 2, locked, rng, forbidden=blocked)
+
+
+def paint_mixed_dead(rng, locked: dict[tuple[int, int], str] | None = None) -> list[list[str]]:
+    """Independent per-cell fill: mixed symbols, no 3-oak, no stacked columns."""
+    locked = dict(locked or {})
+    board: list[list[str]] = [[""] * ROWS for _ in range(REELS)]
+    for _ in range(40):
+        for reel in range(REELS):
+            for row in range(ROWS):
+                if (reel, row) in locked:
+                    board[reel][row] = locked[(reel, row)]
+                else:
+                    board[reel][row] = _pick_zero(rng)
+        for reel in range(REELS):
+            _cap_reel_stacks(board, reel, locked, rng)
+        _break_three_oak(board, locked, rng)
+        if visible_ways_win(board) == 0 and not is_stacked_column_board(board):
+            return board
+    _break_three_oak(board, locked, rng)
+    return board
+
+
+def paint_mixed_pads(rng, visible: list[list[str]] | None = None) -> tuple[list[str], list[str]]:
+    """Padding cells, also mixed — not a copy of the visible stack."""
+    tops = [_pick_zero(rng) for _ in range(REELS)]
+    bottoms = [_pick_zero(rng) for _ in range(REELS)]
+    if not visible:
+        return tops, bottoms
+    for reel in range(REELS):
+        stack = {name for name in visible[reel] if name in PAYING_SET}
+        if len(stack) == 1:
+            only = next(iter(stack))
+            if tops[reel] == only:
+                alt = [symbol for symbol in BONUS_PAYING if symbol != only]
+                tops[reel] = rng.choice(alt)
+            if bottoms[reel] == only:
+                alt = [symbol for symbol in BONUS_PAYING if symbol != only]
+                bottoms[reel] = rng.choice(alt)
+    return tops, bottoms

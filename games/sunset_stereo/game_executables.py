@@ -6,7 +6,7 @@ from game_config import BONUS_PAYING, BUY_BONUS_COST, BUY_WILD_COST, REEL2, SCAT
 from game_events import hold_respin_event, place_wild_event
 from src.calculations.ways import Ways
 from src.events.events import reveal_event, wincap_event
-from ways_paint import plan_payout, payout_target, row_picks
+from ways_paint import paint_mixed_dead, paint_mixed_pads, plan_payout, payout_target, row_picks
 
 
 def quantize_win(value: float) -> float:
@@ -244,24 +244,22 @@ class GameExecutables(GameCalculations):
             reveal_event(self)
 
     def _fill_no_win(self, locked: set[tuple[int, int]] | None = None) -> None:
-        """Visible board with no 3-oak ways. Each call shuffles so empties are not clones."""
+        """Mixed per-cell board with no 3-oak ways. Not one symbol stacked down a reel."""
         locked = locked or set()
-        order = list(BONUS_PAYING)
-        random.shuffle(order)
+        locked_names: dict[tuple[int, int], str] = {}
+        if getattr(self, "board", None):
+            for reel, row in locked:
+                locked_names[(reel, row)] = self.board[reel][row].name
+        names = paint_mixed_dead(random, locked_names)
         rows = self.config.num_rows
         board = [[None] * rows[reel] for reel in range(self.config.num_reels)]
         for reel in range(self.config.num_reels):
-            symbol = order[reel]
             for row in range(rows[reel]):
-                if (reel, row) in locked:
-                    board[reel][row] = self.board[reel][row]
-                    continue
-                board[reel][row] = self.create_symbol(symbol)
+                board[reel][row] = self.create_symbol(names[reel][row])
         self.board = board
-        pads = list(BONUS_PAYING)
-        random.shuffle(pads)
-        self.top_symbols = [self.create_symbol(pads[reel % len(pads)]) for reel in range(self.config.num_reels)]
-        self.bottom_symbols = [self.create_symbol(pads[(reel + 3) % len(pads)]) for reel in range(self.config.num_reels)]
+        tops, bottoms = paint_mixed_pads(random, names)
+        self.top_symbols = [self.create_symbol(name) for name in tops]
+        self.bottom_symbols = [self.create_symbol(name) for name in bottoms]
         self.reel_positions = [random.randrange(256) for _ in range(self.config.num_reels)]
         self.refresh_special_syms()
         self.get_special_symbols_on_board()

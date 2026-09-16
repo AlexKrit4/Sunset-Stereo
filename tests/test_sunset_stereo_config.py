@@ -336,16 +336,46 @@ def _mode_book(mode: str, criteria: str, sim: int):
 
 
 def test_zero_spins_are_not_cloned():
+    from ways_paint import is_stacked_column_board, visible_ways_win
+
     boards = []
     for sim in range(12):
-        _state, book = _mode_book("base", "0", sim)
+        state, book = _mode_book("base", "0", sim)
         reveal = book["events"][0]
         visible = tuple(
             tuple(cell["name"] if isinstance(cell, dict) else cell for cell in col[1:-1])
             for col in reveal["board"]
         )
         boards.append(visible)
+        names = [list(col) for col in visible]
         assert book["payoutMultiplier"] == 0
+        assert state.final_win == 0
+        assert visible_ways_win(names) == 0
+        assert not is_stacked_column_board(names)
+        for col in names:
+            paying = [name for name in col if name not in {"S", "W"}]
+            assert len(set(paying)) >= 2
+    assert len(set(boards)) == len(boards)
+
+
+def test_mixed_dead_boards_never_pay_or_stack():
+    import random
+
+    from ways_paint import is_stacked_column_board, paint_mixed_dead, visible_ways_win
+
+    rng = random.Random(20260916)
+    boards = []
+    for i in range(80):
+        locked = {(1, i % 4): "S"} if i % 5 == 0 else {}
+        board = paint_mixed_dead(rng, locked)
+        boards.append(tuple(tuple(col) for col in board))
+        assert visible_ways_win(board) == 0
+        assert not is_stacked_column_board(board)
+        for reel, col in enumerate(board):
+            paying = [name for name in col if name not in {"S", "W"}]
+            assert len(set(paying)) >= 2
+            if locked and reel == 1:
+                assert board[1][i % 4] == "S"
     assert len(set(boards)) == len(boards)
 
 
