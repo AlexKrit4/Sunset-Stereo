@@ -457,6 +457,16 @@ def paint_hit_fillers(occupied: dict[tuple[int, int], str], rng) -> list[list[st
                 else:
                     board[reel][row] = _pick_pool(rng, pool)
         for reel in range(REELS):
+            unlocked = _unlocked_rows(reel, occupied)
+            for _ in range(8):
+                fillers = [board[reel][row] for row in unlocked]
+                if len(fillers) < 3 or len(set(fillers)) >= 2:
+                    break
+                row = unlocked[rng.randrange(len(unlocked))]
+                alt = [symbol for symbol in pool if symbol != board[reel][row]]
+                if not alt:
+                    break
+                board[reel][row] = _pick_pool(rng, alt)
             _cap_reel_stacks(board, reel, occupied, rng, forbidden=keep)
         _break_unwanted_oaks(board, occupied, keep, rng)
         leaked = any(
@@ -465,7 +475,8 @@ def paint_hit_fillers(occupied: dict[tuple[int, int], str], rng) -> list[list[st
             for row in range(ROWS)
         )
         extras = [symbol for symbol in BONUS_PAYING if symbol not in keep and _oak_kind(board, symbol) >= 3]
-        if not leaked and not extras:
+        stacked = filler_column_reels(board, occupied)
+        if not leaked and not extras and not stacked:
             return board
     return board
 

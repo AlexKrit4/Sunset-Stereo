@@ -120,13 +120,22 @@ def _rewrite_hit_reveal(event: dict, win: dict, book_id: int, salt: int) -> bool
     visible = _visible(board)
     occupied = _occupied_from_wininfo(win, visible)
     before = visible_ways_win(visible)
-    rng = random.Random((int(book_id) + 1) * 9001 + salt * 31)
-    names = paint_hit_fillers(occupied, rng)
-    if visible_ways_win(names) != before:
+    names = None
+    for attempt in range(8):
+        rng = random.Random((int(book_id) + 1) * 9001 + salt * 31 + attempt * 7919)
+        candidate = paint_hit_fillers(occupied, rng)
+        if visible_ways_win(candidate) != before:
+            continue
+        if filler_column_reels(candidate, occupied):
+            continue
+        names = candidate
+        rng_used = rng
+        break
+    else:
         return False
-    if names == visible and not filler_column_reels(visible, occupied):
+    if names == visible:
         return False
-    _apply_board(event, names, rng)
+    _apply_board(event, names, rng_used)
     return True
 
 
