@@ -24,7 +24,7 @@ import {
   XWAYS_REELS,
 } from "./config.js";
 
-function mulberry32(seed) {
+export function mulberry32(seed) {
   let t = seed >>> 0;
   return {
     random() {
@@ -190,18 +190,20 @@ function calculateWaysWin(bet, b, m, reelNudgeMult) {
     const payMult = PAYOUTS[sym][reelsMatched] ?? PAYOUTS[sym][6] ?? 0;
     const win = bet * payMult * ways * nudgeLineMult;
     if (win <= 0) continue;
-    wins.push({ sym, reelsMatched, ways, nudgeLineMult, win });
-    totalWin += win;
-    totalWays += ways;
+    const positions = [];
     for (let r = 0; r < reelsMatched; r += 1) {
       for (let row = 0; row < getReelRows(r); row += 1) {
         if (!cellMatches(sym, b[r][row])) continue;
+        positions.push({ reel: r, row });
         const key = `${r}:${row}`;
         if (highlightKeys.has(key)) continue;
         highlightKeys.add(key);
         highlights.push({ reel: r, row });
       }
     }
+    wins.push({ sym, reelsMatched, ways, nudgeLineMult, win, positions });
+    totalWin += win;
+    totalWays += ways;
   }
   const cap = bet * GAME.wincap;
   if (totalWin > cap) totalWin = cap;
@@ -315,32 +317,43 @@ function respinUnlocked(rng, board, locked) {
   return next;
 }
 
-function playHoldRespinSpin(rng, bet) {
+function playHoldRespinSpin(rng, bet, stickyPositions = []) {
   let board = generateRawBoard(rng, true).b;
+  for (const pos of stickyPositions) {
+    board[pos.reel][pos.row] = "wild";
+  }
+  const stickyKeys = keySet(stickyPositions);
   const steps = [];
-  let locked = new Set();
+  let locked = new Set(stickyKeys);
   const nudge = Array(NUM_REELS).fill(1);
 
   for (let step = 0; step <= MAX_HOLD_RESPINS; step += 1) {
     if (step > 0) board = respinUnlocked(rng, board, locked);
+    for (const pos of stickyPositions) {
+      board[pos.reel][pos.row] = "wild";
+    }
     const winInfo = calculateWaysWin(bet, board, emptyMults(board), nudge);
     if (winInfo.totalWin <= 0) {
       if (step === 0) {
         steps.push({
           board: cloneGrid(board),
           isRespin: false,
-          locked: [],
+          locked: stickyPositions.map((pos) => ({ ...pos })),
           ...winInfo,
         });
       }
       break;
     }
-    const keys = keySet(winInfo.highlights);
-    const grown = [...keys].some((key) => !locked.has(key));
+    const highlightKeys = keySet(winInfo.highlights);
+    const keys = new Set([...highlightKeys, ...stickyKeys]);
+    const grown = [...highlightKeys].some((key) => !locked.has(key));
     steps.push({
       board: cloneGrid(board),
       isRespin: step > 0,
-      locked: winInfo.highlights.map((pos) => ({ ...pos })),
+      locked: [...keys].map((key) => {
+        const [reel, row] = key.split(":").map(Number);
+        return { reel, row };
+      }),
       ...winInfo,
     });
     if (step > 0 && !grown) break;
@@ -430,4 +443,14 @@ export function playRound({ seed = Date.now(), bet = 1 } = {}) {
   };
 }
 
-export { BETS, getWaysTeaseSymbol, reelMatchesWaysTease, XNUDGE_REELS, XWAYS_REELS, SCATTER_REELS, BONUS_SPINS };
+export {
+  BETS,
+  calculateWaysWin,
+  playHoldRespinSpin,
+  getWaysTeaseSymbol,
+  reelMatchesWaysTease,
+  XNUDGE_REELS,
+  XWAYS_REELS,
+  SCATTER_REELS,
+  BONUS_SPINS,
+};

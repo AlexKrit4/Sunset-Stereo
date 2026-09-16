@@ -1,4 +1,5 @@
 import { ui } from "./ui.svelte";
+import { audioSrc } from "./audioBank";
 
 type Bed = "base" | "bonus";
 
@@ -13,7 +14,7 @@ let listening = false;
 const fades = new WeakMap<HTMLAudioElement, number>();
 
 function trackUrl(file: string) {
-  return `${import.meta.env.BASE_URL}audio/${file}`;
+  return audioSrc(`audio/${file}`);
 }
 
 function makeLoop(file: string) {
@@ -72,11 +73,13 @@ function stopFades() {
   }
 }
 
-function applyBedVolumes(immediate = false) {
+let bedDucked = false;
+
+export function applyBedVolumes(immediate = false) {
   if (!base || !bonus) return;
   const next = current === "bonus" ? bonus : base;
   const prev = current === "bonus" ? base : bonus;
-  if (ui.musicMuted) {
+  if (ui.musicMuted || bedDucked) {
     next.volume = 0;
     prev.volume = 0;
     return;
@@ -136,6 +139,20 @@ export function toggleMusicMute() {
   }
   startBoth();
   applyBedVolumes(true);
+}
+
+export function duckMusicBed() {
+  bedDucked = true;
+  if (!base || !bonus) return;
+  stopFades();
+  base.volume = 0;
+  bonus.volume = 0;
+}
+
+export function restoreMusicBed() {
+  bedDucked = false;
+  if (!base || !bonus || ui.musicMuted) return;
+  applyBedVolumes();
 }
 
 export function musicBedFromUi() {

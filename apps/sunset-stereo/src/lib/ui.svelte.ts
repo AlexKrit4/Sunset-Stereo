@@ -30,10 +30,24 @@ export const ui = $state({
   musicMuted: false,
   buyMenuOpen: false,
   scatterBuyOn: false,
-  buyConfirm: "" as "" | "scatter" | "bonus",
+  buyConfirm: "" as "" | "scatter" | "bonus" | "wildbonus",
+  wildBonus: false,
   trayOpen: false,
   autoplayOn: false,
   disableAutoplay: false,
+  bigWinOpen: false,
+  bigWinDisplayMicro: 0,
+  bigWinLeft: "",
+  bigWinRight: "",
+  bigWinTitleKey: 0,
+  bigWinOutgoingLeft: "",
+  bigWinOutgoingRight: "",
+  bigWinOutgoingKey: 0,
+  bigWinExplode: false,
+  bigWinIntro: false,
+  bootOpen: true,
+  bootReady: false,
+  bootProgress: 0,
 });
 
 let bonusIntroResolve: (() => void) | null = null;
@@ -62,6 +76,8 @@ export function cancelBonusIntro() {
   resolve?.();
 }
 
+export const WIN_OVERLAY_MULT = 5;
+
 export function showSpinWin(micro: number, lines = 0) {
   if (micro <= 0) {
     hideSpinWin();
@@ -79,6 +95,10 @@ export function hideSpinWin() {
   ui.spinWinLines = 0;
 }
 
+export function roundWinBeatsStake(micro = ui.winMicro, multiple = WIN_OVERLAY_MULT) {
+  return micro > ui.betMicro * multiple;
+}
+
 export function money(value: number) {
   return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -92,7 +112,7 @@ export function moneyPlain(micro: number) {
 }
 
 export function changeBet(delta: number) {
-  if (ui.busy || ui.replay) return;
+  if (ui.busy || ui.replay || ui.bootOpen) return;
   const index = ui.betLevels.indexOf(ui.betMicro);
   const next = Math.max(0, Math.min(ui.betLevels.length - 1, (index < 0 ? 0 : index) + delta));
   ui.betMicro = ui.betLevels[next];
@@ -111,4 +131,5 @@ export const labels = {
   win: () => (ui.social ? "Won" : "Win"),
   cancel: () => "Cancel",
   confirm: () => "Confirm",
+  continue: () => "Continue",
 };

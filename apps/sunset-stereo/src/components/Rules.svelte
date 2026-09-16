@@ -24,14 +24,16 @@
         unlocked cells until nothing new is built, then pays. Base game plus extra plays is one bet.
         Buy / Get bonus opens the shop. Activate Sun on reel 2 after a confirm to keep spinning at
         1.5× with a sun locked on reel 2; turn it off from the same card. Buy / Get purchases
-        3 scatters for 95× the selected stake and starts 10 extra plays.
+        3 scatters for 95× the selected stake and starts 10 extra plays, or 4 scatters for 225×
+        with a Wild placed on a random cell before each extra play. That Wild substitutes for
+        paying symbols and stays locked while the extra play holds and respins.
       </p>
       <p>RTP {(GAME.rtp * 100).toFixed(0)}%. Max win {GAME.wincap.toLocaleString()}× of the 1× stake.</p>
       <p>
         Spin / Play starts a round. The lightning control opens the feature shop.
         Activate asks for a confirm, then keeps the 1.5× reel-2 sun armed until you switch it off.
-        Buy 3 scatters also asks for a confirm. While the extra bet is on, the stake readout shows
-        that feature and the 1.5× spin cost.
+        Buy 3 scatters and Buy 4 scatters also ask for a confirm. While the extra bet is on, the
+        stake readout shows that feature and the 1.5× spin cost.
         + / – change the stake using bet levels from the game server.
         Spacebar also starts a round unless the operator disables it. Credit / Balance is the wallet.
         Paid / Won is the last round result. Extra plays shows the bonus counter.
@@ -47,7 +49,11 @@
         {/each}
         <li>
           <img src={SYMBOL_PAY_ART.scatter} alt="" />
-          <span>3 suns on reels 2–5 start 10 extra plays</span>
+          <span>3 suns on reels 2–5 start 10 extra plays. 4 suns can be bought for 225×.</span>
+        </li>
+        <li>
+          <img src={SYMBOL_PAY_ART.wild} alt="" />
+          <span>Wild substitutes for paying symbols and stays locked during a 4-scatter extra play.</span>
         </li>
       </ul>
 

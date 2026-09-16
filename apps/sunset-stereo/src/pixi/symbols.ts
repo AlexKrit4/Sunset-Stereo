@@ -16,7 +16,7 @@ import equalizerBar2Url from "../assets/symbols/equalizer-bar-2.png";
 import equalizerBar3Url from "../assets/symbols/equalizer-bar-3.png";
 import equalizerBar4Url from "../assets/symbols/equalizer-bar-4.png";
 import cocktailUrl from "../assets/symbols/cocktail.png";
-import mixerUrl from "../assets/symbols/mixer.png";
+import wildHibiscusUrl from "../assets/symbols/wild-hibiscus.png";
 import sunsetUrl from "../assets/symbols/sunset.png";
 
 const ART: Partial<Record<string, Texture>> = {};
@@ -33,7 +33,7 @@ const ART_URLS: Record<string, string> = {
   L3: equalizerUrl,
   L4: palmUrl,
   L5: cocktailUrl,
-  W: mixerUrl,
+  W: wildHibiscusUrl,
   S: sunsetUrl,
 };
 
@@ -45,6 +45,10 @@ const PART_URLS: Record<string, string> = {
   "equalizer-bar-3": equalizerBar3Url,
   "equalizer-bar-4": equalizerBar4Url,
 };
+
+export function symbolPreloadUrls() {
+  return [...Object.values(ART_URLS), ...Object.values(PART_URLS)];
+}
 
 export const SYMBOL_PAY_ART: Record<string, string> = {
   high1: vinylUrl,
@@ -58,6 +62,7 @@ export const SYMBOL_PAY_ART: Record<string, string> = {
   low4: palmUrl,
   low5: cocktailUrl,
   scatter: sunsetUrl,
+  wild: wildHibiscusUrl,
 };
 
 export async function loadSymbolArt() {

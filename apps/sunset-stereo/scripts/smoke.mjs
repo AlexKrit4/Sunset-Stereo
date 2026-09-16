@@ -66,9 +66,32 @@ await once(ws, "open");
 await send(1, "Page.enable");
 await send(2, "Runtime.enable");
 await send(3, "Page.navigate", { url: base });
-await new Promise((r) => setTimeout(r, 1800));
+await new Promise((r) => setTimeout(r, 800));
 
-const title = await send(5, "Runtime.evaluate", {
+let continued = false;
+for (let i = 0; i < 90; i += 1) {
+  const boot = await send(4, "Runtime.evaluate", {
+    expression: `JSON.stringify({
+      continue: Boolean(document.getElementById('bootContinueBtn')),
+      ready: document.querySelector('[data-boot]')?.getAttribute('data-boot-ready') || '0',
+      progress: document.getElementById('bootProgress')?.textContent || ''
+    })`,
+    returnByValue: true,
+  });
+  const state = JSON.parse(boot.result.value);
+  if (state.continue) {
+    await send(5, "Runtime.evaluate", {
+      expression: `document.getElementById('bootContinueBtn').click()`,
+    });
+    continued = true;
+    break;
+  }
+  await new Promise((r) => setTimeout(r, 400));
+}
+if (!continued) throw new Error("boot continue never appeared");
+await new Promise((r) => setTimeout(r, 600));
+
+const title = await send(8, "Runtime.evaluate", {
   expression:
     "document.title + '|' + document.querySelector('h1')?.textContent + '|' + document.querySelectorAll('canvas').length + '|' + document.getElementById('balanceValue')?.textContent",
   returnByValue: true,
@@ -76,6 +99,12 @@ const title = await send(5, "Runtime.evaluate", {
 const log = (...args) =>
   process.stdout.write(args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ") + "\n");
 log("boot", title.result.value);
+
+function assertWinMeter(hud) {
+  const won = !/0[.,]00\s*$/.test(hud.win || "");
+  if (won && hud.winLit !== "1") throw new Error(`WIN plaque must light when there is a win: ${JSON.stringify(hud)}`);
+  if (!won && hud.winLit === "1") throw new Error(`WIN plaque must stay dim at zero: ${JSON.stringify(hud)}`);
+}
 
 const click = async (id, selector) => {
   await send(id, "Runtime.evaluate", {
@@ -88,6 +117,7 @@ const readHud = async (id) => {
     expression: `JSON.stringify({
       balance: document.getElementById('balanceValue').textContent,
       win: document.getElementById('winValue').textContent,
+      winLit: document.querySelector('.stat.win')?.getAttribute('data-win-lit') || '0',
       bet: document.getElementById('betValue').textContent,
       busy: document.getElementById('spinBtn').disabled,
       mix: document.getElementById('mixValue').textContent
@@ -109,6 +139,7 @@ for (let i = 0; i < 180; i += 1) {
   }
 }
 if (lastHud?.busy) throw new Error(`spin still busy after ${Date.now() - spinStarted}ms`);
+assertWinMeter(lastHud);
 
 await click(60, "#betDown");
 await click(61, "#betDown");
@@ -127,6 +158,8 @@ const menu = await send(66, "Runtime.evaluate", {
   expression: `JSON.stringify({
     bonus: document.getElementById('buyScatterBtn')?.textContent || '',
     bonusCard: document.getElementById('buyBonusCard')?.innerText || '',
+    wildBonus: document.getElementById('buyWildBonusBtn')?.textContent || '',
+    wildBonusCard: document.getElementById('buyWildBonusCard')?.innerText || '',
     scatter: document.getElementById('buyReel2Btn')?.textContent || '',
     scatterCard: document.getElementById('buyReel2Card')?.innerText || '',
     pressed: document.getElementById('buyReel2Btn')?.getAttribute('aria-pressed') || '',
@@ -141,6 +174,8 @@ if (!/activate/i.test(menuState.scatter)) throw new Error("reel-2 sun must use A
 if (menuState.pressed === "true") throw new Error("reel-2 sun must start off");
 if (!/3 scatters/i.test(menuState.bonusCard)) throw new Error("buy shop must list 3 scatters");
 if (!/buy|get/i.test(menuState.bonus)) throw new Error("3 scatters must use Buy");
+if (!/4 scatters/i.test(menuState.wildBonusCard)) throw new Error("buy shop must list 4 scatters");
+if (!/buy|get/i.test(menuState.wildBonus)) throw new Error("4 scatters must use Buy");
 
 await click(641, "#buyReel2Btn");
 await new Promise((r) => setTimeout(r, 200));
@@ -198,6 +233,28 @@ if (/sun on reel 2/i.test(scatterOffState.stakeLabel)) {
   throw new Error("stake readout must return to the base stake");
 }
 
+await click(668, "#buyWildBonusBtn");
+await new Promise((r) => setTimeout(r, 200));
+const wildConfirm = await send(669, "Runtime.evaluate", {
+  expression: `JSON.stringify({
+    open: Boolean(document.getElementById('buyConfirmBtn')),
+    text: document.querySelector('[aria-label="Confirm buy"]')?.innerText || ''
+  })`,
+  returnByValue: true,
+});
+log("wild bonus confirm", wildConfirm.result.value);
+const wildConfirmState = JSON.parse(wildConfirm.result.value);
+if (!wildConfirmState.open) throw new Error("4 scatters must ask for confirm");
+if (!/225|4 scatters|wild/i.test(wildConfirmState.text)) throw new Error("confirm must describe 4 scatters");
+if (!/substitut|lock/i.test(wildConfirmState.text)) throw new Error("confirm must say the wild substitutes and stays locked");
+await click(670, "#buyCancelBtn");
+await new Promise((r) => setTimeout(r, 150));
+const wildConfirmClosed = await send(6705, "Runtime.evaluate", {
+  expression: "Boolean(document.getElementById('buyConfirmBtn'))",
+  returnByValue: true,
+});
+if (wildConfirmClosed.result.value) throw new Error("4 scatters confirm cancel must close");
+
 await click(67, "#buyScatterBtn");
 await new Promise((r) => setTimeout(r, 200));
 const bonusConfirm = await send(671, "Runtime.evaluate", {
@@ -215,7 +272,7 @@ await click(672, "#buyConfirmBtn");
 const buyStarted = Date.now();
 let buyHud;
 let startedBonus = false;
-for (let i = 0; i < 300; i += 1) {
+for (let i = 0; i < 450; i += 1) {
   await new Promise((r) => setTimeout(r, 400));
   if (!startedBonus) {
     const startBtn = await send(200 + i, "Runtime.evaluate", {
@@ -235,6 +292,7 @@ for (let i = 0; i < 300; i += 1) {
   }
 }
 if (buyHud?.busy) throw new Error(`buy bonus still busy after ${Date.now() - buyStarted}ms`);
+assertWinMeter(buyHud);
 
 await click(66, "#spinBtn");
 const spin2Started = Date.now();
@@ -246,6 +304,7 @@ for (let i = 0; i < 180; i += 1) {
 }
 log("after spin2", spin2Hud, `ms=${Date.now() - spin2Started}`);
 if (spin2Hud?.busy) throw new Error("second spin still busy");
+assertWinMeter(spin2Hud);
 const banner = await send(89, "Runtime.evaluate", {
   expression: "document.querySelector('.banner')?.textContent || ''",
   returnByValue: true,

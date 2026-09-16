@@ -43,6 +43,10 @@ html::before {
   background: radial-gradient(800px 240px at 50% 0%, rgba(220, 80, 140, 0.16), transparent 70%);
 }
 
+.cabinet.booting {
+  pointer-events: none;
+}
+
 .masthead {
   display: grid;
   place-items: center;

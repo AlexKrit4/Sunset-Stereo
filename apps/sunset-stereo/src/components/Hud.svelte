@@ -11,11 +11,49 @@
     onBet: (delta: number) => void;
   } = $props();
 
-  const locked = $derived(ui.busy || !ui.ready);
+  const locked = $derived(ui.busy || !ui.ready || ui.bootOpen);
   const showBuy = $derived(!ui.replay && !ui.disableBuyFeature);
   const showAutoplay = $derived(!ui.replay && !ui.disableAutoplay);
   const spinCost = $derived(Math.round(ui.betMicro * (ui.scatterBuyOn ? BUY_SCATTER.cost : 1)));
   const stakeLabel = $derived(ui.scatterBuyOn ? BUY_SCATTER.label : labels.stake());
+  const WIN_COUNT_MS = 500;
+  let displayedWinMicro = $state(0);
+  let displayedWinHold = 0;
+  const winLit = $derived(ui.winMicro > 0 || ui.bigWinOpen);
+
+  $effect(() => {
+    if (ui.bigWinOpen) {
+      displayedWinHold = ui.bigWinDisplayMicro;
+      displayedWinMicro = ui.bigWinDisplayMicro;
+      return;
+    }
+    if (ui.bigWinIntro) {
+      return;
+    }
+    const target = ui.winMicro;
+    if (target <= 0) {
+      displayedWinHold = 0;
+      displayedWinMicro = 0;
+      return;
+    }
+    const from = displayedWinHold;
+    const started = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const u = Math.min(1, (now - started) / WIN_COUNT_MS);
+      const eased = 1 - (1 - u) ** 3;
+      displayedWinHold = Math.round(from + (target - from) * eased);
+      displayedWinMicro = displayedWinHold;
+      if (u < 1) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+      displayedWinHold = target;
+      displayedWinMicro = target;
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  });
 
   function toggleTray() {
     ui.trayOpen = !ui.trayOpen;
@@ -60,9 +98,9 @@
     </div>
   {/if}
 
-  <div class="stat win">
+  <div class="stat win" class:lit={winLit} data-win-lit={winLit ? "1" : "0"}>
     <span>{labels.win()}</span>
-    <strong id="winValue">{moneyHud(ui.winMicro)}</strong>
+    <strong id="winValue">{moneyHud(displayedWinMicro)}</strong>
   </div>
 
   {#if ui.fsTotal > 0}
@@ -240,6 +278,9 @@
     font-variant-numeric: tabular-nums;
   }
   .win strong {
+    color: #8a7d70;
+  }
+  .win.lit strong {
     color: #3ec8f0;
   }
   .extra strong {

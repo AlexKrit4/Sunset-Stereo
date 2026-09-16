@@ -40,7 +40,7 @@ const WIN_DIM_FROM_REEL = 2;
 const WIN_SHEEN_MS = 640;
 const WIN_SHEEN_STAGGER_MS = 36;
 const COCKTAIL_NAMES = new Set(["L5"]);
-const ANIMATED_SYMBOL_NAMES = new Set(["H1", "H2", "H3", "H4", "H5", "L1", "L2", "L3", "L4", "L5"]);
+const ANIMATED_SYMBOL_NAMES = new Set(["H1", "H2", "H3", "H4", "H5", "L1", "L2", "L3", "L4", "L5", "W"]);
 const SYMBOL_ANIMATION_ALIASES: Record<string, string> = {
   high1: "H1",
   high2: "H2",
@@ -52,6 +52,7 @@ const SYMBOL_ANIMATION_ALIASES: Record<string, string> = {
   low3: "L3",
   low4: "L4",
   low5: "L5",
+  wild: "W",
 };
 const COCKTAIL_LAND_MS = 920;
 const SYMBOL_IDLE_MIN_MS = 2400;
@@ -61,6 +62,7 @@ const COCKTAIL_WIN_MS = 1800;
 const THEMED_LAND_MS = 1050;
 const THEMED_IDLE_MS = 2400;
 const THEMED_WIN_MS = 1800;
+const WILD_WIN_MS = 2000;
 
 type CellAnimation = {
   tick: () => void;
@@ -198,6 +200,7 @@ export class BoardController {
   private onSettled: ((col: number) => void) | null = null;
   private teaseOverlay = new Graphics();
   private scatterOverlay = new Graphics();
+  private wildOverlay = new Container();
   private sheenTick: (() => void) | null = null;
   private sheenResolve: (() => void) | null = null;
   private bonusDim = false;
@@ -264,7 +267,8 @@ export class BoardController {
 
     this.teaseOverlay.eventMode = "none";
     this.scatterOverlay.eventMode = "none";
-    window.addChild(this.teaseOverlay, this.scatterOverlay);
+    this.wildOverlay.eventMode = "none";
+    window.addChild(this.teaseOverlay, this.scatterOverlay, this.wildOverlay);
     this.root.addChild(window);
     this.app.stage.addChild(this.root);
     this.app.ticker.add(this.idleTick);
@@ -439,6 +443,75 @@ export class BoardController {
     await spin;
   }
 
+  async placeWildFromCamera(padded: Position) {
+    const pos = unpadPosition(padded);
+    this.replaceCell(pos.reel, pos.row, "wild");
+    const cell = this.cells[pos.reel]?.[pos.row];
+    if (cell) cell.alpha = 0;
+    const host = this.reels[pos.reel]?.parent;
+    const flyer = asView("wild");
+    flyer.eventMode = "none";
+    flyer.pivot.set(CELL / 2, CELL / 2);
+    flyer.x = (host?.x ?? pos.reel * CELL) + CELL / 2;
+    flyer.y = (host?.y ?? 0) + pos.row * CELL + CELL / 2;
+    this.wildOverlay.addChild(flyer);
+    if (typeof document !== "undefined") {
+      document.body.dataset.wildStamp = `${pos.reel}:${pos.row}`;
+    }
+    await this.tweenWildFromPlayer(flyer);
+    flyer.destroy({ children: true });
+    if (cell) cell.alpha = 1;
+    this.holdVisibleCells([pos]);
+  }
+
+  holdVisibleCells(positions: Array<{ reel: number; row: number }>) {
+    const current = [...this.heldCells].map((key) => {
+      const [reel, row] = key.split(":").map(Number);
+      return { reel, row };
+    });
+    const seen = new Set(current.map((pos) => `${pos.reel}:${pos.row}`));
+    const next = [...current];
+    for (const pos of positions) {
+      const key = `${pos.reel}:${pos.row}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      next.push(pos);
+    }
+    if (this.visible.length) this.syncHolds(this.visible, next);
+  }
+
+  private tweenWildFromPlayer(view: Container, ms = 620) {
+    const restY = view.y;
+    view.scale.set(2.55);
+    view.alpha = 0.12;
+    view.y = restY - 18;
+    return new Promise<void>((resolve) => {
+      const start = performance.now();
+      const tick = () => {
+        const u = Math.min((performance.now() - start) / ms, 1);
+        if (u < 0.72) {
+          const t = easeOutCubic(u / 0.72);
+          view.scale.set(2.55 - 1.63 * t);
+          view.y = restY - 18 + 22 * t;
+          view.alpha = 0.12 + 0.88 * Math.min(t / 0.35, 1);
+        } else {
+          const t = easeOutCubic((u - 0.72) / 0.28);
+          view.scale.set(0.92 + 0.08 * t);
+          view.y = restY + 4 - 4 * t;
+          view.alpha = 1;
+        }
+        if (u >= 1) {
+          this.app.ticker.remove(tick);
+          view.scale.set(1);
+          view.y = restY;
+          view.alpha = 1;
+          resolve();
+        }
+      };
+      this.app.ticker.add(tick);
+    });
+  }
+
   applyBookHolds(board: RawSymbol[][], positions: Position[]) {
     this.syncHolds(visibleNames(board), positions.map(unpadPosition));
     if (this.bonusDim) this.applyBonusDim();
@@ -456,17 +529,19 @@ export class BoardController {
   async flashBonusWins(positions: Position[]) {
     const cells = positions.map(unpadPosition);
     if (!cells.length) return;
+    this.markSymbolActivity();
     await this.playWinSheen(cells);
     await wait(220);
   }
 
   async presentNewBonusWins(fresh: Position[], allWins: Position[], firstCombo: boolean) {
-    if (fresh.length) {
+    const flash = firstCombo ? allWins : fresh;
+    if (flash.length) {
       if (firstCombo) await wait(80);
-      await this.flashBonusWins(fresh);
+      await this.flashBonusWins(flash);
     }
     this.lockBonusWinners(allWins);
-    if (fresh.length && firstCombo) await wait(140);
+    if (flash.length && firstCombo) await wait(140);
   }
 
   async showBookWins(positions: Position[]) {
@@ -489,6 +564,7 @@ export class BoardController {
     this.bonusDim = false;
     this.brightCells.clear();
     this.landingBright.clear();
+    this.wildOverlay.removeChildren().forEach((child) => child.destroy({ children: true }));
     this.clearHolds();
     this.clearWins();
     this.syncBonusDimFlag();
@@ -931,7 +1007,8 @@ export class BoardController {
     this.visible.forEach((names, reel) => {
       names.forEach((rawName, row) => {
         const name = animationSymbolName(rawName);
-        const cell = this.cells[reel]?.[row];
+        const hold = this.holds[reel]?.children.find((child) => child.label === this.holdLabel(reel, row));
+        const cell = hold instanceof Container ? hold : this.cells[reel]?.[row];
         if (ANIMATED_SYMBOL_NAMES.has(name) && cell?.parent) candidates.push({ cell, name });
       });
     });
@@ -967,6 +1044,7 @@ export class BoardController {
         if (!entry.cell || !ANIMATED_SYMBOL_NAMES.has(entry.name) || seen.has(entry.cell)) return false;
         seen.add(entry.cell);
         this.traceSymbolAnimation("win", entry.name);
+        if (typeof document !== "undefined" && entry.name === "W") document.body.dataset.wildWin = "1";
         return true;
       });
     if (!symbols.length) return Promise.resolve();
@@ -1085,6 +1163,9 @@ export class BoardController {
         cell.rotation = wave * envelope * 0.03;
       } else if (name === "H5") {
         cell.x = restX + wave * envelope * 0.5;
+      } else if (name === "W") {
+        const pulse = 1 + envelope * (0.02 + 0.02 * Math.sin(progress * Math.PI * 7));
+        cell.scale.set(pulse);
       }
     });
   }
@@ -1096,7 +1177,7 @@ export class BoardController {
     const restX = cell.x;
     const restY = cell.y;
 
-    return this.animateCell(cell, THEMED_WIN_MS + index * 20, (progress) => {
+    return this.animateCell(cell, (name === "W" ? WILD_WIN_MS : THEMED_WIN_MS) + index * 20, (progress) => {
       const entrance = easeOutCubic(Math.min(progress / 0.2, 1));
       const exit = progress > 0.82 ? 1 - easeOutQuad((progress - 0.82) / 0.18) : 1;
       const energy = entrance * exit;
@@ -1129,6 +1210,11 @@ export class BoardController {
       } else if (name === "H5") {
         cell.x = restX + Math.sin(progress * Math.PI * 10) * energy;
         cell.scale.set(1 + Math.sin(progress * Math.PI * 5) * energy * 0.03);
+      } else if (name === "W") {
+        const bloom = Math.sin(progress * Math.PI);
+        const kick = Math.max(0, Math.sin(progress * Math.PI * 8)) * energy;
+        cell.rotation = Math.sin(progress * Math.PI * 10) * energy * 0.07;
+        cell.scale.set(1 + 0.14 * bloom + kick * 0.08, 1 + 0.1 * bloom - kick * 0.045);
       }
       cell.y = restY - Math.sin(progress * Math.PI * 2) * energy * 2;
     });
@@ -1228,12 +1314,10 @@ export class BoardController {
 
   private sheenCell(pos: { reel: number; row: number }) {
     const key = `${pos.reel}:${pos.row}`;
+    const layer = this.holds[pos.reel];
+    const held = layer?.children.find((child) => child.label === this.holdLabel(pos.reel, pos.row));
+    if (held instanceof Container) return held;
     if (this.landingBright.has(key)) return this.cells[pos.reel]?.[pos.row];
-    if (this.bonusDim) {
-      const layer = this.holds[pos.reel];
-      const held = layer?.children.find((child) => child.label === this.holdLabel(pos.reel, pos.row));
-      if (held instanceof Container) return held;
-    }
     return this.cells[pos.reel]?.[pos.row];
   }
 
@@ -1245,6 +1329,8 @@ export class BoardController {
       .map((pos) => {
         const cell = this.sheenCell(pos);
         if (!cell) return null;
+        const symbolName = animationSymbolName(this.visible[pos.reel]?.[pos.row] ?? "");
+        const wildSheen = symbolName === "W";
         const wrap = new Container();
         wrap.label = "sheen";
         wrap.eventMode = "none";
@@ -1253,14 +1339,17 @@ export class BoardController {
         const mask = new Graphics();
         mask.roundRect(pad, pad, inner, inner, 10).fill(0xffffff);
         const pulse = new Graphics();
-        pulse.roundRect(pad, pad, inner, inner, 10).fill({ color: 0xffe7a8, alpha: 0.7 });
+        pulse.roundRect(pad, pad, inner, inner, 10).fill({
+          color: wildSheen ? 0xffc4de : 0xffe7a8,
+          alpha: wildSheen ? 0.82 : 0.7,
+        });
         pulse.blendMode = "add";
         pulse.alpha = 0;
         const shine = new Graphics();
         const len = CELL * 2.35;
-        shine.rect(-len / 2, -16, len, 32).fill({ color: 0xfff4dc, alpha: 0.28 });
-        shine.rect(-len / 2, -8, len, 16).fill({ color: 0xfffaf2, alpha: 0.5 });
-        shine.rect(-len / 2, -2.4, len, 4.8).fill({ color: 0xffffff, alpha: 0.92 });
+        shine.rect(-len / 2, -16, len, 32).fill({ color: wildSheen ? 0xffd6ea : 0xfff4dc, alpha: 0.32 });
+        shine.rect(-len / 2, -8, len, 16).fill({ color: wildSheen ? 0xfff0f7 : 0xfffaf2, alpha: 0.55 });
+        shine.rect(-len / 2, -2.4, len, 4.8).fill({ color: 0xffffff, alpha: wildSheen ? 0.98 : 0.92 });
         shine.rotation = -Math.PI / 4;
         shine.blendMode = "add";
         wrap.addChild(mask, pulse, shine);
@@ -1271,9 +1360,7 @@ export class BoardController {
           wrap,
           shine,
           pulse,
-          counterRotate: ["H1", "L2"].includes(
-            animationSymbolName(this.visible[pos.reel]?.[pos.row] ?? ""),
-          ),
+          counterRotate: ["H1", "L2"].includes(symbolName),
           delay: pos.reel * WIN_SHEEN_STAGGER_MS + pos.row * 12,
           fromX: pad - 8,
           fromY: pad - 8,

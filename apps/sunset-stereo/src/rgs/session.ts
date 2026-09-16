@@ -46,16 +46,23 @@ function asBook(state: unknown, fallbackMult = 0): BookState {
 }
 
 function createMockClient() {
-  const demoPack = demo as { books: BookState[]; bonusBooks?: BookState[]; scatterBooks?: BookState[] };
+  const demoPack = demo as {
+    books: BookState[];
+    bonusBooks?: BookState[];
+    scatterBooks?: BookState[];
+    wildBonusBooks?: BookState[];
+  };
   const books = demoPack.books;
   const bonusBooks = demoPack.bonusBooks?.length ? demoPack.bonusBooks : books.filter((book) => book.criteria === "freegame");
   const scatterBooks = demoPack.scatterBooks?.length ? demoPack.scatterBooks : books;
-  const MODE_COST: Record<string, number> = { base: 1, bonus: 95, scatter: 1.5 };
+  const wildBonusBooks = demoPack.wildBonusBooks?.length ? demoPack.wildBonusBooks : bonusBooks;
+  const MODE_COST: Record<string, number> = { base: 1, bonus: 95, scatter: 1.5, wildbonus: 225 };
   let balance = 1000 * API_MULTIPLIER;
   let active: Round | null = null;
   let nextIndex = 0;
   let nextBonus = 0;
   let nextScatter = 0;
+  let nextWildBonus = 0;
 
   return {
     kind: "mock" as const,
@@ -79,11 +86,26 @@ function createMockClient() {
       const debit = Math.round(amount * cost);
       if (debit > balance) throw new Error("Not enough credit.");
       balance -= debit;
-      const pool = mode === "bonus" ? bonusBooks : mode === "scatter" ? scatterBooks : books;
-      const cursor = mode === "bonus" ? nextBonus : mode === "scatter" ? nextScatter : nextIndex;
+      const pool =
+        mode === "bonus"
+          ? bonusBooks
+          : mode === "scatter"
+            ? scatterBooks
+            : mode === "wildbonus"
+              ? wildBonusBooks
+              : books;
+      const cursor =
+        mode === "bonus"
+          ? nextBonus
+          : mode === "scatter"
+            ? nextScatter
+            : mode === "wildbonus"
+              ? nextWildBonus
+              : nextIndex;
       const book = pool[cursor % pool.length] ?? pool[0];
       if (mode === "bonus") nextBonus += 1;
       else if (mode === "scatter") nextScatter += 1;
+      else if (mode === "wildbonus") nextWildBonus += 1;
       else nextIndex += 1;
       const payout = Math.round((book.payoutMultiplier / 100) * amount);
       active = {
@@ -149,8 +171,18 @@ export async function fetchReplayBook(query: EngineQuery): Promise<BookState> {
     const body = (await res.json()) as { payoutMultiplier?: number; state?: unknown };
     return asBook(body.state ?? body, Math.round((body.payoutMultiplier ?? 0) * 100));
   }
-  const demoPack = demo as { books: BookState[]; bonusBooks?: BookState[]; scatterBooks?: BookState[] };
-  const books = [...demoPack.books, ...(demoPack.bonusBooks ?? []), ...(demoPack.scatterBooks ?? [])];
+  const demoPack = demo as {
+    books: BookState[];
+    bonusBooks?: BookState[];
+    scatterBooks?: BookState[];
+    wildBonusBooks?: BookState[];
+  };
+  const books = [
+    ...demoPack.books,
+    ...(demoPack.bonusBooks ?? []),
+    ...(demoPack.scatterBooks ?? []),
+    ...(demoPack.wildBonusBooks ?? []),
+  ];
   const found = books.find((book) => String(book.id) === String(query.event));
   if (!found) {
     throw new Error(query.event ? `Replay book ${query.event} is not in the demo set.` : "Replay needs rgs_url or a demo event id.");

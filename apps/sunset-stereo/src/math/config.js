@@ -71,3 +71,10 @@ export const BUY_SCATTER = {
   reel: 2,
   label: "Sun on reel 2",
 };
+
+export const BUY_WILD_BONUS = {
+  mode: "wildbonus",
+  cost: 225,
+  label: "4 scatters",
+  spins: BONUS_SPINS,
+};

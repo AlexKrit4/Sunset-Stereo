@@ -1,17 +1,21 @@
 <script lang="ts">
-  import { BUY_BONUS, BUY_SCATTER } from "../math/config.js";
+  import { BUY_BONUS, BUY_SCATTER, BUY_WILD_BONUS } from "../math/config.js";
   import { labels, moneyHud, ui } from "../lib/ui.svelte";
   import { SYMBOL_PAY_ART } from "../pixi/symbols";
 
   let {
     onBuyBonus,
+    onBuyWildBonus,
   }: {
     onBuyBonus: () => void;
+    onBuyWildBonus: () => void;
   } = $props();
 
   const bonusPrice = $derived(Math.round(ui.betMicro * BUY_BONUS.cost));
+  const wildBonusPrice = $derived(Math.round(ui.betMicro * BUY_WILD_BONUS.cost));
   const scatterPrice = $derived(Math.round(ui.betMicro * BUY_SCATTER.cost));
   const sunArt = SYMBOL_PAY_ART.scatter;
+  const wildArt = SYMBOL_PAY_ART.wild;
 
   function close() {
     ui.buyMenuOpen = false;
@@ -34,6 +38,11 @@
     ui.buyConfirm = "bonus";
   }
 
+  function requestWildBonus() {
+    if (ui.busy || ui.balanceMicro < wildBonusPrice) return;
+    ui.buyConfirm = "wildbonus";
+  }
+
   function confirmBuy() {
     if (ui.buyConfirm === "scatter") {
       if (ui.busy || ui.balanceMicro < scatterPrice) return;
@@ -45,6 +54,12 @@
       if (ui.busy || ui.balanceMicro < bonusPrice) return;
       ui.buyConfirm = "";
       onBuyBonus();
+      return;
+    }
+    if (ui.buyConfirm === "wildbonus") {
+      if (ui.busy || ui.balanceMicro < wildBonusPrice) return;
+      ui.buyConfirm = "";
+      onBuyWildBonus();
     }
   }
 
@@ -53,12 +68,18 @@
   }
 
   const confirmTitle = $derived(
-    ui.buyConfirm === "bonus" ? `Buy ${BUY_BONUS.label}?` : "Activate extra bet?",
+    ui.buyConfirm === "bonus"
+      ? `Buy ${BUY_BONUS.label}?`
+      : ui.buyConfirm === "wildbonus"
+        ? `Buy ${BUY_WILD_BONUS.label}?`
+        : "Activate extra bet?",
   );
   const confirmCopy = $derived(
     ui.buyConfirm === "bonus"
       ? `${BUY_BONUS.label} costs ${BUY_BONUS.cost}× the stake (${moneyHud(bonusPrice)}) and starts ${BUY_BONUS.spins} extra plays.`
-      : `${BUY_SCATTER.label} costs ${BUY_SCATTER.cost}× the stake (${moneyHud(scatterPrice)}) on every spin and always lands a sun on reel ${BUY_SCATTER.reel}.`,
+      : ui.buyConfirm === "wildbonus"
+        ? `${BUY_WILD_BONUS.label} costs ${BUY_WILD_BONUS.cost}× the stake (${moneyHud(wildBonusPrice)}) and starts ${BUY_WILD_BONUS.spins} extra plays. A Wild is placed on a random cell before each extra play, substitutes for paying symbols, and stays locked while that extra play holds and respins.`
+        : `${BUY_SCATTER.label} costs ${BUY_SCATTER.cost}× the stake (${moneyHud(scatterPrice)}) on every spin and always lands a sun on reel ${BUY_SCATTER.reel}.`,
   );
 </script>
 
@@ -114,6 +135,30 @@
               type="button"
               disabled={ui.busy || ui.balanceMicro < bonusPrice}
               onclick={requestBonus}
+            >
+              {labels.buyNow()}
+            </button>
+          </div>
+        </article>
+
+        <article id="buyWildBonusCard" class="card">
+          <div class="art wildbonus">
+            <img src={sunArt} alt="" />
+            <img src={sunArt} alt="" />
+            <img src={sunArt} alt="" />
+            <img src={sunArt} alt="" />
+            <img class="wild" src={wildArt} alt="" />
+          </div>
+          <div class="body">
+            <p class="bolts" aria-hidden="true">⚡⚡⚡⚡</p>
+            <h3>{BUY_WILD_BONUS.label}</h3>
+            <p class="price">{moneyHud(wildBonusPrice)}</p>
+            <button
+              id="buyWildBonusBtn"
+              class="purchase"
+              type="button"
+              disabled={ui.busy || ui.balanceMicro < wildBonusPrice}
+              onclick={requestWildBonus}
             >
               {labels.buyNow()}
             </button>
@@ -221,6 +266,25 @@
   .art.bonus img {
     width: 56px;
     height: 56px;
+  }
+  .art.wildbonus {
+    position: relative;
+    background:
+      radial-gradient(circle at 50% 30%, rgba(255, 240, 160, 0.85), transparent 50%),
+      linear-gradient(180deg, #5b1cff 0%, #ff4d8a 100%);
+    flex-wrap: wrap;
+    padding: 8px 10px 0;
+  }
+  .art.wildbonus img {
+    width: 40px;
+    height: 40px;
+  }
+  .art.wildbonus img.wild {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    width: 48px;
+    height: 48px;
   }
   .body {
     padding: 10px 14px 14px;

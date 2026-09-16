@@ -93,6 +93,13 @@ export type BookEventHoldRespin = {
   continuing: boolean;
 };
 
+export type BookEventPlaceWild = {
+  index: number;
+  type: "placeWild";
+  reel: number;
+  row: number;
+};
+
 export type BookEventFinalWin = {
   index: number;
   type: "finalWin";
@@ -115,6 +122,7 @@ export type BookEvent =
   | BookEventUpdateFreeSpin
   | BookEventUpdateGlobalMult
   | BookEventHoldRespin
+  | BookEventPlaceWild
   | BookEventFreeSpinEnd
   | BookEventWincap
   | BookEventFinalWin;

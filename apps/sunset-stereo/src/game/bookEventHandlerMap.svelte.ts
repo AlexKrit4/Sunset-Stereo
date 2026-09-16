@@ -1,4 +1,5 @@
-import { hideSpinWin, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelte";
+import { hideSpinWin, roundWinBeatsStake, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelte";
+import { beginBigWinIntro, isBigWin, playBigWin } from "../lib/bigWin";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { runtime } from "./context";
 import { unpadPosition, winningWays } from "../rgs/bookView";
@@ -7,11 +8,42 @@ import type { BookEvent, BookEventHandlerMap, Position, RawSymbol } from "./type
 
 let lastBoard: RawSymbol[][] = [];
 let pendingHolds: Position[] = [];
+let lockedWilds: Position[] = [];
 let pendingWinLines = 0;
 
 function cellKey(pos: Position) {
   const cell = unpadPosition(pos);
   return `${cell.reel}:${cell.row}`;
+}
+
+function withLockedWilds(positions: Position[]) {
+  if (!lockedWilds.length) return positions;
+  const seen = new Set(positions.map(cellKey));
+  const extra = lockedWilds.filter((pos) => !seen.has(cellKey(pos)));
+  return extra.length ? [...positions, ...extra] : positions;
+}
+
+function clearLockedWilds() {
+  lockedWilds = [];
+}
+
+function upcomingTotalWinCents(events: BookEvent[], current: BookEvent) {
+  let start = events.indexOf(current);
+  if (start < 0) start = events.findIndex((event) => event.index === current.index);
+  if (start < 0) return null;
+  for (let index = start + 1; index < events.length; index += 1) {
+    const event = events[index];
+    if (event.type === "setTotalWin") return event.amount;
+    if (
+      event.type === "reveal" ||
+      event.type === "updateFreeSpin" ||
+      event.type === "freeSpinEnd" ||
+      event.type === "finalWin"
+    ) {
+      return null;
+    }
+  }
+  return null;
 }
 
 function nextBonusWin(
@@ -28,6 +60,7 @@ function nextBonusWin(
     if (
       event.type === "reveal" ||
       event.type === "updateFreeSpin" ||
+      event.type === "setTotalWin" ||
       event.type === "freeSpinEnd" ||
       event.type === "finalWin"
     ) {
@@ -50,48 +83,83 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       ui.fsCurrent = 0;
       ui.fsTotal = 0;
       pendingHolds = [];
+      clearLockedWilds();
       board.clearBookVisuals();
     }
     const upcoming = bookEvent.gameType === "freegame" ? nextBonusWin(context.bookEvents, bookEvent) : null;
-    const already = new Set(pendingHolds.map(cellKey));
-    const fresh = upcoming?.positions.filter((pos) => !already.has(cellKey(pos))) ?? [];
+    const holdCells = withLockedWilds(pendingHolds);
+    const upcomingPositions = upcoming ? withLockedWilds(upcoming.positions) : [];
+    const already = new Set(holdCells.map(cellKey));
+    const fresh = upcomingPositions.filter((pos) => !already.has(cellKey(pos)));
     await board.playBookReveal(bookEvent.board, {
       pace,
       anticipation: bookEvent.anticipation,
-      holds: pendingHolds,
+      holds: holdCells,
       upcomingWins: fresh,
     });
-    if (pendingHolds.length && !upcoming?.beforeRespin) {
-      board.applyBookHolds(bookEvent.board, pendingHolds);
+    if (holdCells.length && !upcoming?.beforeRespin) {
+      board.applyBookHolds(bookEvent.board, holdCells);
     }
     if (upcoming?.beforeRespin) {
-      await board.presentNewBonusWins(fresh, upcoming.positions, pendingHolds.length === 0);
+      const firstCombo =
+        pendingHolds.length === 0 ||
+        (lockedWilds.length > 0 &&
+          pendingHolds.every((pos) => lockedWilds.some((wild) => cellKey(wild) === cellKey(pos))));
+      await board.presentNewBonusWins(fresh, upcomingPositions, firstCombo);
     }
   },
 
   holdRespin: async (bookEvent) => {
-    pendingHolds = bookEvent.positions;
-    runtime.board?.lockBonusWinners(bookEvent.positions);
+    pendingHolds = withLockedWilds(bookEvent.positions);
+    runtime.board?.lockBonusWinners(pendingHolds);
     await waitForTimeout(80);
+  },
+
+  placeWild: async (bookEvent) => {
+    const board = runtime.board;
+    if (!board) return;
+    lockedWilds = [{ reel: bookEvent.reel, row: bookEvent.row }];
+    pendingHolds = withLockedWilds([]);
+    await board.placeWildFromCamera({ reel: bookEvent.reel, row: bookEvent.row });
   },
 
   winInfo: async (bookEvent) => {
     pendingWinLines = winningWays(bookEvent.wins);
     const positions = bookEvent.wins.flatMap((win) => win.positions);
+    const sheenWin = multiplierCentsToMicro(bookEvent.totalWin);
+    if (isBigWin(sheenWin, ui.betMicro)) {
+      beginBigWinIntro();
+    }
     await runtime.board?.showBookWins(positions);
     await waitForTimeout(120);
   },
 
-  setWin: async (bookEvent) => {
+  setWin: async (bookEvent, context) => {
     const micro = multiplierCentsToMicro(bookEvent.amount);
-    ui.winMicro = micro;
+    const totalCents = upcomingTotalWinCents(context.bookEvents, bookEvent);
+    const roundWin = totalCents != null ? multiplierCentsToMicro(totalCents) : micro;
     if (micro <= 0) {
+      ui.winMicro = roundWin;
       hideSpinWin();
       await waitForTimeout(60);
       return;
     }
+    if (isBigWin(micro, ui.betMicro)) {
+      await playBigWin(micro);
+      ui.winMicro = roundWin;
+      return;
+    }
+    ui.winMicro = roundWin;
+    if (ui.feature) {
+      await waitForTimeout(60);
+      return;
+    }
+    if (!roundWinBeatsStake(roundWin)) {
+      await waitForTimeout(500);
+      return;
+    }
     await waitForTimeout(640);
-    showSpinWin(micro, pendingWinLines);
+    showSpinWin(roundWin, pendingWinLines);
     await waitForTimeout(1100);
   },
 
@@ -117,6 +185,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   updateFreeSpin: async (bookEvent) => {
     hideSpinWin();
     pendingHolds = [];
+    clearLockedWilds();
     runtime.board?.clearBookVisuals();
     ui.fsCurrent = bookEvent.amount + 1;
     ui.fsTotal = bookEvent.total;
@@ -133,13 +202,22 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     await waitForTimeout(400);
   },
 
-  freeSpinEnd: async () => {
+  freeSpinEnd: async (bookEvent) => {
     pendingHolds = [];
+    clearLockedWilds();
     runtime.board?.clearBookVisuals();
+    const total = multiplierCentsToMicro(bookEvent.amount);
+    ui.winMicro = total;
     ui.feature = false;
+    ui.wildBonus = false;
     ui.fsCurrent = 0;
     ui.fsTotal = 0;
-    await waitForTimeout(200);
+    if (roundWinBeatsStake(total) && !isBigWin(total, ui.betMicro)) {
+      showSpinWin(total, pendingWinLines);
+      await waitForTimeout(1100);
+    } else {
+      await waitForTimeout(200);
+    }
   },
 
   finalWin: async (bookEvent) => {
