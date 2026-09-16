@@ -2,10 +2,11 @@ import random
 from copy import deepcopy
 
 from game_calculations import GameCalculations, MAX_HOLD_RESPINS
-from game_config import BONUS_PAYING, REEL2, SCATTER_REELS, bonus_payout_band
+from game_config import BONUS_PAYING, BUY_BONUS_COST, BUY_WILD_COST, REEL2, SCATTER_REELS
 from game_events import hold_respin_event, place_wild_event
 from src.calculations.ways import Ways
 from src.events.events import reveal_event, wincap_event
+from ways_paint import plan_payout, payout_target, row_picks
 
 
 def quantize_win(value: float) -> float:
@@ -124,6 +125,68 @@ class GameExecutables(GameCalculations):
     def _scatter_count(self) -> int:
         return self.count_special_symbols("scatter")
 
+    def _locked_symbol_cells(self) -> dict[tuple[int, int], str]:
+        locked: dict[tuple[int, int], str] = {}
+        if not getattr(self, "board", None):
+            return locked
+        for reel, column in enumerate(self.board):
+            for row, cell in enumerate(column):
+                if cell is None:
+                    continue
+                if cell.name in {"S", "W"}:
+                    locked[(reel, row)] = cell.name
+        return locked
+
+    def _available_counts(self, locked: dict[tuple[int, int], str]) -> tuple[int, ...]:
+        caps = []
+        for reel in range(self.config.num_reels):
+            taken = sum(1 for row in range(self.config.num_rows[reel]) if (reel, row) in locked)
+            caps.append(max(0, self.config.num_rows[reel] - taken))
+        return tuple(caps)
+
+    def paint_payout(self, target: float, locked: dict[tuple[int, int], str] | None = None) -> None:
+        """Fill a unique-looking board whose ways total is as close as possible to target."""
+        locked = dict(locked or {})
+        cap = self._available_counts(locked)
+        room = self.remaining_to_wincap()
+        capped = min(max(target, 0.2), room) if room > 0 else max(target, 0.2)
+        want = quantize_win(capped)
+        plan = plan_payout(want, cap)
+        paying = {symbol for symbol, _counts in plan}
+        salt = sum(ord(ch) for ch in str(self.criteria)) + self.repeat_count * 13
+        rng = random.Random((self.sim + 1) * 9176 + salt)
+        pool = [symbol for symbol in BONUS_PAYING if symbol not in paying]
+        rng.shuffle(pool)
+        reel_fill = []
+        for reel in range(self.config.num_reels):
+            pick = pool[reel % len(pool)]
+            if reel_fill and pick == reel_fill[-1]:
+                pick = pool[(reel + 1) % len(pool)]
+            reel_fill.append(pick)
+        rows = self.config.num_rows
+        board = [[None] * rows[reel] for reel in range(self.config.num_reels)]
+        for reel in range(self.config.num_reels):
+            for row in range(rows[reel]):
+                if (reel, row) in locked:
+                    board[reel][row] = self.create_symbol(locked[(reel, row)])
+                    continue
+                board[reel][row] = self.create_symbol(reel_fill[reel])
+        occupied = {key: True for key in locked}
+        for symbol, counts in plan:
+            for reel, count in enumerate(counts):
+                blocked = {row for row in range(rows[reel]) if (reel, row) in occupied}
+                for row in row_picks(count, blocked, rng):
+                    board[reel][row] = self.create_symbol(symbol)
+                    occupied[(reel, row)] = True
+        self.board = board
+        pad_mix = "low"
+        self.top_symbols = [self.create_symbol(self._pick(pad_mix)) for _ in range(self.config.num_reels)]
+        self.bottom_symbols = [self.create_symbol(self._pick(pad_mix)) for _ in range(self.config.num_reels)]
+        self.reel_positions = [rng.randrange(256) for _ in range(self.config.num_reels)]
+        self.refresh_special_syms()
+        self.get_special_symbols_on_board()
+        self._apply_anticipation()
+
     def draw_board(self, emit_event: bool = True, trigger_symbol: str = "scatter") -> None:
         conditions = self._conditions()
         mix = "wincap" if conditions.get("force_wincap") else "mid"
@@ -141,19 +204,57 @@ class GameExecutables(GameCalculations):
                 self._place_scatters(want, require_reel2)
                 if self._scatter_count() == want:
                     break
+        elif self.criteria == "basegame":
+            target = payout_target(self.betmode, self.criteria, self.sim) or 0.4
+            locked: dict[tuple[int, int], str] = {}
+            if require_reel2:
+                locked[(REEL2, random.randrange(self.config.num_rows[REEL2]))] = "S"
+            self.paint_payout(target, locked)
+            if self._scatter_count() >= 3:
+                self._fill_cells("low")
+                if require_reel2:
+                    self._place_scatters(1, True)
+        elif self.criteria == "0":
+            self._fill_no_win()
+            if require_reel2:
+                self._place_scatters(1, True)
         else:
             for _ in range(80):
-                self._fill_cells("zero" if self.criteria == "0" else "low")
+                self._fill_cells("low")
                 if require_reel2:
                     self._place_scatters(1, True)
                 if self._scatter_count() < 3:
                     break
             else:
-                self._fill_cells("zero")
+                self._fill_no_win()
                 if require_reel2:
                     self._place_scatters(1, True)
         if emit_event:
             reveal_event(self)
+
+    def _fill_no_win(self, locked: set[tuple[int, int]] | None = None) -> None:
+        """Visible board with no 3-oak ways. Each call shuffles so empties are not clones."""
+        locked = locked or set()
+        order = list(BONUS_PAYING)
+        random.shuffle(order)
+        rows = self.config.num_rows
+        board = [[None] * rows[reel] for reel in range(self.config.num_reels)]
+        for reel in range(self.config.num_reels):
+            symbol = order[reel]
+            for row in range(rows[reel]):
+                if (reel, row) in locked:
+                    board[reel][row] = self.board[reel][row]
+                    continue
+                board[reel][row] = self.create_symbol(symbol)
+        self.board = board
+        pads = list(BONUS_PAYING)
+        random.shuffle(pads)
+        self.top_symbols = [self.create_symbol(pads[reel % len(pads)]) for reel in range(self.config.num_reels)]
+        self.bottom_symbols = [self.create_symbol(pads[(reel + 3) % len(pads)]) for reel in range(self.config.num_reels)]
+        self.reel_positions = [random.randrange(256) for _ in range(self.config.num_reels)]
+        self.refresh_special_syms()
+        self.get_special_symbols_on_board()
+        self._apply_anticipation()
 
     def respin_unlocked_cells(self, locked: set[tuple[int, int]], mix: str = "mid") -> None:
         force_wincap = bool(self._conditions().get("force_wincap"))
@@ -162,6 +263,14 @@ class GameExecutables(GameCalculations):
 
     def _hold_respin_body(self, mix: str = "mid", sticky: set[tuple[int, int]] | None = None) -> None:
         sticky = set(sticky or ())
+        if mix == "zero":
+            self._fill_no_win(sticky)
+            for reel, row in sticky:
+                self.board[reel][row] = self.create_symbol("W")
+            self.get_special_symbols_on_board()
+            reveal_event(self)
+            self.evaluate_ways_board(emit_events=True)
+            return
         self._fill_cells(mix)
         for reel, row in sticky:
             self.board[reel][row] = self.create_symbol("W")
@@ -207,7 +316,7 @@ class GameExecutables(GameCalculations):
         if room_hi <= 0.2:
             return "zero"
         if per >= 80:
-            return "wincap"
+            return "high"
         if per >= 20:
             return "high"
         if per >= 4:
@@ -221,29 +330,57 @@ class GameExecutables(GameCalculations):
         row = random.randrange(self.config.num_rows[reel])
         return reel, row
 
+    def _bonus_floor(self) -> float:
+        if self.betmode == "wildbonus":
+            return 5.0 if self.criteria == "dead" else BUY_WILD_COST
+        if self.betmode == "bonus":
+            return 3.0 if self.criteria == "dead" else BUY_BONUS_COST
+        return 10.0
+
     def play_hold_respin_spin(self) -> None:
-        band = bonus_payout_band(self.betmode, self.criteria, self.sim)
-        lo, hi = band if band else (0.0, self.config.wincap)
+        target = payout_target(self.betmode, self.criteria, self.sim)
+        floor = self._bonus_floor()
+        lo = floor
+        hi = float(self.config.wincap)
+        if target is not None and self.criteria != "wincap":
+            lo = min(target, floor) if self.criteria == "dead" else max(target * 0.55, floor)
+            hi = min(self.config.wincap, max(target * 1.4, lo + 1.0))
+        if self.criteria == "wincap":
+            lo, hi = 12000.0, 15000.0
         remaining = max(1, self.tot_fs - self.fs + 1)
-        mix = self._bonus_mix_for_room(lo, hi, remaining)
         sticky = set()
         if self._conditions().get("place_bonus_wild"):
             reel, row = self._place_random_wild()
             place_wild_event(self, reel, row)
             sticky.add((reel, row))
+        aim = target if target is not None else floor
+        if self.criteria == "dead":
+            ceiling = BUY_WILD_COST if self.betmode == "wildbonus" else BUY_BONUS_COST
+            aim = min(aim, ceiling - 0.1)
+        need = quantize_win(max(0.0, aim - self.win_manager.running_bet_win))
+        last = self.fs >= self.tot_fs
+        if last and need >= 0.2 and not self.wincap_triggered:
+            room = self.remaining_to_wincap()
+            if room < 0.2:
+                mix = self._bonus_mix_for_room(lo, hi, remaining)
+                self._hold_respin_body(mix=mix, sticky=sticky)
+                return
+            locked = {key: "W" for key in sticky}
+            self.paint_payout(min(need, room), locked)
+            reveal_event(self)
+            self.evaluate_ways_board(emit_events=True)
+            return
+        mix = self._bonus_mix_for_room(lo, hi, remaining)
+        if target is not None and self.win_manager.running_bet_win >= target and remaining > 1:
+            mix = "zero"
         self._hold_respin_body(mix=mix, sticky=sticky)
 
     def force_small_ways_win(self, floor: float) -> None:
-        """Guarantee a non-identical min hit when random extra plays undershoot."""
-        symbol = random.choice(BONUS_PAYING)
-        rows = [random.randrange(4) for _ in range(3)]
-        self._fill_cells("zero")
-        for reel in range(3):
-            self.board[reel][rows[reel]] = self.create_symbol(symbol)
-        self.get_special_symbols_on_board()
+        """Paint a real ways board so a short bonus still clears its floor."""
+        room = self.remaining_to_wincap()
+        need = quantize_win(max(0.2, min(floor - self.win_manager.running_bet_win, room or floor)))
+        if need <= 0 or self.wincap_triggered:
+            return
+        self.paint_payout(need)
         reveal_event(self)
         self.evaluate_ways_board(emit_events=True)
-        if self.win_manager.running_bet_win + 1e-9 < floor and not self.wincap_triggered:
-            extra = quantize_win(floor - self.win_manager.running_bet_win)
-            self.win_manager.running_bet_win = quantize_win(self.win_manager.running_bet_win + extra)
-            self.win_manager.spin_win = quantize_win(self.win_manager.spin_win + extra)

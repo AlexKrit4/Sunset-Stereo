@@ -376,6 +376,53 @@ def test_four_scatter_buy_places_a_locked_wild():
     assert 1 <= wild["row"] <= 4
 
 
+def test_painted_basegame_hits_are_not_cloned_payouts():
+    from gamestate import GameState
+    from ways_paint import payout_target
+
+    GameConfig._instance = None
+    config = GameConfig()
+    payouts = []
+    boards = []
+    for sim in range(80):
+        state = GameState(config)
+        state.betmode = "base"
+        state.criteria = "basegame"
+        state.run_spin(sim)
+        payouts.append(round(state.final_win, 1))
+        reveal = state.book.to_json()["events"][0]
+        boards.append(
+            tuple(tuple(cell["name"] if isinstance(cell, dict) else cell for cell in col[1:-1]) for col in reveal["board"])
+        )
+        assert state.final_win > 0
+        target = payout_target("base", "basegame", sim)
+        assert abs(state.final_win - target) <= max(0.5, 0.15 * target)
+    assert len(set(boards)) == len(boards)
+    assert len(set(payouts)) >= 20
+
+
+def test_weighter_spreads_rtp_across_ranges():
+    from weight_modes import assign_weights, lut_stats
+
+    rows = []
+    book_id = 0
+    for cents in [0] * 200:
+        rows.append((book_id, 1, cents))
+        book_id += 1
+    for cents in range(20, 200, 10):
+        rows.append((book_id, 1, cents))
+        book_id += 1
+    for cents in [400, 900, 1400, 3500, 8000, 16000, 45000, 120000, 350000, 900000] * 3:
+        rows.append((book_id, 1, cents))
+        book_id += 1
+    rows.append((book_id, 1, 1_500_000))
+    weighted = assign_weights(rows, "base")
+    stats = lut_stats(weighted, "base")
+    assert 0.93 <= stats["rtp"] <= 0.97
+    assert stats["peak_range_rtp"] < 0.45
+    assert stats["hit_rate"] >= 1 / 50
+
+
 def test_natural_three_scatter_bonus_pays_at_least_10x():
     state, book = _mode_book("base", "freegame", 8)
     assert state.final_win >= 10

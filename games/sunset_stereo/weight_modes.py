@@ -33,8 +33,8 @@ MODE_COST = {"base": 1.0, "scatter": 1.5, "bonus": 95.0, "wildbonus": 225.0}
 TARGET_RTP = 0.95
 RTP_TOL = 0.004
 HIT_RATE = {"base": 0.25, "scatter": 0.35, "bonus": 1.0, "wildbonus": 1.0}
-MAX_RANGE_RTP = 0.18
-WINCAP_MASS = {"base": 0.00002, "scatter": 0.00002, "bonus": 0.00008, "wildbonus": 0.00012}
+MAX_RANGE_RTP = 0.16
+WINCAP_MASS = {"base": 0.0000008, "scatter": 0.0000008, "bonus": 0.0000005, "wildbonus": 0.0000006}
 
 
 def _gcd_many(values: Iterable[int]) -> int:
@@ -198,9 +198,36 @@ def _range_mass_targets(mode: str) -> dict[tuple[float, float], float]:
     }
 
 
+def _bucket_means(buckets: dict, keys: list[tuple[float, float]]) -> dict[tuple[float, float], float]:
+    means = {}
+    for key in keys:
+        books = buckets[key]
+        means[key] = sum(cents for _, cents in books) / (100.0 * len(books))
+    return means
+
+
+def _rtp_from_mass(mass: dict, means: dict, wincap_mass: float, cost: float) -> float:
+    expected = sum(mass.get(key, 0.0) * means[key] for key in means)
+    expected += wincap_mass * 15000.0
+    return expected / cost
+
+
+def _clip_range_rtp(mass: dict, means: dict, cost: float, sink_key: tuple[float, float]) -> None:
+    """Cap per-bin RTP by sending leftover probability to zeros or the cheapest hits."""
+    for key in list(mass):
+        if key == sink_key or key not in means or mass[key] <= 0:
+            continue
+        contrib = mass[key] * means[key] / cost
+        if contrib <= MAX_RANGE_RTP + 1e-9:
+            continue
+        keep = MAX_RANGE_RTP * cost / max(means[key], 1e-9)
+        extra = mass[key] - keep
+        mass[key] = keep
+        mass[sink_key] = mass.get(sink_key, 0.0) + extra
+
+
 def assign_weights(rows: list[tuple[int, int, int]], mode: str) -> list[tuple[int, int, int]]:
     cost = MODE_COST[mode]
-    target_e = TARGET_RTP * cost
     targets = _range_mass_targets(mode)
     buckets: dict[tuple[float, float] | str, list[tuple[int, int]]] = {key: [] for key in RANGES}
     buckets["wincap"] = []
@@ -212,51 +239,72 @@ def assign_weights(rows: list[tuple[int, int, int]], mode: str) -> list[tuple[in
             key = payout_range(payout) or RANGES[0]
             buckets[key].append((book_id, cents))
 
-    mass = {key: 0.0 for key in targets}
-    leftover = 0.0
-    for key, target in targets.items():
-        if buckets.get(key) or (key[0] >= 10000 and buckets["wincap"]):
-            mass[key] = target
-        else:
-            leftover += target
-    live = [key for key, books in buckets.items() if key != "wincap" and books]
-    if leftover and live:
-        add = leftover / len(live)
-        for key in live:
-            mass[key] += add
-    total_mass = sum(mass.values()) + (WINCAP_MASS[mode] if buckets["wincap"] else 0.0)
-    if total_mass <= 0:
-        raise ValueError(f"{mode} has empty weight buckets")
-    scale_mass = 1.0 / total_mass
-    for key in mass:
-        mass[key] *= scale_mass
-    wincap_mass = WINCAP_MASS[mode] * scale_mass if buckets["wincap"] else 0.0
-    live_pay = [key for key in live if key != (0.0, 0.1)]
+    live_pay = [key for key in RANGES if key != (0.0, 0.1) and buckets[key]]
     zero_key = (0.0, 0.1)
-    zero_mass = mass.get(zero_key, 0.0)
+    has_zero = bool(buckets[zero_key])
+    if not live_pay:
+        raise ValueError(f"{mode} has no paying books to weight")
+    means = _bucket_means(buckets, live_pay)
+    wincap_mass = WINCAP_MASS[mode] if buckets["wincap"] else 0.0
+    zero_mass = targets.get(zero_key, 0.0) if has_zero else 0.0
     pay_mass = max(0.0, 1.0 - zero_mass - wincap_mass)
-    means = {
-        key: sum(cents for _, cents in buckets[key]) / (100.0 * len(buckets[key]))
-        for key in live_pay
-    }
-    ordered = sorted(live_pay, key=lambda key: means[key])
-    for key in live_pay:
-        mass[key] = 0.0
-    if ordered:
-        mass[ordered[0]] = pay_mass
-        target_from_pay = max(0.0, TARGET_RTP * cost - wincap_mass * 15000.0)
-        current = pay_mass * means[ordered[0]]
-        for src, dest in zip(ordered, ordered[1:]):
-            if current >= target_from_pay:
-                break
-            gap = means[dest] - means[src]
-            if gap <= 1e-9:
+    shape = {key: targets.get(key, 0.0) for key in live_pay}
+    if sum(shape.values()) <= 0:
+        shape = {key: 1.0 for key in live_pay}
+
+    def masses_for_tilt(tilt: float) -> dict[tuple[float, float], float]:
+        raw = {}
+        for key in live_pay:
+            raw[key] = max(shape[key], 1e-9) * (max(means[key], 0.05) ** tilt)
+        total = sum(raw.values()) or 1.0
+        out: dict[tuple[float, float], float] = {zero_key: zero_mass} if has_zero else {}
+        for key in live_pay:
+            out[key] = pay_mass * raw[key] / total
+        return out
+
+    lo, hi = -6.0, 6.0
+    tilt = 0.0
+    for _ in range(40):
+        mid = (lo + hi) / 2.0
+        rtp = _rtp_from_mass(masses_for_tilt(mid), means, wincap_mass, cost)
+        tilt = mid
+        if rtp > TARGET_RTP:
+            hi = mid
+        else:
+            lo = mid
+    sink_key = zero_key if has_zero else min(live_pay, key=lambda key: means[key])
+    mass = masses_for_tilt(tilt)
+    _clip_range_rtp(mass, means, cost, sink_key)
+    rtp = _rtp_from_mass(mass, means, wincap_mass, cost)
+    if rtp + 1e-9 < TARGET_RTP:
+        ordered = sorted(live_pay, key=lambda key: means[key])
+        for key in ordered:
+            room = MAX_RANGE_RTP * cost - mass.get(key, 0.0) * means[key]
+            if room <= 0 or key == sink_key:
                 continue
-            need = target_from_pay - current
-            movable = min(mass[src], need / gap)
-            mass[src] -= movable
-            mass[dest] += movable
-            current += movable * gap
+            need = TARGET_RTP * cost - _rtp_from_mass(mass, means, wincap_mass, cost) * cost
+            if need <= 0:
+                break
+            add = min(mass.get(sink_key, 0.0), need / means[key], room / means[key])
+            if add <= 0:
+                continue
+            mass[key] = mass.get(key, 0.0) + add
+            mass[sink_key] = mass.get(sink_key, 0.0) - add
+    rtp = _rtp_from_mass(mass, means, wincap_mass, cost)
+    if abs(rtp - TARGET_RTP) > RTP_TOL:
+        ordered = sorted(live_pay, key=lambda key: means[key])
+        low, high = ordered[0], ordered[-1]
+        gap = means[high] - means[low]
+        if gap > 1e-9:
+            delta = (TARGET_RTP * cost - rtp * cost) / gap
+            if rtp < TARGET_RTP:
+                take = min(mass[low], max(0.0, delta))
+                mass[low] -= take
+                mass[high] += take
+            else:
+                take = min(mass[high], max(0.0, -delta))
+                mass[high] -= take
+                mass[low] += take
 
 
     scale = 1_000_000_000
@@ -296,4 +344,6 @@ def weight_mode_lookup(publish_dir: str, mode: str, lookup_dir: str | None = Non
         raise ValueError(f"{mode} hit-rate {stats['hit_rate']:.4f} is worse than 1/50")
     if stats["unique_payouts"] < 50:
         raise ValueError(f"{mode} only {stats['unique_payouts']:.0f} unique payouts")
+    if len(rows) >= 200_000 and stats["unique_payouts"] < 10_000:
+        raise ValueError(f"{mode} only {stats['unique_payouts']:.0f} unique payouts, need 10000")
     return stats
