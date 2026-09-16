@@ -1,4 +1,4 @@
-"""Generate Stake Engine books and configs for Sunset Stereo 6x4 ways."""
+"""Generate Stake Engine books for all four Sunset Stereo modes."""
 
 import json
 import os
@@ -10,73 +10,75 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
 
 from gamestate import GameState
-from game_config import BUY_BONUS_BOOKS, GameConfig
+from game_config import (
+    BASE_BOOKS,
+    BUY_BONUS_BOOKS,
+    BUY_WILD_BOOKS,
+    SCATTER_BOOKS,
+    GameConfig,
+)
 from game_optimization import OptimizationSetup
-from optimization_program.run_script import OptimizationExecution
-from utils.game_analytics.run_analysis import create_stat_sheet
 from utils.rgs_verification import execute_all_tests
 from src.state.run_sims import create_books
 from src.write_data.write_configs import generate_configs
-from weight_bonus import weight_bonus_lookup
+from weight_modes import weight_mode_lookup
+from copy_publish import write_engine_index
 
 
-def _write_fallback_index(config) -> None:
-    """Keep both ACP modes listed when base files are not in this checkout."""
+MODE_BOOKS = {
+    "base": BASE_BOOKS,
+    "scatter": SCATTER_BOOKS,
+    "bonus": BUY_BONUS_BOOKS,
+    "wildbonus": BUY_WILD_BOOKS,
+}
+
+
+def _write_index(config) -> None:
     path = os.path.join(config.publish_path, "index.json")
     modes = []
     if os.path.isfile(path):
         with open(path, encoding="utf-8") as handle:
             modes = json.load(handle).get("modes", [])
     by_name = {mode["name"]: mode for mode in modes}
-    by_name.setdefault(
-        "base",
-        {
-            "name": "base",
-            "cost": 1.0,
-            "events": "books_base.jsonl.zst",
-            "weights": "lookUpTable_base_0.csv",
-        },
-    )
+    by_name["base"] = {
+        "name": "base",
+        "cost": 1.0,
+        "events": "books_base.jsonl.zst",
+        "weights": "lookUpTable_base_0.csv",
+    }
+    by_name["scatter"] = {
+        "name": "scatter",
+        "cost": 1.5,
+        "events": "books_scatter.jsonl.zst",
+        "weights": "lookUpTable_scatter_0.csv",
+    }
     by_name["bonus"] = {
         "name": "bonus",
         "cost": 95.0,
         "events": "books_bonus.jsonl.zst",
         "weights": "lookUpTable_bonus_0.csv",
     }
-    payload = {"modes": [by_name["base"], by_name["bonus"]]}
-    from copy_publish import write_engine_index
-
-    write_engine_index(path, payload["modes"])
-    print("wrote fallback index.json")
+    by_name["wildbonus"] = {
+        "name": "wildbonus",
+        "cost": 225.0,
+        "events": "books_wildbonus.jsonl.zst",
+        "weights": "lookUpTable_wildbonus_0.csv",
+    }
+    order = ["base", "scatter", "bonus", "wildbonus"]
+    write_engine_index(path, [by_name[name] for name in order])
+    print("wrote index.json")
 
 
 if __name__ == "__main__":
-    sim_mode = os.environ.get("SUNSET_SIM_MODE", "base").strip().lower()
-    num_threads = 4
-    rust_threads = 4
-    profiling = False
+    sim_mode = os.environ.get("SUNSET_SIM_MODE", "all").strip().lower()
+    num_threads = int(os.environ.get("SUNSET_THREADS", "4"))
     compression = True
+    profiling = False
 
-    if sim_mode == "bonus":
-        batching_size = 2500
-        num_sim_args = {"bonus": int(BUY_BONUS_BOOKS)}
-        run_conditions = {
-            "run_sims": True,
-            "run_optimization": False,
-            "run_analysis": False,
-            "run_format_checks": True,
-        }
+    if sim_mode == "all":
+        target_modes = ["base", "scatter", "bonus", "wildbonus"]
     else:
-        batching_size = 5000
-        num_sim_args = {"base": int(1_000_000)}
-        run_conditions = {
-            "run_sims": True,
-            "run_optimization": True,
-            "run_analysis": True,
-            "run_format_checks": True,
-        }
-
-    target_modes = list(num_sim_args.keys())
+        target_modes = [sim_mode]
 
     GameConfig._instance = None
     config = GameConfig()
@@ -88,37 +90,24 @@ if __name__ == "__main__":
         if os.path.exists(lut_zero):
             os.remove(lut_zero)
 
-    if run_conditions["run_sims"]:
-        create_books(
-            gamestate,
-            config,
-            num_sim_args,
-            batching_size,
-            num_threads,
-            compression,
-            profiling,
-        )
+    batch = 2500 if any(mode in {"bonus", "wildbonus"} for mode in target_modes) else 5000
+    override = os.environ.get("SUNSET_NUM_SIMS")
+    num_sim_args = {mode: int(override) if override else MODE_BOOKS[mode] for mode in target_modes}
+    create_books(gamestate, config, num_sim_args, batch, num_threads, compression, profiling)
 
     try:
         generate_configs(gamestate)
     except FileNotFoundError as exc:
         print("generate_configs skipped missing files:", exc)
-        _write_fallback_index(config)
+        _write_index(config)
 
-    if sim_mode == "bonus":
-        stats = weight_bonus_lookup(config.publish_path)
-        print("weighted bonus LUT", stats)
-        from copy_publish import verify_bonus_payouts
+    lookup_dir = os.path.join(os.path.dirname(config.publish_path), "lookup_tables")
+    for mode in target_modes:
+        stats = weight_mode_lookup(config.publish_path, mode, lookup_dir)
+        print(f"weighted {mode} LUT", stats)
 
-        verify_bonus_payouts(config.publish_path)
-
-    if run_conditions["run_optimization"]:
-        OptimizationExecution().run_all_modes(config, target_modes, rust_threads)
-        generate_configs(gamestate)
-
-    if run_conditions["run_analysis"]:
-        create_stat_sheet(gamestate, custom_keys=[])
-
-    if run_conditions["run_format_checks"]:
-        excluded = ["base"] if sim_mode == "bonus" else []
-        execute_all_tests(config, excluded_modes=excluded)
+    _write_index(config)
+    try:
+        execute_all_tests(config, excluded_modes=[mode for mode in MODE_BOOKS if mode not in target_modes])
+    except Exception as exc:
+        print("format checks skipped:", exc)

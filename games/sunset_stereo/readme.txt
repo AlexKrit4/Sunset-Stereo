@@ -3,51 +3,33 @@ Sunset Stereo
 
 PRODUCTION math package for Stake Engine.
 
-6-reel, 4-row, left-to-right ways. No wilds, no xWays / xNudge.
-Buy bonus: 3 scatters for 95x the selected 1x stake.
+6-reel, 4-row, left-to-right ways. 3 scatters start 10 hold-and-respin
+extra plays. 4 scatters do the same and place a locking wild before
+each extra play. Scatter lands on reels 2–5 only.
 
-3 scatters on reels 2-5 start 10 extra plays. Base game plus those
-10 extra plays is one book / one bet. Live scatter chance is tuned
-near 1 in 150-180. The 95x buy always starts with exactly 3 scatters.
-
-During an extra play, a winning ways combo is not paid yet. Winning
-cells hold and unlocked cells respin (the respin does not consume one
-of the 10). New ways can be built, including other symbols. If a
-respin adds no new winning cells, that extra play ends and then pays.
-
-The previous 5x3 20-line + Golden Hour package is archived at
-games/_inactive_sunset_stereo_5x3/ and must not be uploaded.
-
-Theme
+Modes
 -----
-Sunset / vinyl / stereo. Paying symbols are music-night objects
-(vinyl, headphones, cassette, mic, amp, speaker, note, EQ, palm, cocktail).
-Scatter is the sunset sun. It teases on 2 suns and starts 10 extra
-plays on 3+. Scatter lands on reels 2-5 only (max one per reel on a
-4-row window). Extra-play strips (FR0) have no scatters.
+base        cost 1.0     1,000,000 books   high vol, 25% hit rate
+scatter     cost 1.5     1,000,000 books   medium vol, sun locked on reel 2
+bonus       cost 95.0      250,000 books   medium vol 3-scatter buy, min 3×
+wildbonus   cost 225.0     250,000 books   high vol 4-scatter buy, min 5×
 
-Basegame
---------
-Left-to-right ways. Three or more consecutive reels.
-Wilds do not land.
-
-Win cap
--------
-15000x hard ceiling. If a book would pay more, it is cut off and pays
-exactly 15000x. Max-win books are natural bonus games that crossed the
-cap — not a fake full-grid vinyl board.
+Natural bonuses (base / ante) pay at least 10×. Buy bonuses never pay 0.
+Every board is drawn independently — zero spins are not cloned, and the
+same payout uses different symbols.
 
 Target RTP
 ----------
-95.00%, high volatility.
-Bonus fence ~0.560 at ~1/180, basegame ~0.380 at ~1/5, wincap ~0.010.
-`run.py` emits 1,000,000 compressed base books and runs optimization.
+95.00% on every mode, within 0.5% of each other. LUT weights spread RTP
+across hit-rate ranges instead of parking it in one 200–500× pocket.
+Win cap 15000×.
 
-Buy bonus
----------
-Mode name `bonus`, cost 95.0, is_buybonus=True, is_feature=False.
-50,000 unique books. LUT weights lock 75% below 95x and 25% at/above 95x,
-RTP 95% of the 95x cost (payouts still counted in 1x units). Max-win
-15000x of 1x is extremely rare. Generate with:
-
+Generate
+--------
+python3 games/sunset_stereo/run.py
+# or one mode:
+SUNSET_SIM_MODE=base python3 games/sunset_stereo/run.py
+SUNSET_SIM_MODE=scatter python3 games/sunset_stereo/run.py
 SUNSET_SIM_MODE=bonus python3 games/sunset_stereo/run.py
+SUNSET_SIM_MODE=wildbonus python3 games/sunset_stereo/run.py
+python3 games/sunset_stereo/copy_publish.py

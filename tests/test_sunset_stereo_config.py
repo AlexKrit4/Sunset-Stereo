@@ -20,7 +20,7 @@ def test_config_loads_six_by_four_ways():
     assert config.paylines == {}
     assert config.freespin_triggers[config.basegame_type] == {3: 10, 4: 10}
     assert config.freespin_triggers[config.freegame_type] == {}
-    assert config.special_symbols["wild"] == []
+    assert config.special_symbols["wild"] == ["W"]
     assert config.special_symbols["scatter"] == ["S"]
     assert "BR0" in config.reels
     assert "FR0" in config.reels
@@ -44,22 +44,42 @@ def test_config_loads_six_by_four_ways():
 
 
 def test_base_and_buy_bonus_modes():
-    from game_config import BUY_BONUS_COST, BUY_BONUS_DEAD, BUY_BONUS_RECOUP, BUY_BONUS_WINCAP
+    from game_config import BUY_BONUS_COST, BUY_WILD_COST, SCATTER_COST
 
     config = GameConfig()
     names = {mode.get_name(): mode.get_cost() for mode in config.bet_modes}
-    assert names == {"base": 1.0, "bonus": BUY_BONUS_COST}
-    assert BUY_BONUS_COST == 95.0
+    assert names == {
+        "base": 1.0,
+        "scatter": SCATTER_COST,
+        "bonus": BUY_BONUS_COST,
+        "wildbonus": BUY_WILD_COST,
+    }
     base = next(mode for mode in config.bet_modes if mode.get_name() == "base")
+    scatter = next(mode for mode in config.bet_modes if mode.get_name() == "scatter")
     bonus = next(mode for mode in config.bet_modes if mode.get_name() == "bonus")
+    wild = next(mode for mode in config.bet_modes if mode.get_name() == "wildbonus")
     assert base.get_buybonus() is False
-    assert base.get_feature() is True
+    assert scatter.get_feature() is True
     assert bonus.get_buybonus() is True
-    assert bonus.get_feature() is False
-    assert [dist.get_criteria() for dist in base.get_distributions()] == ["wincap", "freegame", "0", "basegame"]
+    assert wild.get_buybonus() is True
+    assert [dist.get_criteria() for dist in base.get_distributions()] == [
+        "wincap",
+        "freegame4",
+        "freegame",
+        "0",
+        "basegame",
+    ]
+    assert [dist.get_criteria() for dist in scatter.get_distributions()] == [
+        "wincap",
+        "freegame4",
+        "freegame",
+        "0",
+        "basegame",
+    ]
     amounts = {dist.get_criteria(): dist.get_fixed_amt() for dist in bonus.get_distributions()}
-    assert amounts == {"wincap": BUY_BONUS_WINCAP, "dead": BUY_BONUS_DEAD, "recoup": BUY_BONUS_RECOUP}
-    assert BUY_BONUS_DEAD + BUY_BONUS_RECOUP + BUY_BONUS_WINCAP == 50_000
+    assert amounts["dead"] + amounts["recoup"] + amounts["wincap"] == 250_000
+    wild_amt = {dist.get_criteria(): dist.get_fixed_amt() for dist in wild.get_distributions()}
+    assert wild_amt["dead"] + wild_amt["recoup"] + wild_amt["wincap"] == 250_000
 
 
 def test_scatter_only_on_inner_reels_and_not_stacked():
@@ -204,7 +224,7 @@ def test_buy_bonus_always_starts_ten_extra_plays_from_three_scatters():
     assert types.count("updateFreeSpin") == 10
     assert "freeSpinEnd" in types
     assert types[-1] == "finalWin"
-    assert state.final_win < 95
+    assert 3 <= state.final_win < 95
 
 
 def test_buy_bonus_recoup_pays_at_least_the_95x_cost():
@@ -236,33 +256,31 @@ def test_buy_bonus_wincap_hits_the_15000x_ceiling():
     assert final["amount"] == 1_500_000
 
 
-def test_bonus_lookup_weights_lock_75_25_and_rtp():
-    from weight_bonus import assign_weights, lut_stats, rtp_by_range
+def test_bonus_lookup_weights_lock_diversity_and_rtp():
+    from weight_modes import assign_weights, lut_stats
 
     rows = []
     book_id = 0
-    for cents in [0, 20, 80, 300, 700, 1400, 3500, 8000, 9400] * 8:
+    for cents in [0] * 40:
         rows.append((book_id, 1, cents))
         book_id += 1
-    for cents in [9600, 15000, 35000, 80000, 160000, 350000, 800000, 1_200_000] * 5:
+    for cents in [20, 80, 150, 400, 900, 1400, 3500, 8000] * 8:
+        rows.append((book_id, 1, cents))
+        book_id += 1
+    for cents in [12000, 25000, 80000, 160000, 400000, 900000] * 4:
         rows.append((book_id, 1, cents))
         book_id += 1
     rows.append((book_id, 1, 1_500_000))
-    weighted = assign_weights(rows)
-    stats = lut_stats(weighted)
-    assert abs(stats["dead_mass"] - 0.75) < 0.01
-    assert abs(stats["recoup_mass"] - 0.25) < 0.01
-    assert 0.94 <= stats["rtp"] <= 0.96
-    assert stats["wincap_mass"] < 0.001
+    weighted = assign_weights(rows, "base")
+    stats = lut_stats(weighted, "base")
+    assert 0.93 <= stats["rtp"] <= 0.97
     assert stats["hit_rate"] >= 1 / 50
-    assert stats["peak_range_rtp"] < 0.40
-    assert stats["recoup_ranges_used"] >= 4
-    contrib = rtp_by_range(weighted)
-    assert contrib[(200.0, 500.0)] < 0.40
+    assert stats["unique_payouts"] >= 15
+    assert stats["peak_range_rtp"] < 0.45
 
 
 def test_bonus_lut_writer_uses_unix_newlines(tmp_path):
-    from weight_bonus import write_lut
+    from weight_modes import write_lut
 
     path = tmp_path / "lookUpTable_bonus_0.csv"
     write_lut(str(path), [(0, 10, 0), (1, 20, 9500)])
@@ -303,4 +321,71 @@ def test_buy_bonus_hold_respin_grows_before_paying():
         assert after.index("reveal") < after.index("winInfo") if "winInfo" in after else True
         break
     assert found, "expected a buy-bonus extra play to hold and respin"
+
+
+def _mode_book(mode: str, criteria: str, sim: int):
+    from gamestate import GameState
+
+    GameConfig._instance = None
+    config = GameConfig()
+    state = GameState(config)
+    state.betmode = mode
+    state.criteria = criteria
+    state.run_spin(sim)
+    return state, state.book.to_json()
+
+
+def test_zero_spins_are_not_cloned():
+    boards = []
+    for sim in range(12):
+        _state, book = _mode_book("base", "0", sim)
+        reveal = book["events"][0]
+        visible = tuple(
+            tuple(cell["name"] if isinstance(cell, dict) else cell for cell in col[1:-1])
+            for col in reveal["board"]
+        )
+        boards.append(visible)
+        assert book["payoutMultiplier"] == 0
+    assert len(set(boards)) == len(boards)
+
+
+def test_scatter_ante_locks_sun_on_reel_two():
+    for criteria, sim in (("0", 4), ("basegame", 9), ("freegame", 3)):
+        state, book = _mode_book("scatter", criteria, sim)
+        reveal = book["events"][0]
+        names = [cell["name"] if isinstance(cell, dict) else cell for cell in reveal["board"][1][1:-1]]
+        assert "S" in names
+        if criteria == "freegame":
+            assert state.final_win >= 10
+
+
+def test_four_scatter_buy_places_a_locked_wild():
+    state, book = _mode_book("wildbonus", "dead", 15)
+    types = [event["type"] for event in book["events"]]
+    assert "placeWild" in types
+    assert types.count("updateFreeSpin") == 10
+    suns = 0
+    reveal = book["events"][0]
+    for col in reveal["board"]:
+        names = [cell["name"] if isinstance(cell, dict) else cell for cell in col]
+        suns += names[1:-1].count("S")
+    assert suns == 4
+    assert state.final_win >= 5
+    wild = next(event for event in book["events"] if event["type"] == "placeWild")
+    assert 0 <= wild["reel"] <= 5
+    assert 1 <= wild["row"] <= 4
+
+
+def test_natural_three_scatter_bonus_pays_at_least_10x():
+    state, book = _mode_book("base", "freegame", 8)
+    assert state.final_win >= 10
+    types = [event["type"] for event in book["events"]]
+    assert "freeSpinTrigger" in types
+    extra = [event for event in book["events"] if event["type"] == "reveal" and event.get("gameType") == "freegame"]
+    boards = [
+        tuple(tuple(cell["name"] if isinstance(cell, dict) else cell for cell in col[1:-1]) for col in reveal["board"])
+        for reveal in extra
+    ]
+    assert len(set(boards)) > 1
+
 

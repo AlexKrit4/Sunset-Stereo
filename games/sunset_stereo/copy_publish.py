@@ -17,7 +17,7 @@ from io import TextIOWrapper
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC = os.path.join(ROOT, "games", "sunset_stereo", "library", "publish_files")
 DST = os.path.join(ROOT, "publish", "sunset_stereo")
-MODE_ORDER = ("base", "bonus")
+MODE_ORDER = ("base", "scatter", "bonus", "wildbonus")
 INDEX_KEYS = ("name", "cost", "events", "weights")
 
 
@@ -46,15 +46,15 @@ def write_engine_index(path: str, modes: list) -> None:
         handle.write(text)
 
 
-def verify_bonus_payouts(publish_dir: str) -> None:
+def verify_mode_payouts(publish_dir: str, mode: str) -> None:
     """Engine hashes book payoutMultiplier against LUT column 3, in file order."""
-    books = os.path.join(publish_dir, "books_bonus.jsonl.zst")
-    lut = os.path.join(publish_dir, "lookUpTable_bonus_0.csv")
+    books = os.path.join(publish_dir, f"books_{mode}.jsonl.zst")
+    lut = os.path.join(publish_dir, f"lookUpTable_{mode}_0.csv")
     if not (os.path.isfile(books) and os.path.isfile(lut)):
-        raise FileNotFoundError("bonus books or LUT missing")
+        raise FileNotFoundError(f"{mode} books or LUT missing")
     raw = open(lut, "rb").read()
     if b"\r" in raw:
-        raise ValueError("lookUpTable_bonus_0.csv must use Unix \\n, not CRLF")
+        raise ValueError(f"lookUpTable_{mode}_0.csv must use Unix \\n, not CRLF")
     lut_payouts = []
     lut_ids = []
     for book_id, _weight, payout in csv.reader(raw.decode("utf-8").splitlines()):
@@ -79,12 +79,16 @@ def verify_bonus_payouts(publish_dir: str) -> None:
                     )
     if book_ids != lut_ids or book_payouts != lut_payouts:
         raise ValueError(
-            f"bonus books/LUT payout mismatch: ids {book_ids[:3]} vs {lut_ids[:3]}, "
+            f"{mode} books/LUT payout mismatch: ids {book_ids[:3]} vs {lut_ids[:3]}, "
             f"len {len(book_payouts)} vs {len(lut_payouts)}"
         )
     if hashlib.md5(pickle.dumps(book_payouts)).hexdigest() != hashlib.md5(pickle.dumps(lut_payouts)).hexdigest():
-        raise ValueError("bonus payout hash mismatch")
-    print("bonus books/LUT payouts match", len(book_payouts), "rows")
+        raise ValueError(f"{mode} payout hash mismatch")
+    print(f"{mode} books/LUT payouts match", len(book_payouts), "rows")
+
+
+def verify_bonus_payouts(publish_dir: str) -> None:
+    verify_mode_payouts(publish_dir, "bonus")
 
 
 def _load_index(path: str) -> dict:
@@ -107,8 +111,8 @@ def main() -> None:
             shutil.copy2(weights_src, os.path.join(DST, mode["weights"]))
             merged[mode["name"]] = mode
             print(f"copied {mode['name']}")
-            if mode["name"] == "bonus":
-                verify_bonus_payouts(DST)
+            if mode["name"] in {"bonus", "wildbonus", "scatter", "base"}:
+                verify_mode_payouts(DST, mode["name"])
         elif mode["name"] in merged:
             print(f"kept existing {mode['name']} (source files missing)")
         else:
