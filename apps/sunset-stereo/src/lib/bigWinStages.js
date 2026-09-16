@@ -12,25 +12,29 @@ export function isBigWin(micro, betMicro) {
   return micro > betMicro * BIG_WIN_MULT;
 }
 
-export function stagesForWin(micro, betMicro, fromMicro = 0) {
+export function stagesForWin(micro, betMicro) {
   const multiple = micro / betMicro;
-  const fromMultiple = Math.max(0, fromMicro / betMicro);
-  if (!(multiple > fromMultiple)) return [];
-  return BIG_WIN_STAGES.filter((stage) => {
-    const stageTo = Number.isFinite(stage.to) ? stage.to : Number.POSITIVE_INFINITY;
-    return multiple > stage.from && fromMultiple < stageTo;
-  })
-    .map((stage) => {
-      const stageTo = Number.isFinite(stage.to) ? stage.to : Number.POSITIVE_INFINITY;
-      const from = Math.max(stage.from, fromMultiple);
-      const to = Math.min(stageTo, multiple);
-      return {
-        ...stage,
-        fromMicro: Math.round(from * betMicro),
-        toMicro: Math.round(to * betMicro),
-      };
-    })
-    .filter((stage) => stage.toMicro > stage.fromMicro);
+  return BIG_WIN_STAGES.filter((stage) => multiple > stage.from).map((stage) => {
+    const toMultiple = Number.isFinite(stage.to) ? Math.min(stage.to, multiple) : multiple;
+    return {
+      ...stage,
+      fromMicro: Math.round(stage.from * betMicro),
+      toMicro: Math.round(toMultiple * betMicro),
+    };
+  });
+}
+
+/** All bands play; win1–win4 hold the paid total; sunset counts the remaining room to the cap. */
+export function stagesForWincap(totalMicro, betMicro, paidMicro) {
+  const stages = stagesForWin(totalMicro, betMicro);
+  const hold = Math.max(0, Math.min(paidMicro, totalMicro));
+  if (hold <= 0) return stages;
+  return stages.map((stage, index, all) => {
+    if (index === all.length - 1) {
+      return { ...stage, fromMicro: hold, toMicro: totalMicro };
+    }
+    return { ...stage, fromMicro: hold, toMicro: hold };
+  });
 }
 
 /** Running total already paid, so a wincap count can start there instead of 0. */

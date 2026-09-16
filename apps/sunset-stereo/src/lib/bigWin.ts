@@ -7,6 +7,7 @@ import {
   BIG_WIN_STAGES,
   isBigWin as isBigWinAt,
   stagesForWin as stagesForWinAt,
+  stagesForWincap as stagesForWincapAt,
 } from "./bigWinStages.js";
 
 export { BIG_WIN_MULT, BIG_WIN_STAGES };
@@ -15,8 +16,8 @@ export function isBigWin(micro: number, betMicro = ui.betMicro) {
   return isBigWinAt(micro, betMicro);
 }
 
-export function stagesForWin(micro: number, betMicro = ui.betMicro, fromMicro = 0) {
-  return stagesForWinAt(micro, betMicro, fromMicro);
+export function stagesForWin(micro: number, betMicro = ui.betMicro) {
+  return stagesForWinAt(micro, betMicro);
 }
 
 const STAGE_MS = 8000;
@@ -132,6 +133,11 @@ async function waitForClipEnd(
 }
 
 function countStage(fromMicro: number, toMicro: number, ms: number) {
+  if (toMicro === fromMicro) {
+    ui.bigWinDisplayMicro = fromMicro;
+    ui.winMicro = fromMicro;
+    return waitForTimeout(ms);
+  }
   return new Promise<void>((resolve) => {
     const started = performance.now();
     const tick = (now: number) => {
@@ -211,7 +217,7 @@ function finishBigWinAudio() {
 }
 
 export async function playBigWin(micro: number, fromMicro = 0) {
-  const stages = stagesForWin(micro, ui.betMicro, fromMicro);
+  const stages = fromMicro > 0 ? stagesForWincapAt(micro, ui.betMicro, fromMicro) : stagesForWin(micro, ui.betMicro);
   if (!stages.length) {
     ui.winMicro = micro;
     return;
@@ -223,10 +229,11 @@ export async function playBigWin(micro: number, fromMicro = 0) {
     await startFinished;
     if (!introActive) return;
 
+    const held = Math.max(0, fromMicro);
     const first = startArmed(stages[0].file);
     const startedAt = performance.now();
-    ui.bigWinDisplayMicro = stages[0].fromMicro;
-    ui.winMicro = stages[0].fromMicro;
+    ui.bigWinDisplayMicro = held || stages[0].fromMicro;
+    ui.winMicro = ui.bigWinDisplayMicro;
     ui.bigWinOpen = true;
     ui.bigWinExplode = false;
     ui.bigWinOutgoingLeft = "";

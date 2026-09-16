@@ -1,4 +1,4 @@
-import { BIG_WIN_STAGES, followingWincap, isBigWin, stagesForWin, wincapCountFrom } from "../src/lib/bigWinStages.js";
+import { BIG_WIN_STAGES, followingWincap, isBigWin, stagesForWin, stagesForWincap, wincapCountFrom } from "../src/lib/bigWinStages.js";
 
 function assert(cond, message) {
   if (!cond) throw new Error(message);
@@ -48,14 +48,16 @@ assert(wincapCountFrom(15000 * bet, remainder, already) === already, "wincap sta
 assert(wincapCountFrom(15000 * bet, 15000 * bet, already) === already, "falls back to the HUD if this spin is the whole cap");
 assert(wincapCountFrom(15000 * bet, 15000 * bet, 0) === 0, "a first-spin max win still counts from 0");
 
-const fromPaid = stagesForWin(15000 * bet, bet, already);
-assert(fromPaid.map((stage) => stage.id).join(",") === "win5", "a 2307x book only plays sunset on the cap");
-assert(fromPaid[0].fromMicro === already, "sunset counter does not reset the paid win");
-assert(fromPaid[0].toMicro === 15000 * bet, "sunset counter fills the remaining room to 15000x");
+const held = stagesForWincap(15000 * bet, bet, already);
+assert(held.map((stage) => stage.id).join(",") === "win1,win2,win3,win4,win5", "wincap still plays every stage");
+assert(held.slice(0, 4).every((stage) => stage.fromMicro === already && stage.toMicro === already), "win1-win4 hold the paid 2307x");
+assert(held.at(-1).id === "win5", "last stage is sunset");
+assert(held.at(-1).fromMicro === already, "sunset starts from the paid win");
+assert(held.at(-1).toMicro === 15000 * bet, "sunset fills the remaining room to 15000x");
 
-const fromFifty = stagesForWin(15000 * bet, bet, 50 * bet);
-assert(fromFifty.map((stage) => stage.id).join(",") === "win2,win3,win4,win5", "unfinished bands still play after 50x");
-assert(fromFifty[0].fromMicro === 50 * bet, "win2 continues from 50x");
+const freshCap = stagesForWincap(15000 * bet, bet, 0);
+assert(freshCap.map((stage) => stage.id).join(",") === "win1,win2,win3,win4,win5", "a first-spin cap still uses every stage");
+assert(freshCap[0].fromMicro === 0 && freshCap[0].toMicro === 40 * bet, "first-spin cap still counts win1 from 0");
 
 const mathWincap = [
   { index: 0, type: "winInfo", totalWin: 1_269_300 },
