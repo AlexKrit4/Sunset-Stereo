@@ -256,38 +256,57 @@ class GameExecutables(GameCalculations):
 
     def respin_unlocked_cells(self, locked: set[tuple[int, int]], mix: str = "mid") -> None:
         force_wincap = bool(self._conditions().get("force_wincap"))
-        use = "wincap" if force_wincap else mix
+        if force_wincap:
+            use = "wincap"
+        elif mix == "zero":
+            use = "low"
+        else:
+            use = mix
         self._fill_cells(use, locked=locked)
 
-    def _hold_respin_body(self, mix: str = "mid", sticky: set[tuple[int, int]] | None = None) -> None:
-        sticky = set(sticky or ())
-        if mix == "zero":
-            self._fill_no_win(sticky)
-            for reel, row in sticky:
-                self.board[reel][row] = self.create_symbol("W")
-            self.get_special_symbols_on_board()
-            reveal_event(self)
-            self.evaluate_ways_board(emit_events=True)
-            return
-        self._fill_cells(mix)
-        for reel, row in sticky:
-            self.board[reel][row] = self.create_symbol("W")
-        self.get_special_symbols_on_board()
-        reveal_event(self)
+    def _dead_ceiling(self) -> float | None:
+        if self.criteria != "dead":
+            return None
+        return BUY_WILD_COST if self.betmode == "wildbonus" else BUY_BONUS_COST
+
+    def _hold_respin_loop(self, mix: str, sticky: set[tuple[int, int]]) -> None:
         locked: set[tuple[int, int]] = set(sticky)
         total_cells = sum(self.config.num_rows)
         last_positive = {"totalWin": 0, "wins": []}
+        ceiling = self._dead_ceiling()
         for step in range(MAX_HOLD_RESPINS + 1):
+            snapshot = None
             if step > 0:
+                snapshot = (
+                    deepcopy(self.board),
+                    list(self.top_symbols),
+                    list(self.bottom_symbols),
+                    list(self.reel_positions),
+                )
                 self.respin_unlocked_cells(locked, mix=mix)
                 for reel, row in sticky:
                     self.board[reel][row] = self.create_symbol("W")
                 self.get_special_symbols_on_board()
-                reveal_event(self)
             self.evaluate_ways_board(emit_events=False)
-            if self.win_data["totalWin"] <= 0:
-                if step > 0:
-                    self.win_data = last_positive
+            total = float(self.win_data.get("totalWin", 0) or 0)
+            projected = self.win_manager.running_bet_win + total
+            over_limit = projected >= self.config.wincap or (ceiling is not None and projected >= ceiling)
+            if step > 0 and total <= 0:
+                reveal_event(self)
+                self.win_data = last_positive
+                break
+            if step > 0 and over_limit:
+                if snapshot is not None:
+                    self.board, self.top_symbols, self.bottom_symbols, self.reel_positions = snapshot
+                    self.get_special_symbols_on_board()
+                self.win_data = last_positive
+                break
+            if step > 0:
+                reveal_event(self)
+            if total <= 0:
+                break
+            if over_limit:
+                last_positive = deepcopy(self.win_data)
                 break
             keys = self.winning_cell_keys() | sticky
             grown = any(key not in locked for key in keys)
@@ -297,11 +316,22 @@ class GameExecutables(GameCalculations):
             locked = keys
             if len(locked) >= total_cells:
                 break
-            if self.win_manager.running_bet_win + self.win_data["totalWin"] >= self.config.wincap:
-                break
             if step < MAX_HOLD_RESPINS:
                 hold_respin_event(self, locked, continuing=True)
         self.pay_current_board()
+
+    def _hold_respin_body(self, mix: str = "mid", sticky: set[tuple[int, int]] | None = None, painted: bool = False) -> None:
+        sticky = set(sticky or ())
+        if not painted:
+            if mix == "zero":
+                self._fill_no_win(sticky)
+            else:
+                self._fill_cells(mix)
+            for reel, row in sticky:
+                self.board[reel][row] = self.create_symbol("W")
+            self.get_special_symbols_on_board()
+            reveal_event(self)
+        self._hold_respin_loop(mix, sticky)
 
     def _bonus_mix_for_room(self, lo: float, hi: float, remaining: int) -> str:
         if self._conditions().get("force_wincap"):
@@ -365,7 +395,7 @@ class GameExecutables(GameCalculations):
             room = self.remaining_to_wincap()
             self.paint_payout(min(slice_, room) if room > 0 else slice_, locked)
             reveal_event(self)
-            self.evaluate_ways_board(emit_events=True)
+            self._hold_respin_loop("mid", sticky)
             return
         if last and not self.wincap_triggered:
             running = float(self.win_manager.running_bet_win)
@@ -384,7 +414,7 @@ class GameExecutables(GameCalculations):
                 if need >= 0.2:
                     self.paint_payout(min(need, room), locked)
                     reveal_event(self)
-                    self.evaluate_ways_board(emit_events=True)
+                    self._hold_respin_loop("mid", sticky)
                     return
         mix = self._bonus_mix_for_room(lo, hi, remaining)
         if self.win_manager.running_bet_win >= aim and remaining > 1:
@@ -403,4 +433,4 @@ class GameExecutables(GameCalculations):
             return
         self.paint_payout(need)
         reveal_event(self)
-        self.evaluate_ways_board(emit_events=True)
+        self._hold_respin_loop("mid", set())

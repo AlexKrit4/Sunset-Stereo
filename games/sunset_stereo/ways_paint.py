@@ -253,6 +253,11 @@ def visible_ways_win(board: list[list[str]]) -> float:
         if name in PAYING_SET and name not in seen:
             seen.add(name)
             starters.append(name)
+    if "W" in board[0]:
+        for symbol in BONUS_PAYING:
+            if symbol not in seen:
+                seen.add(symbol)
+                starters.append(symbol)
     total = 0.0
     n_reels = len(board)
     for symbol in starters:
@@ -317,17 +322,16 @@ def _cap_reel_stacks(board: list[list[str]], reel: int, locked: dict[tuple[int, 
 
 def _blocked_starters(board: list[list[str]]) -> set[str]:
     """Paying symbols on reel 0 that already continue onto reel 1 (or through a wild)."""
-    starters = _paying_names(board[0])
-    if "W" in board[1]:
-        return set(starters)
-    return starters & _paying_names(board[1])
+    starters = set(PAYING_SET) if "W" in board[0] else _paying_names(board[0])
+    nxt = set(PAYING_SET) if "W" in board[1] else _paying_names(board[1])
+    return starters & nxt
 
 
 def _break_three_oak(board: list[list[str]], locked: dict[tuple[int, int], str], rng) -> None:
     """Kill 3-oak ways by replacing reel-2 (or reel-1) cells that would complete a pay."""
     blocked = _blocked_starters(board)
     if "W" in board[2] and blocked:
-        forbidden = _paying_names(board[0])
+        forbidden = set(PAYING_SET) if "W" in board[0] else _paying_names(board[0])
         pool = [symbol for symbol in BONUS_PAYING if symbol not in forbidden]
         if pool:
             for row in _unlocked_rows(1, locked):
@@ -340,7 +344,7 @@ def _break_three_oak(board: list[list[str]], locked: dict[tuple[int, int], str],
         return
     pool = [symbol for symbol in BONUS_PAYING if symbol not in blocked]
     if not pool:
-        forbidden = _paying_names(board[0])
+        forbidden = set(PAYING_SET) if "W" in board[0] else _paying_names(board[0])
         pool = [symbol for symbol in BONUS_PAYING if symbol not in forbidden]
         if not pool:
             return
