@@ -205,15 +205,26 @@ class GameExecutables(GameCalculations):
                 if self._scatter_count() == want:
                     break
         elif self.criteria == "basegame":
-            target = payout_target(self.betmode, self.criteria, self.sim) or 0.4
-            locked: dict[tuple[int, int], str] = {}
-            if require_reel2:
-                locked[(REEL2, random.randrange(self.config.num_rows[REEL2]))] = "S"
-            self.paint_payout(target, locked)
-            if self._scatter_count() >= 3:
-                self._fill_cells("low")
+            target = payout_target(self.betmode, self.criteria, self.sim)
+            if target is None:
+                for _ in range(80):
+                    self._fill_cells("mid")
+                    if require_reel2:
+                        self._place_scatters(1, True)
+                    self.evaluate_ways_board(emit_events=False)
+                    if 0 < float(self.win_data.get("totalWin", 0)) < 500 and self._scatter_count() < 3:
+                        break
+                else:
+                    self.paint_payout(0.4, {(REEL2, 0): "S"} if require_reel2 else {})
+            else:
+                locked: dict[tuple[int, int], str] = {}
                 if require_reel2:
-                    self._place_scatters(1, True)
+                    locked[(REEL2, random.randrange(self.config.num_rows[REEL2]))] = "S"
+                self.paint_payout(target, locked)
+                if self._scatter_count() >= 3:
+                    self._fill_cells("low")
+                    if require_reel2:
+                        self._place_scatters(1, True)
         elif self.criteria == "0":
             self._fill_no_win()
             if require_reel2:
@@ -357,22 +368,44 @@ class GameExecutables(GameCalculations):
         if self.criteria == "dead":
             ceiling = BUY_WILD_COST if self.betmode == "wildbonus" else BUY_BONUS_COST
             aim = min(aim, ceiling - 0.1)
-        need = quantize_win(max(0.0, aim - self.win_manager.running_bet_win))
         last = self.fs >= self.tot_fs
-        if last and need >= 0.2 and not self.wincap_triggered:
+        first = self.fs == 1
+        locked = {key: "W" for key in sticky}
+        if first and aim >= 0.4 and not self.wincap_triggered:
+            slice_ = quantize_win(max(0.2, min(aim * 0.18, 40.0)))
+            if self.criteria == "dead":
+                slice_ = quantize_win(max(0.2, min(aim * 0.35, aim - 0.2)))
             room = self.remaining_to_wincap()
-            if room < 0.2:
-                mix = self._bonus_mix_for_room(lo, hi, remaining)
-                self._hold_respin_body(mix=mix, sticky=sticky)
-                return
-            locked = {key: "W" for key in sticky}
-            self.paint_payout(min(need, room), locked)
+            self.paint_payout(min(slice_, room) if room > 0 else slice_, locked)
             reveal_event(self)
             self.evaluate_ways_board(emit_events=True)
             return
+        if last and not self.wincap_triggered:
+            running = float(self.win_manager.running_bet_win)
+            ceiling = None
+            if self.criteria == "dead":
+                ceiling = BUY_WILD_COST if self.betmode == "wildbonus" else BUY_BONUS_COST
+            need = 0.0
+            if self.criteria == "wincap":
+                need = self.remaining_to_wincap()
+            elif running + 1e-9 < floor:
+                need = quantize_win((aim if aim >= floor else floor) - running)
+            room = self.remaining_to_wincap()
+            if need >= 0.2 and room >= 0.2:
+                if ceiling is not None:
+                    need = min(need, quantize_win(ceiling - 0.1 - running))
+                if need >= 0.2:
+                    self.paint_payout(min(need, room), locked)
+                    reveal_event(self)
+                    self.evaluate_ways_board(emit_events=True)
+                    return
         mix = self._bonus_mix_for_room(lo, hi, remaining)
-        if target is not None and self.win_manager.running_bet_win >= target and remaining > 1:
+        if self.win_manager.running_bet_win >= aim and remaining > 1:
             mix = "zero"
+        if self.criteria == "dead":
+            ceiling = BUY_WILD_COST if self.betmode == "wildbonus" else BUY_BONUS_COST
+            if self.win_manager.running_bet_win >= min(aim, ceiling - 0.2) and remaining > 1:
+                mix = "zero"
         self._hold_respin_body(mix=mix, sticky=sticky)
 
     def force_small_ways_win(self, floor: float) -> None:

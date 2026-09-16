@@ -66,37 +66,71 @@ def _combo_pay(combo: tuple[str, tuple[int, ...]]) -> int:
     return to_tenths(WAYS_PAYTABLE[(len(counts), symbol)]) * ways
 
 
-def _best_single(tenths: int, cap: tuple[int, ...]) -> tuple[str, tuple[int, ...]] | None:
-    idx = bisect.bisect_right(CATALOG_KEYS, tenths) - 1
-    scanned = 0
-    while idx >= 0 and scanned < 80:
-        pay = CATALOG_KEYS[idx]
-        for combo in CATALOG[pay]:
-            if _fits(combo[1], cap):
-                return combo
-        idx -= 1
-        scanned += 1
-    return None
+def _entries() -> list[tuple[int, str, tuple[int, ...]]]:
+    items = []
+    for pay, combos in CATALOG.items():
+        seen: set[str] = set()
+        for symbol, counts in combos:
+            if symbol in seen:
+                continue
+            seen.add(symbol)
+            items.append((pay, symbol, counts))
+    return items
+
+
+def _build_feasible(cap: tuple[int, ...]) -> dict[int, tuple[tuple[str, tuple[int, ...]], ...]]:
+    entries = _entries()
+    kind3 = [item for item in entries if len(item[2]) == 3]
+    feasible: dict[int, tuple[tuple[str, tuple[int, ...]], ...]] = {}
+    for pay, symbol, counts in entries:
+        if _fits(counts, cap):
+            feasible.setdefault(pay, ((symbol, counts),))
+    twos: dict[int, tuple[tuple[str, tuple[int, ...]], ...]] = {}
+    for pay1, symbol1, counts1 in entries:
+        if not _fits(counts1, cap):
+            continue
+        left = _subtract(cap, counts1)
+        for pay2, symbol2, counts2 in entries:
+            if symbol2 == symbol1 or not _fits(counts2, left):
+                continue
+            plan = ((symbol1, counts1), (symbol2, counts2))
+            twos.setdefault(pay1 + pay2, plan)
+            feasible.setdefault(pay1 + pay2, plan)
+    for pay12, plan in twos.items():
+        caps = list(cap)
+        used = {symbol for symbol, _ in plan}
+        for _symbol, counts in plan:
+            for reel, count in enumerate(counts):
+                caps[reel] -= count
+        left = tuple(caps)
+        for pay3, symbol3, counts3 in kind3:
+            if symbol3 in used or not _fits(counts3, left):
+                continue
+            feasible.setdefault(pay12 + pay3, plan + ((symbol3, counts3),))
+    return feasible
+
+
+FEASIBLE = _build_feasible((ROWS,) * REELS)
+FEASIBLE_R2 = _build_feasible((ROWS, ROWS, ROWS - 1, ROWS, ROWS, ROWS))
+FEASIBLE_KEYS = tuple(sorted(FEASIBLE))
+FEASIBLE_R2_KEYS = tuple(sorted(FEASIBLE_R2))
+
+
+def _lookup_feasible(tenths: int, cap: tuple[int, ...]) -> tuple[tuple[str, tuple[int, ...]], ...]:
+    table = FEASIBLE_R2 if cap[2] < ROWS else FEASIBLE
+    keys = FEASIBLE_R2_KEYS if cap[2] < ROWS else FEASIBLE_KEYS
+    tenths = max(2, min(int(tenths), TENTHS_CAP))
+    if tenths in table:
+        return table[tenths]
+    idx = bisect.bisect_right(keys, tenths) - 1
+    if idx < 0:
+        return (("L5", (1, 1, 1)),)
+    return table[keys[idx]]
 
 
 @lru_cache(maxsize=200_000)
 def plan_tenths(tenths: int, cap: tuple[int, ...]) -> tuple[tuple[str, tuple[int, ...]], ...]:
-    """Return one or two ways combos that pay tenths, or the closest under it."""
-    tenths = max(2, min(int(tenths), TENTHS_CAP))
-    exact = [combo for combo in CATALOG.get(tenths, ()) if _fits(combo[1], cap)]
-    if exact:
-        return (exact[len(exact) // 2],)
-
-    first = _best_single(tenths, cap)
-    if first is None:
-        return (("L5", (1, 1, 1)),)
-    rest = tenths - _combo_pay(first)
-    if rest >= 2:
-        left = _subtract(cap, first[1])
-        second = _best_single(rest, left)
-        if second is not None and second[0] != first[0]:
-            return (first, second)
-    return (first,)
+    return _lookup_feasible(tenths, cap)
 
 
 def plan_payout(target: float, cap: tuple[int, ...] | None = None) -> tuple[tuple[str, tuple[int, ...]], ...]:
@@ -112,8 +146,34 @@ def _permute(sim: int, mod: int) -> int:
     return (int(sim) * 1103515245 + 12345) % max(mod, 1)
 
 
+def _keys_between(lo: int, hi: int) -> tuple[int, ...]:
+    return tuple(key for key in FEASIBLE_KEYS if lo <= key < hi)
+
+
+BANDS = {
+    "tiny": _keys_between(2, 10),
+    "small": _keys_between(10, 50),
+    "mid": _keys_between(50, 200),
+    "chunk": _keys_between(200, 1000),
+    "big": _keys_between(1000, 5000),
+    "huge": _keys_between(5000, 25000),
+    "bonus_low": _keys_between(100, 1000),
+    "bonus_mid": _keys_between(1000, 5000),
+    "bonus_high": _keys_between(5000, 40000),
+    "dead": _keys_between(30, 950),
+    "dead_wild": _keys_between(50, 2250),
+    "recoup": _keys_between(950, 150000),
+    "recoup_wild": _keys_between(2250, 150000),
+}
+
+
+def pick_feasible(band: str, sim: int) -> float:
+    keys = BANDS[band]
+    return from_tenths(keys[(int(sim) * 7919) % len(keys)])
+
+
 def payout_target(mode: str, criteria: str, sim: int) -> float | None:
-    """Deterministic 1× target for a book. None means 'no constructed payout'."""
+    """Deterministic 1× target for a book. None means a random natural ways hit."""
     if criteria in {"0"}:
         return 0.0
     if criteria == "wincap":
@@ -122,75 +182,39 @@ def payout_target(mode: str, criteria: str, sim: int) -> float | None:
 
     if criteria == "basegame":
         if lane < 3800:
-            return from_tenths(2 + (lane % 8))  # 0.2–0.9
+            return pick_feasible("tiny", sim)
         if lane < 5600:
-            return from_tenths(10 + _permute(sim, 40))  # 1.0–4.9
-        if lane < 7200:
-            return from_tenths(50 + _permute(sim, 150))  # 5.0–19.9
-        if lane < 8600:
-            return from_tenths(200 + _permute(sim, 800))  # 20–99.9
-        if lane < 9500:
-            return from_tenths(1000 + _permute(sim, 4000))  # 100–499.9
-        return from_tenths(5000 + _permute(sim, 20_000))  # 500–2499.9
+            return pick_feasible("small", sim)
+        if lane < 7000:
+            return pick_feasible("mid", sim)
+        if lane < 8400:
+            return pick_feasible("chunk", sim)
+        if lane < 9400:
+            return pick_feasible("big", sim)
+        if lane < 9700:
+            return pick_feasible("huge", sim)
+        return None
 
     if criteria in {"freegame", "freegame4"}:
         if mode == "scatter" and criteria == "freegame":
-            if lane < 6200:
-                return from_tenths(100 + _permute(sim, 900))  # 10–99.9
-            if lane < 8800:
-                return from_tenths(1000 + _permute(sim, 4000))
-            if lane < 9700:
-                return from_tenths(5000 + _permute(sim, 15000))
-            return from_tenths(20000 + _permute(sim, 80_000))
-        if criteria == "freegame4":
-            if lane < 3500:
-                return from_tenths(120 + _permute(sim, 880))
             if lane < 7000:
-                return from_tenths(1000 + _permute(sim, 4000))
-            if lane < 9000:
-                return from_tenths(5000 + _permute(sim, 20000))
-            return from_tenths(25000 + _permute(sim, 90_000))
-        if lane < 4500:
-            return from_tenths(100 + _permute(sim, 500))  # 10–59.9
-        if lane < 7500:
-            return from_tenths(600 + _permute(sim, 1400))
-        if lane < 9200:
-            return from_tenths(2000 + _permute(sim, 8000))
-        return from_tenths(10000 + _permute(sim, 50_000))
+                return pick_feasible("bonus_low", sim)
+            return pick_feasible("bonus_mid", sim)
+        if criteria == "freegame4" or lane >= 8800:
+            if lane < 7000:
+                return pick_feasible("bonus_mid", sim)
+            return pick_feasible("bonus_high", sim)
+        if lane < 5000:
+            return pick_feasible("bonus_low", sim)
+        if lane < 8500:
+            return pick_feasible("bonus_mid", sim)
+        return pick_feasible("bonus_high", sim)
 
     if criteria == "dead":
-        if mode == "wildbonus":
-            if lane < 3500:
-                return from_tenths(50 + _permute(sim, 100))  # 5–14.9
-            if lane < 7000:
-                return from_tenths(150 + _permute(sim, 250))
-            if lane < 9000:
-                return from_tenths(400 + _permute(sim, 500))
-            return from_tenths(900 + _permute(sim, 1349))  # up to 224.9
-        if lane < 2800:
-            return from_tenths(30 + _permute(sim, 50))  # 3–7.9
-        if lane < 5600:
-            return from_tenths(80 + _permute(sim, 120))
-        if lane < 8000:
-            return from_tenths(200 + _permute(sim, 200))
-        return from_tenths(400 + _permute(sim, 549))  # up to 94.9
+        return pick_feasible("dead_wild" if mode == "wildbonus" else "dead", sim)
 
     if criteria == "recoup":
-        if mode == "wildbonus":
-            if lane < 4000:
-                return from_tenths(2250 + _permute(sim, 1750))  # 225–399.9
-            if lane < 7200:
-                return from_tenths(4000 + _permute(sim, 4000))
-            if lane < 9000:
-                return from_tenths(8000 + _permute(sim, 12000))
-            return from_tenths(20000 + _permute(sim, 80_000))
-        if lane < 4200:
-            return from_tenths(950 + _permute(sim, 450))  # 95–139.9
-        if lane < 7400:
-            return from_tenths(1400 + _permute(sim, 1100))
-        if lane < 9100:
-            return from_tenths(2500 + _permute(sim, 7500))
-        return from_tenths(10000 + _permute(sim, 49_999))
+        return pick_feasible("recoup_wild" if mode == "wildbonus" else "recoup", sim)
 
     return None
 

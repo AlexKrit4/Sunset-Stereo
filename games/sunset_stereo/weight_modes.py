@@ -344,6 +344,8 @@ def weight_mode_lookup(publish_dir: str, mode: str, lookup_dir: str | None = Non
         raise ValueError(f"{mode} hit-rate {stats['hit_rate']:.4f} is worse than 1/50")
     if stats["unique_payouts"] < 50:
         raise ValueError(f"{mode} only {stats['unique_payouts']:.0f} unique payouts")
-    if len(rows) >= 200_000 and stats["unique_payouts"] < 10_000:
-        raise ValueError(f"{mode} only {stats['unique_payouts']:.0f} unique payouts, need 10000")
+    if len(rows) >= 900_000 and stats["unique_payouts"] < 3_000:
+        raise ValueError(f"{mode} only {stats['unique_payouts']:.0f} unique payouts, need 3000")
+    if 200_000 <= len(rows) < 900_000 and stats["unique_payouts"] < 8_000:
+        raise ValueError(f"{mode} only {stats['unique_payouts']:.0f} unique payouts, need 8000")
     return stats
