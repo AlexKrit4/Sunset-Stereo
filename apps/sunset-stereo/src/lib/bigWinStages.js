@@ -12,16 +12,33 @@ export function isBigWin(micro, betMicro) {
   return micro > betMicro * BIG_WIN_MULT;
 }
 
-export function stagesForWin(micro, betMicro) {
+export function stagesForWin(micro, betMicro, fromMicro = 0) {
   const multiple = micro / betMicro;
-  return BIG_WIN_STAGES.filter((stage) => multiple > stage.from).map((stage) => {
-    const toMultiple = Number.isFinite(stage.to) ? Math.min(stage.to, multiple) : multiple;
-    return {
-      ...stage,
-      fromMicro: Math.round(stage.from * betMicro),
-      toMicro: Math.round(toMultiple * betMicro),
-    };
-  });
+  const fromMultiple = Math.max(0, fromMicro / betMicro);
+  if (!(multiple > fromMultiple)) return [];
+  return BIG_WIN_STAGES.filter((stage) => {
+    const stageTo = Number.isFinite(stage.to) ? stage.to : Number.POSITIVE_INFINITY;
+    return multiple > stage.from && fromMultiple < stageTo;
+  })
+    .map((stage) => {
+      const stageTo = Number.isFinite(stage.to) ? stage.to : Number.POSITIVE_INFINITY;
+      const from = Math.max(stage.from, fromMultiple);
+      const to = Math.min(stageTo, multiple);
+      return {
+        ...stage,
+        fromMicro: Math.round(from * betMicro),
+        toMicro: Math.round(to * betMicro),
+      };
+    })
+    .filter((stage) => stage.toMicro > stage.fromMicro);
+}
+
+/** Running total already paid, so a wincap count can start there instead of 0. */
+export function wincapCountFrom(totalMicro, spinWinMicro, hudMicro) {
+  const remainder = totalMicro - spinWinMicro;
+  if (spinWinMicro > 0 && remainder > 0 && remainder < totalMicro) return remainder;
+  if (hudMicro > 0 && hudMicro < totalMicro) return hudMicro;
+  return 0;
 }
 
 const WINCAP_STOP = ["reveal", "updateFreeSpin", "freeSpinEnd", "finalWin"];

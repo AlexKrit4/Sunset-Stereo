@@ -1,4 +1,4 @@
-import { BIG_WIN_STAGES, followingWincap, isBigWin, stagesForWin } from "../src/lib/bigWinStages.js";
+import { BIG_WIN_STAGES, followingWincap, isBigWin, stagesForWin, wincapCountFrom } from "../src/lib/bigWinStages.js";
 
 function assert(cond, message) {
   if (!cond) throw new Error(message);
@@ -41,6 +41,21 @@ assert(sunset.at(-1).toMicro === 250 * bet, "win5 counts through to the actual w
 const cap = stagesForWin(15000 * bet, bet);
 assert(ids(15000 * bet) === "win1,win2,win3,win4,win5", "15000x max win uses every stage");
 assert(cap.at(-1).toMicro === 15000 * bet, "sunset stage counts through to 15000x");
+
+const already = 2307 * bet;
+const remainder = 15000 * bet - already;
+assert(wincapCountFrom(15000 * bet, remainder, already) === already, "wincap starts from the paid total");
+assert(wincapCountFrom(15000 * bet, 15000 * bet, already) === already, "falls back to the HUD if this spin is the whole cap");
+assert(wincapCountFrom(15000 * bet, 15000 * bet, 0) === 0, "a first-spin max win still counts from 0");
+
+const fromPaid = stagesForWin(15000 * bet, bet, already);
+assert(fromPaid.map((stage) => stage.id).join(",") === "win5", "a 2307x book only plays sunset on the cap");
+assert(fromPaid[0].fromMicro === already, "sunset counter does not reset the paid win");
+assert(fromPaid[0].toMicro === 15000 * bet, "sunset counter fills the remaining room to 15000x");
+
+const fromFifty = stagesForWin(15000 * bet, bet, 50 * bet);
+assert(fromFifty.map((stage) => stage.id).join(",") === "win2,win3,win4,win5", "unfinished bands still play after 50x");
+assert(fromFifty[0].fromMicro === 50 * bet, "win2 continues from 50x");
 
 const mathWincap = [
   { index: 0, type: "winInfo", totalWin: 1_269_300 },

@@ -15,8 +15,8 @@ export function isBigWin(micro: number, betMicro = ui.betMicro) {
   return isBigWinAt(micro, betMicro);
 }
 
-export function stagesForWin(micro: number, betMicro = ui.betMicro) {
-  return stagesForWinAt(micro, betMicro);
+export function stagesForWin(micro: number, betMicro = ui.betMicro, fromMicro = 0) {
+  return stagesForWinAt(micro, betMicro, fromMicro);
 }
 
 const STAGE_MS = 8000;
@@ -210,9 +210,12 @@ function finishBigWinAudio() {
   restoreMusicBed();
 }
 
-export async function playBigWin(micro: number) {
-  const stages = stagesForWin(micro, ui.betMicro);
-  if (!stages.length) return;
+export async function playBigWin(micro: number, fromMicro = 0) {
+  const stages = stagesForWin(micro, ui.betMicro, fromMicro);
+  if (!stages.length) {
+    ui.winMicro = micro;
+    return;
+  }
 
   beginBigWinIntro();
 
@@ -222,6 +225,8 @@ export async function playBigWin(micro: number) {
 
     const first = startArmed(stages[0].file);
     const startedAt = performance.now();
+    ui.bigWinDisplayMicro = stages[0].fromMicro;
+    ui.winMicro = stages[0].fromMicro;
     ui.bigWinOpen = true;
     ui.bigWinExplode = false;
     ui.bigWinOutgoingLeft = "";
