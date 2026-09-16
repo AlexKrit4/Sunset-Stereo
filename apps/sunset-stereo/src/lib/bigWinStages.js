@@ -24,25 +24,11 @@ export function stagesForWin(micro, betMicro) {
   });
 }
 
-/** All bands play; win1–win4 hold the paid total; sunset counts the remaining room to the cap. */
-export function stagesForWincap(totalMicro, betMicro, paidMicro) {
-  const stages = stagesForWin(totalMicro, betMicro);
-  const hold = Math.max(0, Math.min(paidMicro, totalMicro));
-  if (hold <= 0) return stages;
-  return stages.map((stage, index, all) => {
-    if (index === all.length - 1) {
-      return { ...stage, fromMicro: hold, toMicro: totalMicro };
-    }
-    return { ...stage, fromMicro: hold, toMicro: hold };
-  });
-}
-
-/** Running total already paid, so a wincap count can start there instead of 0. */
-export function wincapCountFrom(totalMicro, spinWinMicro, hudMicro) {
-  const remainder = totalMicro - spinWinMicro;
-  if (spinWinMicro > 0 && remainder > 0 && remainder < totalMicro) return remainder;
-  if (hudMicro > 0 && hudMicro < totalMicro) return hudMicro;
-  return 0;
+/** This extra play's clamped add toward the cap: 15000× − totalWin already paid. */
+export function wincapStageWin(totalMicro, spinWinMicro, hudMicro) {
+  if (spinWinMicro > 0 && spinWinMicro < totalMicro) return spinWinMicro;
+  if (hudMicro > 0 && hudMicro < totalMicro) return totalMicro - hudMicro;
+  return totalMicro;
 }
 
 const WINCAP_STOP = ["reveal", "updateFreeSpin", "freeSpinEnd", "finalWin"];

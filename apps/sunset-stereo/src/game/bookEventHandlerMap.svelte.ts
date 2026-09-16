@@ -1,6 +1,6 @@
 import { hideSpinWin, roundWinBeatsStake, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelte";
 import { beginBigWinIntro, isBigWin, playBigWin } from "../lib/bigWin";
-import { followingWincap, wincapCountFrom } from "../lib/bigWinStages.js";
+import { followingWincap, wincapStageWin } from "../lib/bigWinStages.js";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { runtime } from "./context";
 import { unpadPosition, winningWays } from "../rgs/bookView";
@@ -208,9 +208,10 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
 
   wincap: async (bookEvent) => {
     const total = multiplierCentsToMicro(bookEvent.amount);
-    const fromMicro = wincapCountFrom(total, lastSpinWinMicro, ui.winMicro);
-    if (isBigWin(total, ui.betMicro) || ui.bigWinIntro) {
-      await playBigWin(total, fromMicro);
+    const spin = wincapStageWin(total, lastSpinWinMicro, ui.winMicro);
+    const paid = Math.max(0, total - spin);
+    if (isBigWin(spin, ui.betMicro) || isBigWin(total, ui.betMicro) || ui.bigWinIntro) {
+      await playBigWin(spin, paid);
     }
     ui.winMicro = total;
     ui.banner = "Max win";

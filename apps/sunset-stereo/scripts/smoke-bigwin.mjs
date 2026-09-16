@@ -1,4 +1,4 @@
-import { BIG_WIN_STAGES, followingWincap, isBigWin, stagesForWin, stagesForWincap, wincapCountFrom } from "../src/lib/bigWinStages.js";
+import { BIG_WIN_STAGES, followingWincap, isBigWin, stagesForWin, wincapStageWin } from "../src/lib/bigWinStages.js";
 
 function assert(cond, message) {
   if (!cond) throw new Error(message);
@@ -44,20 +44,15 @@ assert(cap.at(-1).toMicro === 15000 * bet, "sunset stage counts through to 15000
 
 const already = 2307 * bet;
 const remainder = 15000 * bet - already;
-assert(wincapCountFrom(15000 * bet, remainder, already) === already, "wincap starts from the paid total");
-assert(wincapCountFrom(15000 * bet, 15000 * bet, already) === already, "falls back to the HUD if this spin is the whole cap");
-assert(wincapCountFrom(15000 * bet, 15000 * bet, 0) === 0, "a first-spin max win still counts from 0");
+assert(wincapStageWin(15000 * bet, remainder, already) === remainder, "wincap stages use 15000x minus paid total");
+assert(wincapStageWin(15000 * bet, 15000 * bet, 0) === 15000 * bet, "a first-spin max win still counts the full cap");
 
-const held = stagesForWincap(15000 * bet, bet, already);
-assert(held.map((stage) => stage.id).join(",") === "win1,win2,win3,win4,win5", "wincap still plays every stage");
-assert(held.slice(0, 4).every((stage) => stage.fromMicro === already && stage.toMicro === already), "win1-win4 hold the paid 2307x");
-assert(held.at(-1).id === "win5", "last stage is sunset");
-assert(held.at(-1).fromMicro === already, "sunset starts from the paid win");
-assert(held.at(-1).toMicro === 15000 * bet, "sunset fills the remaining room to 15000x");
-
-const freshCap = stagesForWincap(15000 * bet, bet, 0);
-assert(freshCap.map((stage) => stage.id).join(",") === "win1,win2,win3,win4,win5", "a first-spin cap still uses every stage");
-assert(freshCap[0].fromMicro === 0 && freshCap[0].toMicro === 40 * bet, "first-spin cap still counts win1 from 0");
+const capSpin = stagesForWin(remainder, bet);
+assert(capSpin.map((stage) => stage.id).join(",") === "win1,win2,win3,win4,win5", "remaining 12693x still plays every stage");
+assert(capSpin[0].fromMicro === 0 && capSpin[0].toMicro === 40 * bet, "win1 still counts 0-40x");
+assert(capSpin.at(-1).id === "win5", "last stage is sunset");
+assert(capSpin.at(-1).fromMicro === 200 * bet, "sunset starts at 200x");
+assert(capSpin.at(-1).toMicro === remainder, "sunset ends at 15000x minus the paid 2307x");
 
 const mathWincap = [
   { index: 0, type: "winInfo", totalWin: 1_269_300 },
