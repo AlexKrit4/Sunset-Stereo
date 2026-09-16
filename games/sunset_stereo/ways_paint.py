@@ -485,6 +485,79 @@ def paint_hit_fillers(occupied: dict[tuple[int, int], str], rng) -> list[list[st
     return board
 
 
+def delay_opening_win(seed: int) -> bool:
+    """About 90% of bonus books open on a dead extra play."""
+    return int(seed) % 10 != 0
+
+
+def opening_respin_count(seed: int) -> int:
+    """2 or 3 hold-respins for the first paying extra play."""
+    return 3 if int(seed) % 2 else 2
+
+
+def growing_hold_stages(
+    occupied: dict[tuple[int, int], str],
+    n_respins: int = 2,
+) -> list[dict[tuple[int, int], str]]:
+    """Build 2–3 respins that grow into the final occupied win.
+
+    Returns n_respins+1 occupied maps. The last map is the full win. Sticky
+    wilds stay in every stage. Earlier stages are a valid 3-oak subset when
+    the final win has enough cells; otherwise the same lock is shown while
+    fillers change.
+    """
+    occupied = dict(occupied or {})
+    n_respins = 2 if n_respins < 3 else 3
+    sticky = {key: name for key, name in occupied.items() if name == "W"}
+    by_reel: list[list[tuple[int, int]]] = [[] for _ in range(REELS)]
+    for key in occupied:
+        by_reel[key[0]].append(key)
+    kind = 0
+    for reel in range(REELS):
+        if by_reel[reel]:
+            kind += 1
+        else:
+            break
+
+    def add_reel(dst: dict[tuple[int, int], str], reel: int, one: bool) -> None:
+        cells = by_reel[reel]
+        if not cells:
+            return
+        if one:
+            non_wild = [cell for cell in cells if occupied[cell] != "W"]
+            cell = (non_wild or cells)[0]
+            dst[cell] = occupied[cell]
+            return
+        for cell in cells:
+            dst[cell] = occupied[cell]
+
+    core: dict[tuple[int, int], str] = dict(sticky)
+    for reel in range(min(3, kind)):
+        add_reel(core, reel, one=True)
+    if len(core) < 3 and occupied:
+        core = dict(occupied)
+
+    rest = sorted(key for key in occupied if key not in core)
+    stages = [core]
+    if rest:
+        parts = n_respins - 1
+        chunk = max(1, (len(rest) + parts - 1) // max(1, parts))
+        grown = dict(core)
+        for index, key in enumerate(rest):
+            grown[key] = occupied[key]
+            last_in_part = (index + 1) % chunk == 0 or index == len(rest) - 1
+            if last_in_part and grown != stages[-1]:
+                stages.append(dict(grown))
+            if len(stages) >= n_respins:
+                break
+    full = dict(occupied)
+    if stages[-1] != full:
+        stages.append(full)
+    while len(stages) < n_respins + 1:
+        stages.insert(-1, dict(stages[-1]))
+    return stages[-n_respins - 1 :]
+
+
 def filler_column_reels(board: list[list[str]], occupied: dict[tuple[int, int], str]) -> list[int]:
     """Reels whose non-win cells are a 3+ stack of one filler symbol."""
     stacked = []

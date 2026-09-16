@@ -397,6 +397,69 @@ def test_bonus_paying_extra_plays_hold_and_respin():
         assert paid >= 1, (mode, criteria)
 
 
+def test_growing_hold_stages_are_two_or_three_respins():
+    from ways_paint import growing_hold_stages, opening_respin_count
+
+    occupied = {
+        (0, 0): "H1",
+        (0, 1): "H1",
+        (1, 0): "H1",
+        (1, 1): "H1",
+        (2, 0): "H1",
+        (3, 0): "H1",
+        (4, 0): "H1",
+        (5, 2): "W",
+    }
+    for seed in (2, 3):
+        n_respins = opening_respin_count(seed)
+        stages = growing_hold_stages(occupied, n_respins=n_respins)
+        assert len(stages) == n_respins + 1
+        assert stages[-1] == occupied
+        assert (5, 2) in stages[0]
+        assert len(stages[0]) <= len(stages[-1])
+
+
+def test_bonus_opening_swaps_first_pay_and_stages_it():
+    from ways_paint import delay_opening_win
+
+    delayed = 0
+    staged = 0
+    for mode, criteria in (
+        ("bonus", "dead"),
+        ("wildbonus", "dead"),
+        ("bonus", "recoup"),
+        ("wildbonus", "recoup"),
+        ("base", "freegame"),
+        ("base", "freegame4"),
+    ):
+        for sim in range(16):
+            _state, book = _mode_book(mode, criteria, sim)
+            payout = book["payoutMultiplier"]
+            types = [event["type"] for event in book["events"]]
+            chunks = _extra_play_chunks(types)
+            if not chunks:
+                continue
+            assert types.count("updateFreeSpin") == 10 or "wincap" in types
+            has_dead = any("winInfo" not in chunk for chunk in chunks)
+            first_pays = "winInfo" in chunks[0]
+            if has_dead and delay_opening_win(sim) and "wincap" not in chunks[0]:
+                delayed += 1
+                assert not first_pays, (mode, criteria, sim, chunks[0])
+            if first_pays:
+                holds = chunks[0].count("holdRespin")
+                assert holds in (2, 3), (mode, criteria, sim, chunks[0])
+                assert chunks[0].count("reveal") >= holds + 1
+            paying = [chunk for chunk in chunks if "winInfo" in chunk]
+            if not paying:
+                continue
+            assert any(chunk.count("holdRespin") in (2, 3) for chunk in paying), (mode, criteria, sim)
+            staged += 1
+            final = next(event for event in book["events"] if event["type"] == "finalWin")
+            assert int(final["amount"]) == int(payout)
+    assert delayed >= 8
+    assert staged >= 8
+
+
 def _mode_book(mode: str, criteria: str, sim: int):
     from gamestate import GameState
 

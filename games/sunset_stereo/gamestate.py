@@ -24,7 +24,16 @@ class GameState(GameStateOverride):
                     f"spin {sim} mode={self.betmode} criteria={self.criteria} "
                     f"stuck at win={self.final_win} after {self.repeat_count} retries"
                 )
+        self._apply_bonus_opening()
         self.imprint_wins()
+
+    def _apply_bonus_opening(self) -> None:
+        from patch_bonus_opening import transform_book
+
+        blob = self.book.to_json()
+        blob["id"] = int(getattr(self, "sim", 0))
+        if transform_book(blob):
+            self.book.events = blob["events"]
 
     def run_freespin(self):
         self.reset_fs_spin()
