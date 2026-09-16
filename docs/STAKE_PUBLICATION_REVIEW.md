@@ -92,7 +92,7 @@ From the ACP play modal:
 
 1. Authenticate loads balance and bet levels.
 2. Spin → Play `mode: "base"` → animations from `round.state.events` → EndRound.
-3. Disconnect/reload finishes an active round (the player resumes `round.active` on authenticate).
+3. Disconnect/reload finishes an active round (the player resumes `round.active` on authenticate). HUD stake and win display use `round.amount` (the original Play base bet), not `config.defaultBetLevel`. RGS still pays `payoutMultiplier × amount`.
 4. Replay URL (mandatory later for review):
 
 `?replay=true&game={gameId}&version={mathVersion}&mode=base&event={bookId}&rgs_url={rgs host}`
