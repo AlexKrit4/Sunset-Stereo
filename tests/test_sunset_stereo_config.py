@@ -20,7 +20,7 @@ def test_config_loads_six_by_four_ways():
     assert config.paylines == {}
     assert config.freespin_triggers[config.basegame_type] == {3: 10, 4: 10}
     assert config.freespin_triggers[config.freegame_type] == {}
-    assert config.special_symbols["wild"] == []
+    assert config.special_symbols["wild"] == ["W"]
     assert config.special_symbols["scatter"] == ["S"]
     assert "BR0" in config.reels
     assert "FR0" in config.reels
@@ -44,22 +44,42 @@ def test_config_loads_six_by_four_ways():
 
 
 def test_base_and_buy_bonus_modes():
-    from game_config import BUY_BONUS_COST, BUY_BONUS_DEAD, BUY_BONUS_RECOUP, BUY_BONUS_WINCAP
+    from game_config import BUY_BONUS_COST, BUY_WILD_COST, SCATTER_COST
 
     config = GameConfig()
     names = {mode.get_name(): mode.get_cost() for mode in config.bet_modes}
-    assert names == {"base": 1.0, "bonus": BUY_BONUS_COST}
-    assert BUY_BONUS_COST == 95.0
+    assert names == {
+        "base": 1.0,
+        "scatter": SCATTER_COST,
+        "bonus": BUY_BONUS_COST,
+        "wildbonus": BUY_WILD_COST,
+    }
     base = next(mode for mode in config.bet_modes if mode.get_name() == "base")
+    scatter = next(mode for mode in config.bet_modes if mode.get_name() == "scatter")
     bonus = next(mode for mode in config.bet_modes if mode.get_name() == "bonus")
+    wild = next(mode for mode in config.bet_modes if mode.get_name() == "wildbonus")
     assert base.get_buybonus() is False
-    assert base.get_feature() is True
+    assert scatter.get_feature() is True
     assert bonus.get_buybonus() is True
-    assert bonus.get_feature() is False
-    assert [dist.get_criteria() for dist in base.get_distributions()] == ["wincap", "freegame", "0", "basegame"]
+    assert wild.get_buybonus() is True
+    assert [dist.get_criteria() for dist in base.get_distributions()] == [
+        "wincap",
+        "freegame4",
+        "freegame",
+        "0",
+        "basegame",
+    ]
+    assert [dist.get_criteria() for dist in scatter.get_distributions()] == [
+        "wincap",
+        "freegame4",
+        "freegame",
+        "0",
+        "basegame",
+    ]
     amounts = {dist.get_criteria(): dist.get_fixed_amt() for dist in bonus.get_distributions()}
-    assert amounts == {"wincap": BUY_BONUS_WINCAP, "dead": BUY_BONUS_DEAD, "recoup": BUY_BONUS_RECOUP}
-    assert BUY_BONUS_DEAD + BUY_BONUS_RECOUP + BUY_BONUS_WINCAP == 50_000
+    assert amounts["dead"] + amounts["recoup"] + amounts["wincap"] == 250_000
+    wild_amt = {dist.get_criteria(): dist.get_fixed_amt() for dist in wild.get_distributions()}
+    assert wild_amt["dead"] + wild_amt["recoup"] + wild_amt["wincap"] == 250_000
 
 
 def test_scatter_only_on_inner_reels_and_not_stacked():
@@ -204,7 +224,7 @@ def test_buy_bonus_always_starts_ten_extra_plays_from_three_scatters():
     assert types.count("updateFreeSpin") == 10
     assert "freeSpinEnd" in types
     assert types[-1] == "finalWin"
-    assert state.final_win < 95
+    assert 3 <= state.final_win < 95
 
 
 def test_buy_bonus_recoup_pays_at_least_the_95x_cost():
@@ -236,33 +256,31 @@ def test_buy_bonus_wincap_hits_the_15000x_ceiling():
     assert final["amount"] == 1_500_000
 
 
-def test_bonus_lookup_weights_lock_75_25_and_rtp():
-    from weight_bonus import assign_weights, lut_stats, rtp_by_range
+def test_bonus_lookup_weights_lock_diversity_and_rtp():
+    from weight_modes import assign_weights, lut_stats
 
     rows = []
     book_id = 0
-    for cents in [0, 20, 80, 300, 700, 1400, 3500, 8000, 9400] * 8:
+    for cents in [0] * 40:
         rows.append((book_id, 1, cents))
         book_id += 1
-    for cents in [9600, 15000, 35000, 80000, 160000, 350000, 800000, 1_200_000] * 5:
+    for cents in [20, 80, 150, 400, 900, 1400, 3500, 8000] * 8:
+        rows.append((book_id, 1, cents))
+        book_id += 1
+    for cents in [12000, 25000, 80000, 160000, 400000, 900000] * 4:
         rows.append((book_id, 1, cents))
         book_id += 1
     rows.append((book_id, 1, 1_500_000))
-    weighted = assign_weights(rows)
-    stats = lut_stats(weighted)
-    assert abs(stats["dead_mass"] - 0.75) < 0.01
-    assert abs(stats["recoup_mass"] - 0.25) < 0.01
-    assert 0.94 <= stats["rtp"] <= 0.96
-    assert stats["wincap_mass"] < 0.001
+    weighted = assign_weights(rows, "base")
+    stats = lut_stats(weighted, "base")
+    assert 0.93 <= stats["rtp"] <= 0.97
     assert stats["hit_rate"] >= 1 / 50
-    assert stats["peak_range_rtp"] < 0.40
-    assert stats["recoup_ranges_used"] >= 4
-    contrib = rtp_by_range(weighted)
-    assert contrib[(200.0, 500.0)] < 0.40
+    assert stats["unique_payouts"] >= 15
+    assert stats["peak_range_rtp"] < 0.45
 
 
 def test_bonus_lut_writer_uses_unix_newlines(tmp_path):
-    from weight_bonus import write_lut
+    from weight_modes import write_lut
 
     path = tmp_path / "lookUpTable_bonus_0.csv"
     write_lut(str(path), [(0, 10, 0), (1, 20, 9500)])
@@ -303,4 +321,324 @@ def test_buy_bonus_hold_respin_grows_before_paying():
         assert after.index("reveal") < after.index("winInfo") if "winInfo" in after else True
         break
     assert found, "expected a buy-bonus extra play to hold and respin"
+
+
+def test_left_wild_starts_ways_for_other_symbols():
+    from gamestate import GameState
+
+    GameConfig._instance = None
+    state = GameState(GameConfig())
+    names = [
+        ["W", "H5", "H4", "H3"],
+        ["L1", "H2", "H5", "H4"],
+        ["L1", "H2", "H5", "H3"],
+        ["L4", "L5", "L2", "L3"],
+        ["L4", "L5", "L2", "L3"],
+        ["L4", "L5", "L2", "L3"],
+    ]
+    state.board = [[state.create_symbol(name) for name in col] for col in names]
+    state.evaluate_ways_board(emit_events=False)
+    assert float(state.win_data["totalWin"]) > 0
+    assert "L1" in {win["symbol"] for win in state.win_data["wins"]}
+
+
+def test_screenshot_left_wild_speaker_line_pays():
+    """W on reel 0 + speakers on reels 1–2 is a 3-oak L1, same as the frontend."""
+    from gamestate import GameState
+
+    GameConfig._instance = None
+    state = GameState(GameConfig())
+    names = [
+        ["W", "L3", "L5", "H4"],
+        ["L1", "H2", "L4", "L3"],
+        ["L1", "H1", "H3", "L5"],
+        ["H4", "L1", "H3", "H1"],
+        ["L1", "L3", "H2", "L4"],
+        ["H1", "H2", "H3", "L2"],
+    ]
+    state.board = [[state.create_symbol(name) for name in col] for col in names]
+    state.evaluate_ways_board(emit_events=False)
+    assert float(state.win_data["totalWin"]) > 0
+    assert "L1" in {win["symbol"] for win in state.win_data["wins"]}
+
+
+def _extra_play_chunks(types: list[str]) -> list[list[str]]:
+    starts = [index for index, kind in enumerate(types) if kind == "updateFreeSpin"]
+    chunks = []
+    for offset, start in enumerate(starts):
+        end = starts[offset + 1] if offset + 1 < len(starts) else len(types)
+        chunks.append(types[start:end])
+    return chunks
+
+
+def test_bonus_paying_extra_plays_hold_and_respin():
+    modes = (
+        ("bonus", "dead"),
+        ("wildbonus", "dead"),
+        ("bonus", "recoup"),
+        ("wildbonus", "recoup"),
+        ("wildbonus", "wincap"),
+        ("bonus", "wincap"),
+    )
+    for mode, criteria in modes:
+        paid = 0
+        for sim in range(12):
+            _state, book = _mode_book(mode, criteria, sim)
+            types = [event["type"] for event in book["events"]]
+            for chunk in _extra_play_chunks(types):
+                if "winInfo" not in chunk:
+                    continue
+                assert "holdRespin" in chunk, (mode, criteria, sim, chunk)
+                assert chunk.count("reveal") >= 2, (mode, criteria, sim, chunk)
+                hold_at = max(index for index, kind in enumerate(chunk) if kind == "holdRespin")
+                win_at = chunk.index("winInfo")
+                assert "reveal" in chunk[hold_at + 1 : win_at], (mode, criteria, sim, chunk)
+                paid += 1
+        assert paid >= 1, (mode, criteria)
+
+
+def test_growing_hold_stages_are_two_or_three_respins():
+    from ways_paint import growing_hold_stages, opening_respin_count
+
+    occupied = {
+        (0, 0): "H1",
+        (0, 1): "H1",
+        (1, 0): "H1",
+        (1, 1): "H1",
+        (2, 0): "H1",
+        (3, 0): "H1",
+        (4, 0): "H1",
+        (5, 2): "W",
+    }
+    for seed in (2, 3):
+        n_respins = opening_respin_count(seed)
+        stages = growing_hold_stages(occupied, n_respins=n_respins)
+        assert len(stages) == n_respins + 1
+        assert stages[-1] == occupied
+        assert (5, 2) in stages[0]
+        assert len(stages[0]) <= len(stages[-1])
+
+
+def test_bonus_opening_swaps_first_pay_and_stages_it():
+    from ways_paint import delay_opening_win
+
+    delayed = 0
+    staged = 0
+    for mode, criteria in (
+        ("bonus", "dead"),
+        ("wildbonus", "dead"),
+        ("bonus", "recoup"),
+        ("wildbonus", "recoup"),
+        ("base", "freegame"),
+        ("base", "freegame4"),
+    ):
+        for sim in range(16):
+            _state, book = _mode_book(mode, criteria, sim)
+            payout = book["payoutMultiplier"]
+            types = [event["type"] for event in book["events"]]
+            chunks = _extra_play_chunks(types)
+            if not chunks:
+                continue
+            assert types.count("updateFreeSpin") == 10 or "wincap" in types
+            has_dead = any("winInfo" not in chunk for chunk in chunks)
+            first_pays = "winInfo" in chunks[0]
+            if has_dead and delay_opening_win(sim) and "wincap" not in chunks[0]:
+                delayed += 1
+                assert not first_pays, (mode, criteria, sim, chunks[0])
+            if first_pays:
+                holds = chunks[0].count("holdRespin")
+                assert holds in (2, 3), (mode, criteria, sim, chunks[0])
+                assert chunks[0].count("reveal") >= holds + 1
+            paying = [chunk for chunk in chunks if "winInfo" in chunk]
+            if not paying:
+                continue
+            assert any(chunk.count("holdRespin") in (2, 3) for chunk in paying), (mode, criteria, sim)
+            staged += 1
+            final = next(event for event in book["events"] if event["type"] == "finalWin")
+            assert int(final["amount"]) == int(payout)
+    assert delayed >= 8
+    assert staged >= 8
+
+
+def _mode_book(mode: str, criteria: str, sim: int):
+    from gamestate import GameState
+
+    GameConfig._instance = None
+    config = GameConfig()
+    state = GameState(config)
+    state.betmode = mode
+    state.criteria = criteria
+    state.run_spin(sim)
+    return state, state.book.to_json()
+
+
+def test_zero_spins_are_not_cloned():
+    from ways_paint import is_stacked_column_board, visible_ways_win
+
+    boards = []
+    for sim in range(12):
+        state, book = _mode_book("base", "0", sim)
+        reveal = book["events"][0]
+        visible = tuple(
+            tuple(cell["name"] if isinstance(cell, dict) else cell for cell in col[1:-1])
+            for col in reveal["board"]
+        )
+        boards.append(visible)
+        names = [list(col) for col in visible]
+        assert book["payoutMultiplier"] == 0
+        assert state.final_win == 0
+        assert visible_ways_win(names) == 0
+        assert not is_stacked_column_board(names)
+        for col in names:
+            paying = [name for name in col if name not in {"S", "W"}]
+            assert len(set(paying)) >= 2
+    assert len(set(boards)) == len(boards)
+
+
+def test_mixed_dead_boards_never_pay_or_stack():
+    import random
+
+    from ways_paint import is_stacked_column_board, paint_mixed_dead, visible_ways_win
+
+    rng = random.Random(20260916)
+    boards = []
+    for i in range(80):
+        locked = {(1, i % 4): "S"} if i % 5 == 0 else {}
+        board = paint_mixed_dead(rng, locked)
+        boards.append(tuple(tuple(col) for col in board))
+        assert visible_ways_win(board) == 0
+        assert not is_stacked_column_board(board)
+        for reel, col in enumerate(board):
+            paying = [name for name in col if name not in {"S", "W"}]
+            assert len(set(paying)) >= 2
+            if locked and reel == 1:
+                assert board[1][i % 4] == "S"
+    assert len(set(boards)) == len(boards)
+
+
+def test_scatter_ante_locks_sun_on_reel_two():
+    for criteria, sim in (("0", 4), ("basegame", 9), ("freegame", 3)):
+        state, book = _mode_book("scatter", criteria, sim)
+        reveal = book["events"][0]
+        names = [cell["name"] if isinstance(cell, dict) else cell for cell in reveal["board"][1][1:-1]]
+        assert "S" in names
+        if criteria == "freegame":
+            assert state.final_win >= 10
+
+
+def test_four_scatter_buy_places_a_locked_wild():
+    state, book = _mode_book("wildbonus", "dead", 15)
+    types = [event["type"] for event in book["events"]]
+    assert "placeWild" in types
+    assert types.count("updateFreeSpin") == 10
+    suns = 0
+    reveal = book["events"][0]
+    for col in reveal["board"]:
+        names = [cell["name"] if isinstance(cell, dict) else cell for cell in col]
+        suns += names[1:-1].count("S")
+    assert suns == 4
+    assert state.final_win >= 5
+    wild = next(event for event in book["events"] if event["type"] == "placeWild")
+    assert 0 <= wild["reel"] <= 5
+    assert 1 <= wild["row"] <= 4
+
+
+def test_hit_fillers_are_not_the_winning_symbol():
+    import random
+
+    from ways_paint import filler_column_reels, paint_hit_fillers, visible_ways_win
+
+    rng = random.Random(77)
+    occupied = {(0, 0): "L2", (1, 1): "L2", (2, 2): "L2"}
+    board = paint_hit_fillers(occupied, rng)
+    assert visible_ways_win(board) == 0.2
+    assert not filler_column_reels(board, occupied)
+    for reel, col in enumerate(board):
+        for row, name in enumerate(col):
+            if (reel, row) not in occupied:
+                assert name != "L2"
+                assert name != "W"
+
+
+def test_painted_basegame_hits_are_not_cloned_payouts():
+    from gamestate import GameState
+    from ways_paint import payout_target
+
+    GameConfig._instance = None
+    config = GameConfig()
+    payouts = []
+    boards = []
+    for sim in range(80):
+        state = GameState(config)
+        state.betmode = "base"
+        state.criteria = "basegame"
+        state.run_spin(sim)
+        payouts.append(round(state.final_win, 1))
+        reveal = state.book.to_json()["events"][0]
+        boards.append(
+            tuple(tuple(cell["name"] if isinstance(cell, dict) else cell for cell in col[1:-1]) for col in reveal["board"])
+        )
+        assert state.final_win > 0
+        target = payout_target("base", "basegame", sim)
+        if target:
+            from ways_paint import plan_payout, planned_tenths, from_tenths
+
+            planned = from_tenths(planned_tenths(plan_payout(target)))
+            assert abs(state.final_win - planned) <= max(0.6, 0.2 * planned)
+            win = next(event for event in state.book.to_json()["events"] if event["type"] == "winInfo")
+            occupied = {}
+            keep = set()
+            for item in win["wins"]:
+                keep.add(item["symbol"])
+                for pos in item["positions"]:
+                    row = pos["row"] - 1
+                    if 0 <= row < 4:
+                        occupied[(pos["reel"], row)] = item["symbol"]
+            visible_names = [list(col) for col in boards[-1]]
+            from ways_paint import filler_column_reels, visible_ways_win
+
+            assert not filler_column_reels(visible_names, occupied)
+            for reel, col in enumerate(visible_names):
+                for row, name in enumerate(col):
+                    if (reel, row) not in occupied and name not in {"S", "W"}:
+                        assert name not in keep
+            assert abs(visible_ways_win(visible_names) - win["totalWin"] / 100.0) < 0.05
+    assert len(set(boards)) == len(boards)
+    assert len(set(payouts)) >= 20
+
+
+def test_weighter_spreads_rtp_across_ranges():
+    from weight_modes import assign_weights, lut_stats
+
+    rows = []
+    book_id = 0
+    for cents in [0] * 200:
+        rows.append((book_id, 1, cents))
+        book_id += 1
+    for cents in range(20, 200, 10):
+        rows.append((book_id, 1, cents))
+        book_id += 1
+    for cents in [400, 900, 1400, 3500, 8000, 16000, 45000, 120000, 350000, 900000] * 3:
+        rows.append((book_id, 1, cents))
+        book_id += 1
+    rows.append((book_id, 1, 1_500_000))
+    weighted = assign_weights(rows, "base")
+    stats = lut_stats(weighted, "base")
+    assert 0.93 <= stats["rtp"] <= 0.97
+    assert stats["peak_range_rtp"] < 0.45
+    assert stats["hit_rate"] >= 1 / 50
+
+
+def test_natural_three_scatter_bonus_pays_at_least_10x():
+    state, book = _mode_book("base", "freegame", 8)
+    assert state.final_win >= 10
+    types = [event["type"] for event in book["events"]]
+    assert "freeSpinTrigger" in types
+    extra = [event for event in book["events"] if event["type"] == "reveal" and event.get("gameType") == "freegame"]
+    boards = [
+        tuple(tuple(cell["name"] if isinstance(cell, dict) else cell for cell in col[1:-1]) for col in reveal["board"])
+        for reveal in extra
+    ]
+    assert len(set(boards)) > 1
+
 

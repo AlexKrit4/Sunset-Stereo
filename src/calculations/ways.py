@@ -46,6 +46,20 @@ class Ways:
                     if board[reel][row].check_attribute(multiplier_key):
                         wilds[reel][-1][multiplier_key] = board[reel][row].get_attribute(multiplier_key)
 
+        if wilds[0]:
+            paying_symbols = {symbol for _kind, symbol in config.paytable}
+            n_reels = len(board)
+            seeded = []
+            for symbol in paying_symbols:
+                if symbol not in potential_wins:
+                    potential_wins[symbol] = [[] for _ in range(n_reels)]
+                    seeded.append(symbol)
+            seeded = set(seeded)
+            for reel in range(n_reels):
+                for row, sym in enumerate(board[reel]):
+                    if sym.name in seeded:
+                        potential_wins[sym.name][reel].append({"reel": reel, "row": row})
+
         for symbol in potential_wins:
             kind, ways, cumulative_sym_mult = (0, 1, 0)
             for reel, _ in enumerate(potential_wins[symbol]):

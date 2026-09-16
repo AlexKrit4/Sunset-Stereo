@@ -44,6 +44,18 @@ bonus:
 	SUNSET_SIM_MODE=bonus $(PYTHON) games/sunset_stereo/run.py
 	$(PYTHON) games/sunset_stereo/copy_publish.py
 
+scatter:
+	SUNSET_SIM_MODE=scatter $(PYTHON) games/sunset_stereo/run.py
+	$(PYTHON) games/sunset_stereo/copy_publish.py
+
+wildbonus:
+	SUNSET_SIM_MODE=wildbonus $(PYTHON) games/sunset_stereo/run.py
+	$(PYTHON) games/sunset_stereo/copy_publish.py
+
+math:
+	SUNSET_SIM_MODE=all $(PYTHON) games/sunset_stereo/run.py
+	$(PYTHON) games/sunset_stereo/copy_publish.py
+
 test:
 	cd $(CURDIR)
 	$(VENV_PY) -m pytest tests/
