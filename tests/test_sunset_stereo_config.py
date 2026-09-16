@@ -406,6 +406,23 @@ def test_four_scatter_buy_places_a_locked_wild():
     assert 1 <= wild["row"] <= 4
 
 
+def test_hit_fillers_are_not_the_winning_symbol():
+    import random
+
+    from ways_paint import filler_column_reels, paint_hit_fillers, visible_ways_win
+
+    rng = random.Random(77)
+    occupied = {(0, 0): "L2", (1, 1): "L2", (2, 2): "L2"}
+    board = paint_hit_fillers(occupied, rng)
+    assert visible_ways_win(board) == 0.2
+    assert not filler_column_reels(board, occupied)
+    for reel, col in enumerate(board):
+        for row, name in enumerate(col):
+            if (reel, row) not in occupied:
+                assert name != "L2"
+                assert name != "W"
+
+
 def test_painted_basegame_hits_are_not_cloned_payouts():
     from gamestate import GameState
     from ways_paint import payout_target
@@ -431,6 +448,24 @@ def test_painted_basegame_hits_are_not_cloned_payouts():
 
             planned = from_tenths(planned_tenths(plan_payout(target)))
             assert abs(state.final_win - planned) <= max(0.6, 0.2 * planned)
+            win = next(event for event in state.book.to_json()["events"] if event["type"] == "winInfo")
+            occupied = {}
+            keep = set()
+            for item in win["wins"]:
+                keep.add(item["symbol"])
+                for pos in item["positions"]:
+                    row = pos["row"] - 1
+                    if 0 <= row < 4:
+                        occupied[(pos["reel"], row)] = item["symbol"]
+            visible_names = [list(col) for col in boards[-1]]
+            from ways_paint import filler_column_reels, visible_ways_win
+
+            assert not filler_column_reels(visible_names, occupied)
+            for reel, col in enumerate(visible_names):
+                for row, name in enumerate(col):
+                    if (reel, row) not in occupied and name not in {"S", "W"}:
+                        assert name not in keep
+            assert abs(visible_ways_win(visible_names) - win["totalWin"] / 100.0) < 0.05
     assert len(set(boards)) == len(boards)
     assert len(set(payouts)) >= 20
 

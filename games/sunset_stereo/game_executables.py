@@ -6,7 +6,7 @@ from game_config import BONUS_PAYING, BUY_BONUS_COST, BUY_WILD_COST, REEL2, SCAT
 from game_events import hold_respin_event, place_wild_event
 from src.calculations.ways import Ways
 from src.events.events import reveal_event, wincap_event
-from ways_paint import paint_mixed_dead, paint_mixed_pads, plan_payout, payout_target, row_picks
+from ways_paint import paint_hit_fillers, paint_mixed_dead, paint_mixed_pads, plan_payout, payout_target, row_picks
 
 
 def quantize_win(value: float) -> float:
@@ -155,33 +155,22 @@ class GameExecutables(GameCalculations):
         paying = {symbol for symbol, _counts in plan}
         salt = sum(ord(ch) for ch in str(self.criteria)) + self.repeat_count * 13
         rng = random.Random((self.sim + 1) * 9176 + salt)
-        pool = [symbol for symbol in BONUS_PAYING if symbol not in paying]
-        rng.shuffle(pool)
-        reel_fill = []
-        for reel in range(self.config.num_reels):
-            pick = pool[reel % len(pool)]
-            if reel_fill and pick == reel_fill[-1]:
-                pick = pool[(reel + 1) % len(pool)]
-            reel_fill.append(pick)
+        occupied: dict[tuple[int, int], str] = dict(locked)
         rows = self.config.num_rows
-        board = [[None] * rows[reel] for reel in range(self.config.num_reels)]
-        for reel in range(self.config.num_reels):
-            for row in range(rows[reel]):
-                if (reel, row) in locked:
-                    board[reel][row] = self.create_symbol(locked[(reel, row)])
-                    continue
-                board[reel][row] = self.create_symbol(reel_fill[reel])
-        occupied = {key: True for key in locked}
         for symbol, counts in plan:
             for reel, count in enumerate(counts):
                 blocked = {row for row in range(rows[reel]) if (reel, row) in occupied}
                 for row in row_picks(count, blocked, rng):
-                    board[reel][row] = self.create_symbol(symbol)
-                    occupied[(reel, row)] = True
+                    occupied[(reel, row)] = symbol
+        names = paint_hit_fillers(occupied, rng)
+        board = [[None] * rows[reel] for reel in range(self.config.num_reels)]
+        for reel in range(self.config.num_reels):
+            for row in range(rows[reel]):
+                board[reel][row] = self.create_symbol(names[reel][row])
         self.board = board
-        pad_mix = "low"
-        self.top_symbols = [self.create_symbol(self._pick(pad_mix)) for _ in range(self.config.num_reels)]
-        self.bottom_symbols = [self.create_symbol(self._pick(pad_mix)) for _ in range(self.config.num_reels)]
+        tops, bottoms = paint_mixed_pads(rng, names, forbidden=paying)
+        self.top_symbols = [self.create_symbol(name) for name in tops]
+        self.bottom_symbols = [self.create_symbol(name) for name in bottoms]
         self.reel_positions = [rng.randrange(256) for _ in range(self.config.num_reels)]
         self.refresh_special_syms()
         self.get_special_symbols_on_board()

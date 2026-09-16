@@ -379,20 +379,102 @@ def paint_mixed_dead(rng, locked: dict[tuple[int, int], str] | None = None) -> l
     return board
 
 
-def paint_mixed_pads(rng, visible: list[list[str]] | None = None) -> tuple[list[str], list[str]]:
+def paint_mixed_pads(rng, visible: list[list[str]] | None = None, forbidden: set[str] | None = None) -> tuple[list[str], list[str]]:
     """Padding cells, also mixed — not a copy of the visible stack."""
-    tops = [_pick_zero(rng) for _ in range(REELS)]
-    bottoms = [_pick_zero(rng) for _ in range(REELS)]
+    banned = set(forbidden or ())
+    pool = [symbol for symbol in BONUS_PAYING if symbol not in banned] or list(BONUS_PAYING)
+    tops = [_pick_pool(rng, pool) for _ in range(REELS)]
+    bottoms = [_pick_pool(rng, pool) for _ in range(REELS)]
     if not visible:
         return tops, bottoms
     for reel in range(REELS):
         stack = {name for name in visible[reel] if name in PAYING_SET}
         if len(stack) == 1:
             only = next(iter(stack))
+            alt = [symbol for symbol in pool if symbol != only] or pool
             if tops[reel] == only:
-                alt = [symbol for symbol in BONUS_PAYING if symbol != only]
                 tops[reel] = rng.choice(alt)
             if bottoms[reel] == only:
-                alt = [symbol for symbol in BONUS_PAYING if symbol != only]
                 bottoms[reel] = rng.choice(alt)
     return tops, bottoms
+
+
+def _pick_pool(rng, pool: list[str]) -> str:
+    if not pool:
+        return _pick_zero(rng)
+    if len(pool) == 1:
+        return pool[0]
+    weights = [ZERO_WEIGHTS[BONUS_PAYING.index(symbol)] for symbol in pool]
+    return rng.choices(pool, weights=weights, k=1)[0]
+
+
+def _oak_kind(board: list[list[str]], symbol: str) -> int:
+    kind = 0
+    for col in board:
+        if any(name == symbol or name == "W" for name in col):
+            kind += 1
+        else:
+            break
+    return kind
+
+
+def _break_unwanted_oaks(board: list[list[str]], occupied: dict[tuple[int, int], str], keep: set[str], rng) -> None:
+    """Kill extra 3-oaks of filler symbols without moving win/scatter/wild cells."""
+    pool = [symbol for symbol in BONUS_PAYING if symbol not in keep]
+    if not pool:
+        return
+    for _ in range(24):
+        extras = [symbol for symbol in BONUS_PAYING if symbol not in keep and _oak_kind(board, symbol) >= 3]
+        if not extras:
+            return
+        symbol = extras[0]
+        moved = False
+        for reel in (2, 1, 0, 3, 4, 5):
+            for row in _unlocked_rows(reel, occupied):
+                if board[reel][row] != symbol:
+                    continue
+                board[reel][row] = _pick_pool(rng, pool)
+                moved = True
+            if _oak_kind(board, symbol) < 3:
+                break
+        if not moved:
+            return
+
+
+def paint_hit_fillers(occupied: dict[tuple[int, int], str], rng) -> list[list[str]]:
+    """Keep win/scatter/wild cells; mix every other cell with non-winning symbols."""
+    occupied = dict(occupied or {})
+    keep = {name for name in occupied.values() if name in PAYING_SET}
+    pool = [symbol for symbol in BONUS_PAYING if symbol not in keep]
+    if not pool:
+        pool = list(BONUS_PAYING)
+    board: list[list[str]] = [[""] * ROWS for _ in range(REELS)]
+    for _ in range(40):
+        for reel in range(REELS):
+            for row in range(ROWS):
+                if (reel, row) in occupied:
+                    board[reel][row] = occupied[(reel, row)]
+                else:
+                    board[reel][row] = _pick_pool(rng, pool)
+        for reel in range(REELS):
+            _cap_reel_stacks(board, reel, occupied, rng, forbidden=keep)
+        _break_unwanted_oaks(board, occupied, keep, rng)
+        leaked = any(
+            (reel, row) not in occupied and board[reel][row] in keep
+            for reel in range(REELS)
+            for row in range(ROWS)
+        )
+        extras = [symbol for symbol in BONUS_PAYING if symbol not in keep and _oak_kind(board, symbol) >= 3]
+        if not leaked and not extras:
+            return board
+    return board
+
+
+def filler_column_reels(board: list[list[str]], occupied: dict[tuple[int, int], str]) -> list[int]:
+    """Reels whose non-win cells are a 3+ stack of one filler symbol."""
+    stacked = []
+    for reel, col in enumerate(board):
+        fillers = [col[row] for row in range(len(col)) if (reel, row) not in occupied and col[row] in PAYING_SET]
+        if len(fillers) >= 3 and len(set(fillers)) == 1:
+            stacked.append(reel)
+    return stacked

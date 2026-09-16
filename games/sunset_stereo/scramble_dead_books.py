@@ -19,7 +19,9 @@ sys.path.insert(0, HERE)
 
 from game_config import BONUS_PAYING  # noqa: E402
 from ways_paint import (  # noqa: E402
+    filler_column_reels,
     is_stacked_column_board,
+    paint_hit_fillers,
     paint_mixed_dead,
     paint_mixed_pads,
     visible_ways_win,
@@ -62,6 +64,21 @@ def _looks_column_dead(visible: list[list[str]]) -> bool:
     return is_stacked_column_board(visible)
 
 
+def _apply_board(event: dict, names: list[list[str]], rng) -> None:
+    board = event["board"]
+    keep = {name for col in names for name in col if name in PAYING}
+    tops, bottoms = paint_mixed_pads(rng, names, forbidden=keep)
+    new_board = []
+    for reel, col in enumerate(board):
+        rebuilt = [_cell_json(tops[reel], col[0])]
+        for row, name in enumerate(names[reel]):
+            rebuilt.append(_cell_json(name, col[1 + row] if len(col) > 1 + row else None))
+        rebuilt.append(_cell_json(bottoms[reel], col[-1]))
+        new_board.append(rebuilt)
+    event["board"] = new_board
+    event["paddingPositions"] = [rng.randrange(256) for _ in range(6)]
+
+
 def _rewrite_reveal(event: dict, book_id: int, salt: int) -> bool:
     board = event.get("board")
     if not board:
@@ -72,39 +89,59 @@ def _rewrite_reveal(event: dict, book_id: int, salt: int) -> bool:
     names = paint_mixed_dead(rng, locked)
     if visible_ways_win(names) != 0:
         return False
-    tops, bottoms = paint_mixed_pads(rng, names)
-    new_board = []
-    for reel, col in enumerate(board):
-        rebuilt = [_cell_json(tops[reel], col[0])]
-        for row, name in enumerate(names[reel]):
-            rebuilt.append(_cell_json(name, col[1 + row] if len(col) > 1 + row else None))
-        rebuilt.append(_cell_json(bottoms[reel], col[-1]))
-        new_board.append(rebuilt)
-    event["board"] = new_board
-    event["paddingPositions"] = [rng.randrange(256) for _ in range(6)]
+    _apply_board(event, names, rng)
     return True
 
 
-def _reveal_pays(events: list, index: int) -> bool:
+def _wininfo_after(events: list, index: int) -> dict | None:
     for nxt in events[index + 1 :]:
         if nxt.get("type") == "reveal":
-            return False
+            return None
         if nxt.get("type") == "winInfo":
-            return True
-    return False
+            return nxt
+    return None
+
+
+def _occupied_from_wininfo(win: dict, visible: list[list[str]]) -> dict[tuple[int, int], str]:
+    occupied = _locked_from_visible(visible)
+    for item in win.get("wins") or []:
+        for pos in item.get("positions") or []:
+            reel = int(pos["reel"])
+            row = int(pos["row"]) - 1
+            if 0 <= reel < 6 and 0 <= row < 4:
+                occupied[(reel, row)] = visible[reel][row]
+    return occupied
+
+
+def _rewrite_hit_reveal(event: dict, win: dict, book_id: int, salt: int) -> bool:
+    board = event.get("board")
+    if not board:
+        return False
+    visible = _visible(board)
+    occupied = _occupied_from_wininfo(win, visible)
+    before = visible_ways_win(visible)
+    rng = random.Random((int(book_id) + 1) * 9001 + salt * 31)
+    names = paint_hit_fillers(occupied, rng)
+    if visible_ways_win(names) != before:
+        return False
+    if names == visible and not filler_column_reels(visible, occupied):
+        return False
+    _apply_board(event, names, rng)
+    return True
 
 
 def scramble_book(book: dict) -> bool:
     events = book.get("events") or []
     changed = False
-    payout = int(book.get("payoutMultiplier") or 0)
     reveal_i = 0
     for index, event in enumerate(events):
         if event.get("type") != "reveal":
             continue
         visible = _visible(event.get("board") or [])
-        rewrite = payout == 0 or (not _reveal_pays(events, index) and _looks_column_dead(visible))
-        if rewrite:
+        win = _wininfo_after(events, index)
+        if win:
+            changed = _rewrite_hit_reveal(event, win, int(book.get("id") or 0), reveal_i) or changed
+        elif _looks_column_dead(visible):
             changed = _rewrite_reveal(event, int(book.get("id") or 0), reveal_i) or changed
         reveal_i += 1
     return changed
@@ -143,8 +180,36 @@ def patch_mode(mode: str) -> tuple[int, int]:
     return total, changed
 
 
+DEMO = os.path.join(ROOT, "apps", "sunset-stereo", "src", "rgs", "demoBooks.json")
+
+
+def scramble_demo() -> int:
+    if not os.path.isfile(DEMO):
+        return 0
+    with open(DEMO, encoding="utf-8") as handle:
+        pack = json.load(handle)
+    changed = 0
+    for key, books in pack.items():
+        if not isinstance(books, list):
+            continue
+        for book in books:
+            if scramble_book(book):
+                changed += 1
+    with open(DEMO, "w", encoding="utf-8") as handle:
+        json.dump(pack, handle, separators=(",", ":"))
+        handle.write("\n")
+    print(f"demoBooks: {changed} books rewritten")
+    return changed
+
+
 def main() -> None:
-    modes = sys.argv[1:] or list(MODES)
+    args = sys.argv[1:]
+    if args == ["demo"] or "demo" in args:
+        scramble_demo()
+        args = [item for item in args if item != "demo"]
+        if not args:
+            return
+    modes = args or list(MODES)
     for mode in modes:
         print(f"patching {mode}", flush=True)
         total, changed = patch_mode(mode)
