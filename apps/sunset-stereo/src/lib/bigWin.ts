@@ -132,6 +132,11 @@ async function waitForClipEnd(
 }
 
 function countStage(fromMicro: number, toMicro: number, ms: number) {
+  if (toMicro === fromMicro) {
+    ui.bigWinDisplayMicro = fromMicro;
+    if (!ui.bigWinFreezeHudMicro) ui.winMicro = fromMicro;
+    return waitForTimeout(ms);
+  }
   return new Promise<void>((resolve) => {
     const started = performance.now();
     const tick = (now: number) => {
@@ -141,17 +146,17 @@ function countStage(fromMicro: number, toMicro: number, ms: number) {
       }
       const progress = Math.min(1, (now - started) / ms);
       ui.bigWinDisplayMicro = Math.round(fromMicro + (toMicro - fromMicro) * easeOutCount(progress));
-      ui.winMicro = ui.bigWinDisplayMicro;
+      if (!ui.bigWinFreezeHudMicro) ui.winMicro = ui.bigWinDisplayMicro;
       if (progress < 1) {
         requestAnimationFrame(tick);
         return;
       }
       ui.bigWinDisplayMicro = toMicro;
-      ui.winMicro = toMicro;
+      if (!ui.bigWinFreezeHudMicro) ui.winMicro = toMicro;
       resolve();
     };
     ui.bigWinDisplayMicro = fromMicro;
-    ui.winMicro = fromMicro;
+    if (!ui.bigWinFreezeHudMicro) ui.winMicro = fromMicro;
     requestAnimationFrame(tick);
   });
 }
@@ -183,6 +188,7 @@ function resetOverlay() {
   ui.bigWinOutgoingLeft = "";
   ui.bigWinOutgoingRight = "";
   ui.bigWinDisplayMicro = 0;
+  ui.bigWinFreezeHudMicro = 0;
 }
 
 /** Mute the lounge bed and start bzzz as soon as winning symbols sheen. */
@@ -210,9 +216,12 @@ function finishBigWinAudio() {
   restoreMusicBed();
 }
 
-export async function playBigWin(micro: number) {
+export async function playBigWin(micro: number, freezeHudMicro = 0) {
   const stages = stagesForWin(micro, ui.betMicro);
-  if (!stages.length) return;
+  if (!stages.length) {
+    ui.winMicro = freezeHudMicro || micro;
+    return;
+  }
 
   beginBigWinIntro();
 
@@ -220,8 +229,11 @@ export async function playBigWin(micro: number) {
     await startFinished;
     if (!introActive) return;
 
+    ui.bigWinFreezeHudMicro = Math.max(0, freezeHudMicro);
     const first = startArmed(stages[0].file);
     const startedAt = performance.now();
+    ui.bigWinDisplayMicro = stages[0].fromMicro;
+    if (!ui.bigWinFreezeHudMicro) ui.winMicro = stages[0].fromMicro;
     ui.bigWinOpen = true;
     ui.bigWinExplode = false;
     ui.bigWinOutgoingLeft = "";

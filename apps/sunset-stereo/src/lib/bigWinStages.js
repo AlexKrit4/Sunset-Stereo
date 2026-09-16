@@ -23,3 +23,25 @@ export function stagesForWin(micro, betMicro) {
     };
   });
 }
+
+/** This extra play's clamped add toward the cap: 15000× − totalWin already paid. */
+export function wincapStageWin(totalMicro, spinWinMicro, hudMicro) {
+  if (spinWinMicro > 0 && spinWinMicro < totalMicro) return spinWinMicro;
+  if (hudMicro > 0 && hudMicro < totalMicro) return totalMicro - hudMicro;
+  return totalMicro;
+}
+
+const WINCAP_STOP = ["reveal", "updateFreeSpin", "freeSpinEnd", "finalWin"];
+
+/** Math books emit winInfo → wincap and skip setWin. Demo books may still send setWin first. */
+export function followingWincap(events, current) {
+  let start = events.indexOf(current);
+  if (start < 0) start = events.findIndex((event) => event.index === current.index);
+  if (start < 0) return null;
+  for (let index = start + 1; index < events.length; index += 1) {
+    const event = events[index];
+    if (event.type === "wincap") return event;
+    if (WINCAP_STOP.includes(event.type)) return null;
+  }
+  return null;
+}
