@@ -1,5 +1,6 @@
 import { hideSpinWin, roundWinBeatsStake, showSpinWin, ui, waitForBonusStart } from "../lib/ui.svelte";
 import { beginBigWinIntro, isBigWin, playBigWin } from "../lib/bigWin";
+import { followingWincap } from "../lib/bigWinStages.js";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { runtime } from "./context";
 import { unpadPosition, winningWays } from "../rgs/bookView";
@@ -123,11 +124,11 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     await board.placeWildFromCamera({ reel: bookEvent.reel, row: bookEvent.row });
   },
 
-  winInfo: async (bookEvent) => {
+  winInfo: async (bookEvent, context) => {
     pendingWinLines = winningWays(bookEvent.wins);
     const positions = bookEvent.wins.flatMap((win) => win.positions);
     const sheenWin = multiplierCentsToMicro(bookEvent.totalWin);
-    if (isBigWin(sheenWin, ui.betMicro)) {
+    if (isBigWin(sheenWin, ui.betMicro) || followingWincap(context.bookEvents, bookEvent)) {
       beginBigWinIntro();
     }
     await runtime.board?.showBookWins(positions);
@@ -138,6 +139,10 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     const micro = multiplierCentsToMicro(bookEvent.amount);
     const totalCents = upcomingTotalWinCents(context.bookEvents, bookEvent);
     const roundWin = totalCents != null ? multiplierCentsToMicro(totalCents) : micro;
+    const cap = followingWincap(context.bookEvents, bookEvent);
+    if (cap) {
+      return;
+    }
     if (micro <= 0) {
       ui.winMicro = roundWin;
       hideSpinWin();
@@ -164,6 +169,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   },
 
   setTotalWin: async (bookEvent) => {
+    if (ui.bigWinIntro || ui.bigWinOpen) return;
     ui.winMicro = multiplierCentsToMicro(bookEvent.amount);
   },
 
@@ -197,9 +203,14 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     ui.mix = bookEvent.globalMult;
   },
 
-  wincap: async () => {
+  wincap: async (bookEvent) => {
+    const total = multiplierCentsToMicro(bookEvent.amount);
+    if (isBigWin(total, ui.betMicro) || ui.bigWinIntro) {
+      await playBigWin(total);
+    }
+    ui.winMicro = total;
     ui.banner = "Max win";
-    await waitForTimeout(400);
+    await waitForTimeout(1800);
   },
 
   freeSpinEnd: async (bookEvent) => {
@@ -222,7 +233,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
 
   finalWin: async (bookEvent) => {
     ui.winMicro = multiplierCentsToMicro(bookEvent.amount);
-    ui.banner = "";
+    if (ui.banner !== "Max win") ui.banner = "";
     await waitForTimeout(120);
   },
 };

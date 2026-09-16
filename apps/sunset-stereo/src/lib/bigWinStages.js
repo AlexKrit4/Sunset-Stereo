@@ -23,3 +23,18 @@ export function stagesForWin(micro, betMicro) {
     };
   });
 }
+
+const WINCAP_STOP = ["reveal", "updateFreeSpin", "freeSpinEnd", "finalWin"];
+
+/** Math books emit winInfo → wincap and skip setWin. Demo books may still send setWin first. */
+export function followingWincap(events, current) {
+  let start = events.indexOf(current);
+  if (start < 0) start = events.findIndex((event) => event.index === current.index);
+  if (start < 0) return null;
+  for (let index = start + 1; index < events.length; index += 1) {
+    const event = events[index];
+    if (event.type === "wincap") return event;
+    if (WINCAP_STOP.includes(event.type)) return null;
+  }
+  return null;
+}

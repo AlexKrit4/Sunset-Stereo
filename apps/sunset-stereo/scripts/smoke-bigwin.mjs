@@ -1,4 +1,4 @@
-import { BIG_WIN_STAGES, isBigWin, stagesForWin } from "../src/lib/bigWinStages.js";
+import { BIG_WIN_STAGES, followingWincap, isBigWin, stagesForWin } from "../src/lib/bigWinStages.js";
 
 function assert(cond, message) {
   if (!cond) throw new Error(message);
@@ -37,5 +37,34 @@ const sunset = stagesForWin(250 * bet, bet);
 assert(sunset.at(-1).id === "win5", "final stage is sunset");
 assert(sunset.at(-1).fromMicro === 200 * bet, "win5 starts at 200x");
 assert(sunset.at(-1).toMicro === 250 * bet, "win5 counts through to the actual win");
+
+const cap = stagesForWin(15000 * bet, bet);
+assert(ids(15000 * bet) === "win1,win2,win3,win4,win5", "15000x max win uses every stage");
+assert(cap.at(-1).toMicro === 15000 * bet, "sunset stage counts through to 15000x");
+
+const mathWincap = [
+  { index: 0, type: "winInfo", totalWin: 1_269_300 },
+  { index: 1, type: "wincap", amount: 1_500_000 },
+  { index: 2, type: "setTotalWin", amount: 1_500_000 },
+  { index: 3, type: "freeSpinEnd", amount: 1_500_000 },
+  { index: 4, type: "finalWin", amount: 1_500_000 },
+];
+assert(followingWincap(mathWincap, mathWincap[0])?.type === "wincap", "math books emit wincap right after winInfo");
+
+const demoWincap = [
+  { index: 0, type: "winInfo", totalWin: 1_500_000 },
+  { index: 1, type: "setWin", amount: 1_269_300 },
+  { index: 2, type: "setTotalWin", amount: 1_500_000 },
+  { index: 3, type: "wincap", amount: 1_500_000 },
+];
+assert(followingWincap(demoWincap, demoWincap[1])?.amount === 1_500_000, "demo books still expose wincap after setWin");
+
+const laterSpin = [
+  { index: 0, type: "setWin", amount: 80_000 },
+  { index: 1, type: "setTotalWin", amount: 230_700 },
+  { index: 2, type: "updateFreeSpin", amount: 4, total: 10 },
+  { index: 3, type: "wincap", amount: 1_500_000 },
+];
+assert(followingWincap(laterSpin, laterSpin[0]) == null, "a later extra play wincap does not attach to this setWin");
 
 console.log("bigwin stages ok");
