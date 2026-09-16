@@ -4,6 +4,7 @@ import { runtime } from "./context";
 import { cancelBonusIntro, hideSpinWin, ui } from "../lib/ui.svelte";
 import { unlockMusic } from "../lib/music";
 import { createEngineHandle, fetchReplayBook, type EngineHandle, type BookState } from "../rgs/session";
+import { roundModeFlags, roundStakeAmount, stakeFromAuthenticate } from "../rgs/roundStake.js";
 import type { Round } from "stake-engine";
 
 export const betMachine = createMachine({
@@ -38,6 +39,18 @@ async function waitForBoard(timeoutMs = 20000) {
     }
     await new Promise((resolve) => setTimeout(resolve, 40));
   }
+}
+
+function applyRoundBet(round: Round) {
+  const amount = roundStakeAmount(round);
+  if (amount != null) ui.betMicro = amount;
+}
+
+function applyRestoredRound(round: Round) {
+  applyRoundBet(round);
+  const flags = roundModeFlags(round.mode);
+  ui.scatterBuyOn = flags.scatterBuyOn;
+  ui.wildBonus = flags.wildBonus;
 }
 
 function listenForEngineEvents() {
@@ -75,12 +88,15 @@ export async function bootEngine() {
   ui.balanceMicro = auth.balance.amount;
   ui.currency = auth.balance.currency;
   ui.betLevels = auth.config.betLevels?.length ? auth.config.betLevels : ui.betLevels;
-  ui.betMicro = auth.config.defaultBetLevel || ui.betLevels[0];
+  ui.betMicro = stakeFromAuthenticate(auth) || ui.betLevels[0];
   ui.social = auth.jurisdictionFlags.socialCasino || engine.query.social;
   ui.disableSpacebar = auth.jurisdictionFlags.disabledSpacebar;
   ui.disableBuyFeature = Boolean(auth.jurisdictionFlags.disabledBuyFeature);
   ui.disableAutoplay = Boolean(auth.jurisdictionFlags.disabledAutoplay);
-  if (auth.round?.active) pendingRestore = auth.round;
+  if (auth.round?.active) {
+    pendingRestore = auth.round;
+    applyRestoredRound(auth.round);
+  }
   ui.ready = true;
 }
 
@@ -90,6 +106,7 @@ export async function playPendingRestore() {
   pendingRestore = null;
   ui.busy = true;
   try {
+    applyRestoredRound(round);
     await playEngineRound(round);
     const ended = await engine.EndRound();
     ui.balanceMicro = ended.balance.amount;
@@ -100,6 +117,7 @@ export async function playPendingRestore() {
 
 async function playEngineRound(round: Round) {
   await waitForBoard();
+  applyRoundBet(round);
   const book = engine!.bookFromRound(round);
   ui.winMicro = 0;
   ui.banner = "";

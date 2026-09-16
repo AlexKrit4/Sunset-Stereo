@@ -45,7 +45,7 @@ function asBook(state: unknown, fallbackMult = 0): BookState {
   throw new Error("Unexpected RGS round state.");
 }
 
-function createMockClient() {
+function createMockClient(query: EngineQuery) {
   const demoPack = demo as {
     books: BookState[];
     bonusBooks?: BookState[];
@@ -63,6 +63,38 @@ function createMockClient() {
   let nextBonus = 0;
   let nextScatter = 0;
   let nextWildBonus = 0;
+  const restoreAmount = Number(query.amount);
+  const restoring = Boolean(query.restore) && !query.replay;
+  const restoredStake = restoring && Number.isFinite(restoreAmount) && restoreAmount > 0 ? restoreAmount : API_MULTIPLIER;
+
+  if (restoring) {
+    const pool =
+      query.mode === "bonus"
+        ? bonusBooks
+        : query.mode === "scatter"
+          ? scatterBooks
+          : query.mode === "wildbonus"
+            ? wildBonusBooks
+            : books;
+    const allBooks = [...books, ...bonusBooks, ...scatterBooks, ...wildBonusBooks];
+    const book =
+      (query.event ? allBooks.find((item) => String(item.id) === String(query.event)) : undefined) ??
+      pool[0] ??
+      books[0];
+    if (!book) throw new Error("No mock book to restore.");
+    const payout = Math.round((book.payoutMultiplier / 100) * restoredStake);
+    const debit = Math.round(restoredStake * (MODE_COST[query.mode] ?? 1));
+    if (debit > 0 && debit <= balance) balance -= debit;
+    active = {
+      betID: 1,
+      amount: restoredStake,
+      payout,
+      payoutMultiplier: book.payoutMultiplier / 100,
+      active: true,
+      mode: query.mode || "base",
+      state: book,
+    };
+  }
 
   return {
     kind: "mock" as const,
@@ -73,7 +105,7 @@ function createMockClient() {
           minBet: DEFAULT_LEVELS[0],
           maxBet: DEFAULT_LEVELS[DEFAULT_LEVELS.length - 1],
           stepBet: DEFAULT_LEVELS[0],
-          defaultBetLevel: API_MULTIPLIER,
+          defaultBetLevel: restoring ? 100 * API_MULTIPLIER : API_MULTIPLIER,
           betLevels: DEFAULT_LEVELS,
         },
         jurisdictionFlags: { ...DEFAULT_FLAGS },
@@ -149,7 +181,7 @@ export function createEngineHandle(): EngineHandle {
       bookFromRound: (round) => asBook(round.state, Math.round((round.payoutMultiplier ?? 0) * 100)),
     };
   }
-  const mock = createMockClient();
+  const mock = createMockClient(query);
   return {
     kind: "mock",
     query,

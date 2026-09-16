@@ -11,6 +11,7 @@ export type EngineQuery = {
   social: boolean;
   currency: string;
   amount: string;
+  restore: boolean;
 };
 
 export function readEngineQuery(search = window.location.search): EngineQuery {
@@ -28,6 +29,7 @@ export function readEngineQuery(search = window.location.search): EngineQuery {
     social: params.get("social") === "true",
     currency: params.get("currency") || "USD",
     amount: params.get("amount") || "",
+    restore: params.get("restore") === "true",
   };
 }
 
