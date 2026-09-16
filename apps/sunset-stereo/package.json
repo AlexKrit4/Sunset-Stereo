@@ -10,6 +10,7 @@
     "smoke:math": "node scripts/smoke-math.mjs",
     "smoke:bigwin": "node scripts/smoke-bigwin.mjs",
     "smoke:round-stake": "node scripts/smoke-round-stake.mjs",
+    "smoke:round-stake-ui": "node scripts/smoke-round-stake-ui.mjs",
     "smoke": "node scripts/smoke.mjs",
     "smoke:wild": "node scripts/smoke-wildbonus.mjs"
   },
