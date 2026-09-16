@@ -52,6 +52,9 @@ function stopClips() {
 function makeClip(file: string) {
   const clip = new Audio(audioUrl(file));
   clip.preload = "auto";
+  clip.playsInline = true;
+  clip.setAttribute("playsinline", "true");
+  clip.setAttribute("webkit-playsinline", "true");
   clip.volume = 0;
   clips.push(clip);
   return clip;

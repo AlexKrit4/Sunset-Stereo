@@ -21,6 +21,9 @@ function makeLoop(file: string) {
   const audio = new Audio(trackUrl(file));
   audio.loop = true;
   audio.preload = "auto";
+  audio.playsInline = true;
+  audio.setAttribute("playsinline", "true");
+  audio.setAttribute("webkit-playsinline", "true");
   audio.volume = 0;
   return audio;
 }

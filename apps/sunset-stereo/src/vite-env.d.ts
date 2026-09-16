@@ -1,6 +1,11 @@
 /// <reference types="svelte" />
 /// <reference types="vite/client" />
 
+declare module "*.mp3?url" {
+  const src: string;
+  export default src;
+}
+
 declare module "*.json" {
   const value: unknown;
   export default value;

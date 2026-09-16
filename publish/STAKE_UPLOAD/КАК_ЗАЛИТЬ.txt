@@ -19,10 +19,10 @@ FRONTEND: статический Vite-билд (base="./"), без внешни�
    Распакуй в Z:\ — получится Z:\Sunset Stereo\frontend
    В ACP выбери папку frontend. В ней должны быть:
      index.html
-     assets\
-     audio\
+     assets\   (js, css, png, mp3)
      sunset-scene.jpg
    Не грузи внешние шрифты и не оборачивай папку ещё одним корнем.
+   Музыка лежит в assets/, не в отдельной папке audio/.
 
 3) Игра в ACP
    Game id: sunset_stereo
