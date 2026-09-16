@@ -1,27 +1,48 @@
+import loungeUrl from "../assets/audio/golden-hour-lounge.mp3?url";
+import bonusUrl from "../assets/audio/sunset-bonus-loop.mp3?url";
+import bzzzUrl from "../assets/audio/bigwin/bzzz.mp3?url";
+import startUrl from "../assets/audio/bigwin/start.mp3?url";
+import win1Url from "../assets/audio/bigwin/win1.mp3?url";
+import win2Url from "../assets/audio/bigwin/win2.mp3?url";
+import win3Url from "../assets/audio/bigwin/win3.mp3?url";
+import win4Url from "../assets/audio/bigwin/win4.mp3?url";
+import win5Url from "../assets/audio/bigwin/win5.mp3?url";
+import endUrl from "../assets/audio/bigwin/end.mp3?url";
+
 const BASE = import.meta.env.BASE_URL;
 
-export const AUDIO_PATHS = [
-  "audio/golden-hour-lounge.mp3",
-  "audio/sunset-bonus-loop.mp3",
-  "audio/bigwin/bzzz.mp3",
-  "audio/bigwin/start.mp3",
-  "audio/bigwin/win1.mp3",
-  "audio/bigwin/win2.mp3",
-  "audio/bigwin/win3.mp3",
-  "audio/bigwin/win4.mp3",
-  "audio/bigwin/win5.mp3",
-  "audio/bigwin/end.mp3",
-];
+const AUDIO_URLS: Record<string, string> = {
+  "audio/golden-hour-lounge.mp3": loungeUrl,
+  "audio/sunset-bonus-loop.mp3": bonusUrl,
+  "audio/bigwin/bzzz.mp3": bzzzUrl,
+  "audio/bigwin/start.mp3": startUrl,
+  "audio/bigwin/win1.mp3": win1Url,
+  "audio/bigwin/win2.mp3": win2Url,
+  "audio/bigwin/win3.mp3": win3Url,
+  "audio/bigwin/win4.mp3": win4Url,
+  "audio/bigwin/win5.mp3": win5Url,
+  "audio/bigwin/end.mp3": endUrl,
+};
 
-const blobUrls = new Map<string, string>();
+export const AUDIO_PATHS = Object.keys(AUDIO_URLS);
 
 export function assetUrl(path: string) {
+  if (/^(?:blob:|data:|https?:)/i.test(path)) return path;
   const trimmed = path.replace(/^\.\//, "");
-  return new URL(`${BASE}${trimmed}`, document.baseURI).href;
+  const imported = AUDIO_URLS[trimmed];
+  const relative = imported || `${BASE}${trimmed}`;
+  return new URL(relative, pageBase()).href;
 }
 
 export function audioSrc(path: string) {
-  return blobUrls.get(path) || assetUrl(path);
+  return assetUrl(path);
+}
+
+function pageBase() {
+  const url = new URL(document.baseURI || document.location.href);
+  url.search = "";
+  url.hash = "";
+  return url.href;
 }
 
 async function bufferFromResponse(
@@ -55,10 +76,18 @@ async function bufferFromResponse(
   return out.buffer;
 }
 
-async function warmAudio(url: string) {
+function prepareClip(url: string) {
   const clip = new Audio();
   clip.preload = "auto";
+  clip.playsInline = true;
+  clip.setAttribute("playsinline", "true");
+  clip.setAttribute("webkit-playsinline", "true");
   clip.src = url;
+  return clip;
+}
+
+async function warmAudio(url: string) {
+  const clip = prepareClip(url);
   await new Promise<void>((resolve) => {
     let settled = false;
     const done = () => {
@@ -73,6 +102,16 @@ async function warmAudio(url: string) {
     if (clip.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) done();
     else clip.load();
   });
+}
+
+async function cacheAudio(url: string, onBytes: (received: number, total: number) => void) {
+  try {
+    const response = await fetch(url, { cache: "force-cache", mode: "same-origin" });
+    if (!response.ok) return;
+    await bufferFromResponse(response, onBytes);
+  } catch {
+    /* Engine CSP may block fetch; the audio element still loads the same URL. */
+  }
 }
 
 export async function preloadAudio(onProgress: (ratio: number) => void) {
@@ -98,25 +137,16 @@ export async function preloadAudio(onProgress: (ratio: number) => void) {
 
   await Promise.all(
     files.map(async (file) => {
-      try {
-        const response = await fetch(assetUrl(file.path), { cache: "force-cache" });
-        if (!response.ok) throw new Error(`${file.path} ${response.status}`);
-        const buffer = await bufferFromResponse(response, (received, total) => {
-          file.received = received;
-          file.total = total;
-          report();
-        });
-        const blob = new Blob([buffer], { type: "audio/mpeg" });
-        const url = URL.createObjectURL(blob);
-        blobUrls.set(file.path, url);
-        await warmAudio(url);
-        file.received = file.total || file.received;
-        file.done = true;
+      const url = assetUrl(file.path);
+      await cacheAudio(url, (received, total) => {
+        file.received = received;
+        file.total = total;
         report();
-      } catch {
-        file.done = true;
-        report();
-      }
+      });
+      await warmAudio(url);
+      file.received = file.total || file.received;
+      file.done = true;
+      report();
     }),
   );
   onProgress(1);

@@ -22,9 +22,9 @@
 
   function continueBoot() {
     if (!ui.bootReady && !ui.error) return;
-    ui.bootOpen = false;
     bootMusic();
     unlockMusic();
+    ui.bootOpen = false;
     unbindMusic = bindMusicUnlock();
     void playPendingRestore();
   }
