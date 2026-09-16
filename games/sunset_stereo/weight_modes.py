@@ -323,7 +323,44 @@ def assign_weights(rows: list[tuple[int, int, int]], mode: str) -> list[tuple[in
         for book_id, _ in buckets["wincap"]:
             weights[book_id] = each
     gcd = _gcd_many(weights.values())
-    return [(book_id, max(1, weights[book_id] // gcd), cents) for book_id, _, cents in rows]
+    out = [(book_id, max(1, weights[book_id] // gcd), cents) for book_id, _, cents in rows]
+    return _finalize_weights(out, mode)
+
+
+def _finalize_weights(rows: list[tuple[int, int, int]], mode: str) -> list[tuple[int, int, int]]:
+    """Lock RTP onto 95% after integer weights so modes stay within 0.5%."""
+    cost = MODE_COST[mode]
+    knob_ids = {
+        book_id
+        for book_id, _, cents in rows
+        if cents / 100.0 < min(40.0 * cost, 500.0)
+    }
+    if not knob_ids:
+        knob_ids = {book_id for book_id, _, cents in rows if cents > 0}
+    knob_w = sum(weight for book_id, weight, _ in rows if book_id in knob_ids)
+    knob_e = sum(weight * (cents / 100.0) for book_id, weight, cents in rows if book_id in knob_ids)
+    rest_w = sum(weight for book_id, weight, _ in rows if book_id not in knob_ids)
+    rest_e = sum(weight * (cents / 100.0) for book_id, weight, cents in rows if book_id not in knob_ids)
+
+    def rtp_at(mult: float) -> float:
+        total_w = rest_w + knob_w * mult
+        expected = rest_e + knob_e * mult
+        return expected / max(total_w, 1e-12) / cost
+
+    best_m = 1.0
+    best_err = abs(rtp_at(1.0) - TARGET_RTP)
+    for step in list(range(4, 481, 4)) + list(range(70, 141)):
+        mult = step / 100.0
+        err = abs(rtp_at(mult) - TARGET_RTP)
+        if err < best_err:
+            best_m, best_err = mult, err
+    out = []
+    for book_id, weight, cents in rows:
+        if book_id in knob_ids:
+            weight = max(1, int(round(weight * best_m)))
+        out.append((book_id, weight, cents))
+    gcd = _gcd_many(weight for _, weight, _ in out)
+    return [(book_id, max(1, weight // gcd), cents) for book_id, weight, cents in out]
 
 
 def lut_stats(rows: list[tuple[int, int, int]], mode: str) -> dict[str, float]:
