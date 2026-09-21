@@ -8,16 +8,16 @@
   import BuyMenu from "./components/BuyMenu.svelte";
   import Loader from "./components/Loader.svelte";
   import { bootEngine, playBet, playBuyBonus, playBuyWildBonus, playPendingRestore } from "./game/betMachine.svelte";
-  import { changeBet, confirmBonusStart, ui } from "./lib/ui.svelte";
+  import { changeBet, confirmBonusStart, stopAutoplay, ui } from "./lib/ui.svelte";
   import { bindMusicUnlock, bootMusic, musicBedFromUi, setMusicBed, unlockMusic } from "./lib/music";
   import { preloadGame } from "./lib/preload";
 
   let unbindMusic = () => {};
 
   async function spin() {
-    if (ui.bootOpen) return;
+    if (ui.bootOpen) return false;
     unlockMusic();
-    await playBet(ui.scatterBuyOn ? "scatter" : "base");
+    return playBet(ui.scatterBuyOn ? "scatter" : "base");
   }
 
   function continueBoot() {
@@ -38,6 +38,8 @@
     if (
       ui.bootOpen ||
       !ui.autoplayOn ||
+      ui.autoplayLeft <= 0 ||
+      ui.autoplayMenuOpen ||
       ui.busy ||
       !ui.ready ||
       ui.replay ||
@@ -51,9 +53,11 @@
     ) {
       return;
     }
-    const timer = window.setTimeout(() => {
-      void spin();
-    }, 280);
+    const timer = window.setTimeout(async () => {
+      const ok = await spin();
+      if (!ui.autoplayOn) return;
+      if (!ok || ui.autoplayLeft <= 0) stopAutoplay();
+    }, ui.fastPlay ? 90 : 280);
     return () => window.clearTimeout(timer);
   });
 
@@ -92,6 +96,11 @@
           ui.buyMenuOpen = false;
           return;
         }
+        if (ui.autoplayMenuOpen) {
+          event.preventDefault();
+          ui.autoplayMenuOpen = false;
+          return;
+        }
         if (ui.trayOpen) {
           event.preventDefault();
           ui.trayOpen = false;
@@ -105,6 +114,7 @@
         ui.buyMenuOpen ||
         ui.buyConfirm ||
         ui.trayOpen ||
+        ui.autoplayMenuOpen ||
         ui.bigWinOpen
       ) {
         return;
@@ -113,6 +123,10 @@
       unlockMusic();
       if (ui.bonusIntroOpen) {
         confirmBonusStart();
+        return;
+      }
+      if (ui.autoplayOn) {
+        stopAutoplay();
         return;
       }
       void spin();

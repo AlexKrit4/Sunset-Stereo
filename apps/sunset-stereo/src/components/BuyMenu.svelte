@@ -23,7 +23,7 @@
   }
 
   function requestScatter() {
-    if (ui.busy) return;
+    if (ui.busy || ui.autoplayOn) return;
     if (ui.scatterBuyOn) {
       ui.scatterBuyOn = false;
       ui.buyConfirm = "";
@@ -34,30 +34,30 @@
   }
 
   function requestBonus() {
-    if (ui.busy || ui.balanceMicro < bonusPrice) return;
+    if (ui.busy || ui.autoplayOn || ui.scatterBuyOn || ui.balanceMicro < bonusPrice) return;
     ui.buyConfirm = "bonus";
   }
 
   function requestWildBonus() {
-    if (ui.busy || ui.balanceMicro < wildBonusPrice) return;
+    if (ui.busy || ui.autoplayOn || ui.scatterBuyOn || ui.balanceMicro < wildBonusPrice) return;
     ui.buyConfirm = "wildbonus";
   }
 
   function confirmBuy() {
     if (ui.buyConfirm === "scatter") {
-      if (ui.busy || ui.balanceMicro < scatterPrice) return;
+      if (ui.busy || ui.autoplayOn || ui.balanceMicro < scatterPrice) return;
       ui.scatterBuyOn = true;
       ui.buyConfirm = "";
       return;
     }
     if (ui.buyConfirm === "bonus") {
-      if (ui.busy || ui.balanceMicro < bonusPrice) return;
+      if (ui.busy || ui.autoplayOn || ui.scatterBuyOn || ui.balanceMicro < bonusPrice) return;
       ui.buyConfirm = "";
       onBuyBonus();
       return;
     }
     if (ui.buyConfirm === "wildbonus") {
-      if (ui.busy || ui.balanceMicro < wildBonusPrice) return;
+      if (ui.busy || ui.autoplayOn || ui.scatterBuyOn || ui.balanceMicro < wildBonusPrice) return;
       ui.buyConfirm = "";
       onBuyWildBonus();
     }
@@ -110,7 +110,7 @@
               class="activate"
               class:on={ui.scatterBuyOn}
               type="button"
-              disabled={ui.busy || (!ui.scatterBuyOn && ui.balanceMicro < scatterPrice)}
+              disabled={ui.busy || ui.autoplayOn || (!ui.scatterBuyOn && ui.balanceMicro < scatterPrice)}
               aria-pressed={ui.scatterBuyOn}
               onclick={requestScatter}
             >
@@ -119,7 +119,7 @@
           </div>
         </article>
 
-        <article id="buyBonusCard" class="card">
+        <article id="buyBonusCard" class="card" class:blocked={ui.scatterBuyOn}>
           <div class="art bonus">
             <img src={sunArt} alt="" />
             <img src={sunArt} alt="" />
@@ -133,7 +133,7 @@
               id="buyScatterBtn"
               class="purchase"
               type="button"
-              disabled={ui.busy || ui.balanceMicro < bonusPrice}
+              disabled={ui.busy || ui.autoplayOn || ui.scatterBuyOn || ui.balanceMicro < bonusPrice}
               onclick={requestBonus}
             >
               {labels.buyNow()}
@@ -141,7 +141,7 @@
           </div>
         </article>
 
-        <article id="buyWildBonusCard" class="card">
+        <article id="buyWildBonusCard" class="card" class:blocked={ui.scatterBuyOn}>
           <div class="art wildbonus">
             <img src={sunArt} alt="" />
             <img src={sunArt} alt="" />
@@ -157,7 +157,7 @@
               id="buyWildBonusBtn"
               class="purchase"
               type="button"
-              disabled={ui.busy || ui.balanceMicro < wildBonusPrice}
+              disabled={ui.busy || ui.autoplayOn || ui.scatterBuyOn || ui.balanceMicro < wildBonusPrice}
               onclick={requestWildBonus}
             >
               {labels.buyNow()}
@@ -239,6 +239,9 @@
   .card.live {
     outline: 3px solid #2ee6a0;
     outline-offset: 2px;
+  }
+  .card.blocked {
+    opacity: 0.48;
   }
   .art {
     height: 118px;

@@ -30,11 +30,16 @@
       </p>
       <p>RTP {(GAME.rtp * 100).toFixed(0)}%. Max win {GAME.wincap.toLocaleString()}× of the 1× stake.</p>
       <p>
-        Spin / Play starts a round. The lightning control opens the feature shop.
+        Spin / Play starts a round. Fast play (lightning) shortens reel stops and round timing.
+        The orange studio button opens the feature shop. Autoplay (play triangle) asks how many
+        rounds to run; confirm with Spin. While autoplay is running the main spin button shows the
+        remaining rounds — hover and click it, or press it, to stop.
         Activate asks for a confirm, then keeps the 1.5× reel-2 sun armed until you switch it off.
+        While Sun on reel 2 is active, Buy 3 scatters and Buy 4 scatters stay off until you turn that extra bet off.
         Buy 3 scatters and Buy 4 scatters also ask for a confirm. While the extra bet is on, the
         stake readout shows that feature and the 1.5× spin cost.
-        + / – change the stake using bet levels from the game server.
+        + / – change the stake using bet levels from the game server. Stake and the feature shop
+        stay locked while autoplay is running.
         Spacebar also starts a round unless the operator disables it. Credit / Balance is the wallet.
         Paid / Won is the last round result. Extra plays shows the bonus counter.
       </p>

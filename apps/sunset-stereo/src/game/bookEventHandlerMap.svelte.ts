@@ -2,6 +2,7 @@ import { hideSpinWin, roundWinBeatsStake, showSpinWin, ui, waitForBonusStart } f
 import { beginBigWinIntro, isBigWin, playBigWin } from "../lib/bigWin";
 import { bigWinHudBase, followingWincap, wincapStageWin } from "../lib/bigWinStages.js";
 import { waitForTimeout } from "../utils/waitForTimeout";
+import { paceMs } from "../lib/pace";
 import { runtime } from "./context";
 import { unpadPosition, winningWays } from "../rgs/bookView";
 import { multiplierCentsToMicro } from "../rgs/money";
@@ -115,7 +116,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   holdRespin: async (bookEvent) => {
     pendingHolds = withLockedWilds(bookEvent.positions);
     runtime.board?.lockBonusWinners(pendingHolds);
-    await waitForTimeout(80);
+    await waitForTimeout(paceMs(80));
   },
 
   placeWild: async (bookEvent) => {
@@ -135,7 +136,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       beginBigWinIntro();
     }
     await runtime.board?.showBookWins(positions);
-    await waitForTimeout(120);
+    await waitForTimeout(paceMs(120));
   },
 
   setWin: async (bookEvent, context) => {
@@ -149,7 +150,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     if (micro <= 0) {
       ui.winMicro = roundWin;
       hideSpinWin();
-      await waitForTimeout(60);
+      await waitForTimeout(paceMs(60));
       return;
     }
     if (isBigWin(micro, ui.betMicro)) {
@@ -160,16 +161,16 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     }
     ui.winMicro = roundWin;
     if (ui.feature) {
-      await waitForTimeout(60);
+      await waitForTimeout(paceMs(60));
       return;
     }
     if (!roundWinBeatsStake(roundWin)) {
-      await waitForTimeout(500);
+      await waitForTimeout(paceMs(500));
       return;
     }
-    await waitForTimeout(640);
+    await waitForTimeout(paceMs(640));
     showSpinWin(roundWin, pendingWinLines);
-    await waitForTimeout(1100);
+    await waitForTimeout(paceMs(1100));
   },
 
   setTotalWin: async (bookEvent) => {
@@ -189,7 +190,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   freeSpinRetrigger: async (bookEvent) => {
     ui.fsTotal = bookEvent.totalFs;
     ui.banner = `Retrigger — ${bookEvent.totalFs} extra plays`;
-    await waitForTimeout(280);
+    await waitForTimeout(paceMs(280));
   },
 
   updateFreeSpin: async (bookEvent) => {
@@ -200,7 +201,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     ui.fsCurrent = bookEvent.amount + 1;
     ui.fsTotal = bookEvent.total;
     ui.banner = "";
-    await waitForTimeout(40);
+    await waitForTimeout(paceMs(40));
   },
 
   updateGlobalMult: async (bookEvent) => {
@@ -216,7 +217,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     }
     ui.winMicro = total;
     ui.banner = "Max win";
-    await waitForTimeout(1800);
+    await waitForTimeout(paceMs(1800));
   },
 
   freeSpinEnd: async (bookEvent) => {
@@ -231,15 +232,15 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     ui.fsTotal = 0;
     if (roundWinBeatsStake(total) && !isBigWin(total, ui.betMicro)) {
       showSpinWin(total, pendingWinLines);
-      await waitForTimeout(1100);
+      await waitForTimeout(paceMs(1100));
     } else {
-      await waitForTimeout(200);
+      await waitForTimeout(paceMs(200));
     }
   },
 
   finalWin: async (bookEvent) => {
     ui.winMicro = multiplierCentsToMicro(bookEvent.amount);
     if (ui.banner !== "Max win") ui.banner = "";
-    await waitForTimeout(120);
+    await waitForTimeout(paceMs(120));
   },
 };
