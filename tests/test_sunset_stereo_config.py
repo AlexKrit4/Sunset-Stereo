@@ -629,6 +629,77 @@ def test_weighter_spreads_rtp_across_ranges():
     assert stats["hit_rate"] >= 1 / 50
 
 
+def _synth_bonus_freq_rows(mode: str):
+    """Small pack that mirrors Stake 1/N bonus quotas plus empty-book RTP padding."""
+    from bonus_freq import BONUS_FREQ
+
+    freq = BONUS_FREQ[mode]
+    n = 20_000
+    n3 = int(round(n * freq["fg3"]))
+    n4 = int(round(n * freq["fg4"]))
+    n_zero = int(round(n * (0.70 if mode == "base" else 0.60)))
+    n_hit = n - n3 - n4 - n_zero
+    rows = []
+    classes = {}
+    book_id = 1
+
+    def add(kind: str, cents: int, count: int) -> None:
+        nonlocal book_id
+        for _ in range(count):
+            rows.append((book_id, 1, cents))
+            classes[book_id] = kind
+            book_id += 1
+
+    add("fg3", 1000, max(1, n3 - 8))  # 10×
+    add("fg3", 2500, 4)
+    add("fg3", 12000, 2)
+    add("fg3", 90000, 1)
+    add("fg3", 1_500_000, 1)
+    add("fg4", 1000, max(1, n4 - 6))
+    add("fg4", 4000, 3)
+    add("fg4", 25000, 1)
+    add("fg4", 180000, 1)
+    add("fg4", 1_500_000, 1)
+    for cents in (20, 40, 80, 150, 300, 600, 1200, 3500) * ((n_hit // 8) + 1):
+        if sum(1 for _, kind in classes.items() if kind == "hit") >= n_hit:
+            break
+        add("hit", cents, 1)
+    add("zero", 0, n_zero)
+    return rows, classes
+
+
+def test_bonus_freq_weights_lock_one_in_rates_and_rtp():
+    from bonus_freq import BONUS_FREQ, reweight_mode_rows
+
+    for mode in ("base", "scatter"):
+        rows, classes = _synth_bonus_freq_rows(mode)
+        weighted, stats = reweight_mode_rows(rows, mode, classes)
+        freq = stats["bonus_freq"]["classes"]
+        want = BONUS_FREQ[mode]
+        assert abs(freq["fg3"]["p"] - want["fg3"]) / want["fg3"] < 0.08
+        assert abs(freq["fg4"]["p"] - want["fg4"]) / want["fg4"] < 0.08
+        assert 0.93 <= stats["rtp"] <= 0.97
+        assert stats["hit_rate"] >= 1 / 50
+        assert freq["zero"]["p"] > 0.4
+        cheap_fg3 = [weight for book_id, weight, cents in weighted if classes[book_id] == "fg3" and cents <= 1500]
+        rich_fg3 = [weight for book_id, weight, cents in weighted if classes[book_id] == "fg3" and cents >= 90000]
+        assert min(cheap_fg3) > max(rich_fg3)
+
+
+def test_classify_book_uses_criteria_and_scatter_count():
+    from bonus_freq import classify_book, classify_events
+
+    assert classify_book({"id": 1, "criteria": "freegame", "payoutMultiplier": 1200, "events": []}) == "fg3"
+    assert classify_book({"id": 2, "criteria": "freegame4", "payoutMultiplier": 8000, "events": []}) == "fg4"
+    assert classify_book({"id": 3, "criteria": "wincap", "payoutMultiplier": 1_500_000, "events": []}) == "fg4"
+    assert classify_book({"id": 4, "criteria": "0", "payoutMultiplier": 0, "events": []}) == "zero"
+    assert classify_book({"id": 5, "criteria": "basegame", "payoutMultiplier": 80, "events": []}) == "hit"
+    three = [{"type": "freeSpinTrigger", "positions": [{}, {}, {}]}]
+    four = [{"type": "freeSpinTrigger", "positions": [{}, {}, {}, {}]}, {"type": "placeWild"}]
+    assert classify_events(three, 1000) == "fg3"
+    assert classify_events(four, 8000) == "fg4"
+
+
 def test_natural_three_scatter_bonus_pays_at_least_10x():
     state, book = _mode_book("base", "freegame", 8)
     assert state.final_win >= 10

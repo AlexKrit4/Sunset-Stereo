@@ -226,7 +226,15 @@ def _clip_range_rtp(mass: dict, means: dict, cost: float, sink_key: tuple[float,
         mass[sink_key] = mass.get(sink_key, 0.0) + extra
 
 
-def assign_weights(rows: list[tuple[int, int, int]], mode: str) -> list[tuple[int, int, int]]:
+def assign_weights(
+    rows: list[tuple[int, int, int]],
+    mode: str,
+    classes: dict[int, str] | None = None,
+) -> list[tuple[int, int, int]]:
+    if classes and mode in {"base", "scatter"}:
+        from bonus_freq import assign_bonus_freq_weights
+
+        return assign_bonus_freq_weights(rows, mode, classes)
     cost = MODE_COST[mode]
     targets = _range_mass_targets(mode)
     buckets: dict[tuple[float, float] | str, list[tuple[int, int]]] = {key: [] for key in RANGES}
@@ -372,7 +380,16 @@ def weight_mode_lookup(publish_dir: str, mode: str, lookup_dir: str | None = Non
     if not os.path.isfile(source):
         source = os.path.join(publish_dir, f"lookUpTable_{mode}.csv")
     dest = os.path.join(publish_dir, f"lookUpTable_{mode}_0.csv")
-    rows = assign_weights(load_lut(source), mode)
+    rows = load_lut(source)
+    classes = None
+    books = os.path.join(publish_dir, f"books_{mode}.jsonl.zst")
+    if not os.path.isfile(books):
+        books = os.path.join(publish_dir, f"books_{mode}.jsonl")
+    if mode in {"base", "scatter"} and os.path.isfile(books):
+        from bonus_freq import classify_books_file
+
+        classes = classify_books_file(books)
+    rows = assign_weights(rows, mode, classes)
     write_lut(dest, rows)
     stats = lut_stats(rows, mode)
     if not (TARGET_RTP - RTP_TOL * 2 <= stats["rtp"] <= TARGET_RTP + RTP_TOL * 2):
@@ -385,4 +402,17 @@ def weight_mode_lookup(publish_dir: str, mode: str, lookup_dir: str | None = Non
         raise ValueError(f"{mode} only {stats['unique_payouts']:.0f} unique payouts, need 3000")
     if 200_000 <= len(rows) < 900_000 and stats["unique_payouts"] < 8_000:
         raise ValueError(f"{mode} only {stats['unique_payouts']:.0f} unique payouts, need 8000")
+    if mode in {"base", "scatter"} and classes:
+        from bonus_freq import BONUS_FREQ, class_stats
+
+        freq = class_stats(rows, classes, mode)
+        want = BONUS_FREQ[mode]
+        p3 = freq["classes"].get("fg3", {}).get("p", 0.0)
+        p4 = freq["classes"].get("fg4", {}).get("p", 0.0)
+        if abs(p3 - want["fg3"]) / want["fg3"] > 0.08:
+            raise ValueError(f"{mode} 3-scatter p={p3:.6f} want {want['fg3']}")
+        if abs(p4 - want["fg4"]) / want["fg4"] > 0.08:
+            raise ValueError(f"{mode} 4-scatter p={p4:.6f} want {want['fg4']}")
+        stats["fg3"] = freq["classes"].get("fg3", {}).get("one_in")
+        stats["fg4"] = freq["classes"].get("fg4", {}).get("one_in")
     return stats
