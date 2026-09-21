@@ -347,7 +347,8 @@ export class BoardController {
     const startStagger = paceMs(START_STAGGER_MS);
     const s0 = (MAX_ROWS + BASE_FILLERS) * CELL;
     const velocity = (LINEAR_FRAC * s0) / linearMs;
-    const gravityLead = 0.5 * velocity * SPIN_GRAVITY_MS;
+    const gravityMs = paceMs(SPIN_GRAVITY_MS);
+    const gravityLead = 0.5 * velocity * gravityMs;
     const plans: Array<{ delay: number; fillers: number; velocity: number }> = [];
     let prevStop = 0;
 
@@ -810,8 +811,8 @@ export class BoardController {
 
   private tickLandBounce(job: SpinJob, now: number) {
     const elapsed = now - job.bounceAt;
-    const down = LAND_BOUNCE_DOWN_MS;
-    const up = LAND_BOUNCE_UP_MS;
+    const down = paceMs(LAND_BOUNCE_DOWN_MS, 20);
+    const up = paceMs(LAND_BOUNCE_UP_MS, 40);
     if (elapsed < down) {
       job.strip.y = job.bouncePx * easeOutQuad(elapsed / down);
       return;
@@ -1235,8 +1236,8 @@ export class BoardController {
     this.paintStrip(strip, ["xNudge", ...names]);
     strip.y = -CELL;
     const windUp = Math.min(Math.round(CELL * NUDGE_WINDUP_FRAC), NUDGE_WINDUP_MAX_PX);
-    await this.tweenY(strip, -CELL, -CELL - windUp, NUDGE_WINDUP_MS);
-    await this.tweenY(strip, -CELL - windUp, 0, NUDGE_PUSH_MS);
+    await this.tweenY(strip, -CELL, -CELL - windUp, paceMs(NUDGE_WINDUP_MS));
+    await this.tweenY(strip, -CELL - windUp, 0, paceMs(NUDGE_PUSH_MS));
     for (let i = 0; i < rows; i += 1) names[i] = next[i];
     this.landStatic(reel, names);
   }

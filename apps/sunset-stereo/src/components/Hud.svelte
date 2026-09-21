@@ -95,7 +95,10 @@
       stopAutoplay();
       return;
     }
-    ui.autoplayMenuOpen = false;
+    if (ui.autoplayMenuOpen) {
+      if (ui.autoplayPick) startAutoplay(ui.autoplayPick);
+      return;
+    }
     onSpin();
   }
 
@@ -190,25 +193,27 @@
     >
       {#if ui.autoplayOn}
         <span id="spinRemain" class="remain" class:tight={ui.autoplayLeft >= 100}>{ui.autoplayLeft}</span>
-        <span class="stopx" aria-hidden="true">×</span>
+        <svg class="stopx" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6.2 6.2 17.8 17.8M17.8 6.2 6.2 17.8" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" />
+        </svg>
       {:else}
-        <svg viewBox="0 0 24 24" aria-hidden="true">
+        <svg class="arrows" viewBox="0 0 48 48" aria-hidden="true">
           <path
-            d="M4.2 11.2A7.8 7.8 0 0 1 12 4.2c2.8 0 5.2 1.4 6.6 3.6"
+            d="M11.07 19.8A13.6 13.6 0 0 1 34.91 15.88"
             fill="none"
             stroke="currentColor"
-            stroke-width="2.4"
-            stroke-linecap="round"
+            stroke-width="5.4"
+            stroke-linecap="butt"
           />
-          <path d="M19.4 3.2v5.2h-5.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M38.51 21.93 30.13 17.62 38.96 12.52Z" fill="currentColor" />
           <path
-            d="M19.8 12.8A7.8 7.8 0 0 1 12 19.8c-2.8 0-5.2-1.4-6.6-3.6"
+            d="M36.93 28.2A13.6 13.6 0 0 1 13.09 32.12"
             fill="none"
             stroke="currentColor"
-            stroke-width="2.4"
-            stroke-linecap="round"
+            stroke-width="5.4"
+            stroke-linecap="butt"
           />
-          <path d="M4.6 20.8v-5.2h5.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M9.49 26.07 17.87 30.38 9.04 35.48Z" fill="currentColor" />
         </svg>
       {/if}
     </button>
@@ -226,7 +231,7 @@
           onclick={toggleAutoplayMenu}
         >
           <svg viewBox="0 0 32 32" aria-hidden="true">
-            <path d="M11 7.2v17.6L25.2 16 11 7.2z" fill="currentColor" />
+            <path d="M12.4 7.1v17.8L25.8 16 12.4 7.1z" fill="currentColor" />
           </svg>
         </button>
       {/if}
@@ -417,22 +422,21 @@
     display: grid;
     place-items: center;
     padding: 0;
-    border: 3px solid #16110c;
-    border-radius: 14px;
+    border: 4px solid #111;
+    border-radius: 16px;
     background: #ff7a18;
     cursor: pointer;
-    box-shadow: 0 3px 0 #16110c;
     flex: 0 0 52px;
   }
   .provider img {
-    width: 78%;
-    height: 78%;
+    width: 82%;
+    height: 82%;
     object-fit: contain;
     pointer-events: none;
   }
   .provider.on,
   .provider.armed {
-    box-shadow: 0 0 0 3px #ffd080, 0 3px 0 #16110c;
+    box-shadow: 0 0 0 3px #ffd080;
   }
   .provider:disabled {
     opacity: 0.45;
@@ -451,9 +455,9 @@
     box-shadow: 0 4px 0 #0d0b09;
     flex: 0 0 86px;
   }
-  .spin svg {
-    width: 42px;
-    height: 42px;
+  .spin svg.arrows {
+    width: 46px;
+    height: 46px;
   }
   .spin .remain,
   .spin .stopx {
@@ -461,11 +465,11 @@
     inset: 0;
     display: grid;
     place-items: center;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
     pointer-events: none;
   }
   .spin .remain {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
     font-size: 26px;
     letter-spacing: -0.03em;
   }
@@ -473,17 +477,24 @@
     font-size: 18px;
   }
   .spin .stopx {
-    font-size: 46px;
-    line-height: 1;
+    width: 42px;
+    height: 42px;
+    margin: auto;
     opacity: 0;
   }
-  .spin.auto:hover .remain,
   .spin.auto:focus-visible .remain {
     opacity: 0;
   }
-  .spin.auto:hover .stopx,
   .spin.auto:focus-visible .stopx {
     opacity: 1;
+  }
+  @media (hover: hover) {
+    .spin.auto:hover .remain {
+      opacity: 0;
+    }
+    .spin.auto:hover .stopx {
+      opacity: 1;
+    }
   }
   .spin:disabled {
     opacity: 0.45;
