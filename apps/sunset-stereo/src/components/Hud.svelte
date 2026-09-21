@@ -215,9 +215,10 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 14px 16px;
-    margin-top: 18px;
+    flex: 0 0 auto;
+    margin-top: 10px;
     padding: 10px 14px 10px 16px;
-    min-height: 72px;
+    min-height: 64px;
     border-radius: 14px;
     background: #1b140f;
     color: #f4efe6;

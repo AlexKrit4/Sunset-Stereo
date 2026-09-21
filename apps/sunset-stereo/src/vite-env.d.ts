@@ -1,6 +1,10 @@
 /// <reference types="svelte" />
 /// <reference types="vite/client" />
 
+interface ImportMetaEnv {
+  readonly VITE_VPS?: string;
+}
+
 declare module "*.mp3?url" {
   const src: string;
   export default src;

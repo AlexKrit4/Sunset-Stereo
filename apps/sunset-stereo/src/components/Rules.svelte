@@ -58,7 +58,7 @@
       </ul>
 
       <p class="note">{disclaimer}</p>
-      {#if ui.source === "mock"}
+      {#if ui.source === "mock" && import.meta.env.VITE_VPS !== "1"}
         <p class="note">Local demo uses sample books until the game is opened from Stake Engine.</p>
       {/if}
       <button type="button" onclick={() => (ui.rulesOpen = false)}>Close</button>

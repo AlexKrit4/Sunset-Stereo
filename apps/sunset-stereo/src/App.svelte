@@ -127,6 +127,7 @@
 
 <Loader onContinue={continueBoot} />
 
+<div class="stage">
 <div class="cabinet" class:feature={ui.feature} class:booting={ui.bootOpen}>
   <header class="masthead">
     <h1>Sunset Stereo</h1>
@@ -153,3 +154,9 @@
   <BuyMenu onBuyBonus={() => playBuyBonus()} onBuyWildBonus={() => playBuyWildBonus()} />
   <Rules />
 </div>
+</div>
+{#if import.meta.env.VITE_VPS === "1"}
+  {#await import("./vps/VpsStats.svelte") then mod}
+    <mod.default />
+  {/await}
+{/if}
