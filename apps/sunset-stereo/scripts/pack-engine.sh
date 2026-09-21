@@ -12,6 +12,10 @@ if [[ ! -f "$DIST/index.html" ]]; then
   echo "missing $DIST/index.html — run: make frontend-build" >&2
   exit 1
 fi
+if grep -R -l --include='*.js' -E 'data-vps-stats|vps-stats-round|/vps/base\\.jsonl' "$DIST" >/dev/null; then
+  echo "refusing to pack a VPS-only build into the Stake frontend zip" >&2
+  exit 1
+fi
 
 rm -rf "$STAGE/frontend"
 mkdir -p "$STAGE/frontend"

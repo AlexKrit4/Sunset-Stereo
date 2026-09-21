@@ -5,6 +5,7 @@ import { cancelBonusIntro, hideSpinWin, ui } from "../lib/ui.svelte";
 import { unlockMusic } from "../lib/music";
 import { createEngineHandle, fetchReplayBook, type EngineHandle, type BookState } from "../rgs/session";
 import { roundModeFlags, roundStakeAmount, stakeFromAuthenticate } from "../rgs/roundStake.js";
+import { BUY_BONUS, BUY_SCATTER, BUY_WILD_BONUS } from "../math/config.js";
 import type { Round } from "stake-engine";
 
 export const betMachine = createMachine({
@@ -115,6 +116,13 @@ export async function playPendingRestore() {
   }
 }
 
+const MODE_COST: Record<string, number> = {
+  base: 1,
+  scatter: BUY_SCATTER.cost,
+  bonus: BUY_BONUS.cost,
+  wildbonus: BUY_WILD_BONUS.cost,
+};
+
 async function playEngineRound(round: Round) {
   await waitForBoard();
   applyRoundBet(round);
@@ -161,6 +169,17 @@ export async function playBet(mode = "base") {
     if (result.round.active) {
       const ended = await engine.EndRound();
       ui.balanceMicro = ended.balance.amount;
+    }
+    if (import.meta.env.VITE_VPS === "1") {
+      const cost = MODE_COST[mode] ?? 1;
+      window.dispatchEvent(
+        new CustomEvent("vps-stats-round", {
+          detail: {
+            spentMicro: Math.round(result.round.amount * cost),
+            wonMicro: Math.max(0, Math.round(result.round.payout) || 0),
+          },
+        }),
+      );
     }
     ui.banner = "";
     return true;

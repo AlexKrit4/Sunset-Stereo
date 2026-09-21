@@ -76,8 +76,8 @@
   .viewport {
     position: relative;
     width: 100%;
-    height: min(620px, 78vw);
-    min-height: 400px;
+    height: 100%;
+    min-height: 180px;
     background: transparent;
     overflow: hidden;
   }

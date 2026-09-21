@@ -126,19 +126,25 @@ function createMockClient(query: EngineQuery) {
             : mode === "wildbonus"
               ? wildBonusBooks
               : books;
-      const cursor =
-        mode === "bonus"
-          ? nextBonus
-          : mode === "scatter"
-            ? nextScatter
-            : mode === "wildbonus"
-              ? nextWildBonus
-              : nextIndex;
-      const book = pool[cursor % pool.length] ?? pool[0];
-      if (mode === "bonus") nextBonus += 1;
-      else if (mode === "scatter") nextScatter += 1;
-      else if (mode === "wildbonus") nextWildBonus += 1;
-      else nextIndex += 1;
+      let book;
+      if (import.meta.env.VITE_VPS === "1") {
+        const { loadVpsBook } = await import("../vps/books");
+        book = (await loadVpsBook(mode, pool)) as BookState;
+      } else {
+        const cursor =
+          mode === "bonus"
+            ? nextBonus
+            : mode === "scatter"
+              ? nextScatter
+              : mode === "wildbonus"
+                ? nextWildBonus
+                : nextIndex;
+        book = pool[cursor % pool.length] ?? pool[0];
+        if (mode === "bonus") nextBonus += 1;
+        else if (mode === "scatter") nextScatter += 1;
+        else if (mode === "wildbonus") nextWildBonus += 1;
+        else nextIndex += 1;
+      }
       const payout = Math.round((book.payoutMultiplier / 100) * amount);
       active = {
         betID: Date.now(),
