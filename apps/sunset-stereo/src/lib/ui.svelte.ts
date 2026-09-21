@@ -34,6 +34,10 @@ export const ui = $state({
   wildBonus: false,
   trayOpen: false,
   autoplayOn: false,
+  autoplayMenuOpen: false,
+  autoplayPick: 0,
+  autoplayLeft: 0,
+  fastPlay: false,
   disableAutoplay: false,
   bigWinOpen: false,
   bigWinDisplayMicro: 0,
@@ -53,8 +57,25 @@ export const ui = $state({
 
 let bonusIntroResolve: (() => void) | null = null;
 
-export function waitForBonusStart(totalFs: number) {
+export const AUTOPLAY_COUNTS = [5, 10, 25, 50, 75, 100, 200, 500, 1000];
+
+export function stopAutoplay() {
   ui.autoplayOn = false;
+  ui.autoplayLeft = 0;
+  ui.autoplayMenuOpen = false;
+}
+
+export function startAutoplay(count: number) {
+  const next = Math.max(0, Math.round(count) || 0);
+  if (next <= 0) return;
+  ui.autoplayPick = next;
+  ui.autoplayLeft = next;
+  ui.autoplayOn = true;
+  ui.autoplayMenuOpen = false;
+}
+
+export function waitForBonusStart(totalFs: number) {
+  stopAutoplay();
   ui.bonusIntroSpins = totalFs;
   ui.bonusIntroOpen = true;
   return new Promise<void>((resolve) => {
@@ -133,4 +154,7 @@ export const labels = {
   cancel: () => "Cancel",
   confirm: () => "Confirm",
   continue: () => "Continue",
+  autoplay: () => "Autoplay",
+  rounds: () => "Rounds",
+  turbo: () => "Fast play",
 };

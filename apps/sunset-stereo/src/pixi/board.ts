@@ -1,10 +1,15 @@
 import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
 import { createSymbolView } from "./symbols";
-import { wait } from "../game/eventEmitter";
+import { wait as waitRaw } from "../game/eventEmitter";
 import { getReelRows, pickStripItems } from "../math/math.js";
 import { MAX_ROWS, NUM_REELS } from "../math/config.js";
 import type { RawSymbol, Position } from "../game/typesBookEvent";
 import { unpadPosition, visibleNames } from "../rgs/bookView";
+import { paceMs } from "../lib/pace";
+
+function wait(ms: number) {
+  return waitRaw(paceMs(ms));
+}
 
 export const CELL = 90;
 export const GAP = 5;
@@ -338,8 +343,8 @@ export class BoardController {
   }
 
   private planSpin(waysGaps: number[], scatterGaps: number[], pace: "base" | "bonus" | "respin" = "base") {
-    const linearMs = pace === "base" ? LINEAR_MS : 640;
-    const startStagger = START_STAGGER_MS;
+    const linearMs = paceMs(pace === "base" ? LINEAR_MS : 640);
+    const startStagger = paceMs(START_STAGGER_MS);
     const s0 = (MAX_ROWS + BASE_FILLERS) * CELL;
     const velocity = (LINEAR_FRAC * s0) / linearMs;
     const gravityLead = 0.5 * velocity * SPIN_GRAVITY_MS;
@@ -348,20 +353,21 @@ export class BoardController {
 
     for (let col = 0; col < COLS; col += 1) {
       const delay = col * startStagger;
-      const waysGap = pace === "base" ? waysGaps[col] || 0 : 0;
-      const scatterGap = pace === "base" ? scatterGaps[col] || 0 : 0;
+      const waysGap = pace === "base" ? paceMs(waysGaps[col] || 0, 0) : 0;
+      const scatterGap = pace === "base" ? paceMs(scatterGaps[col] || 0, 0) : 0;
       const rows = getReelRows(col);
-      const stopStagger = scatterGap > 0 ? 0 : STOP_STAGGER_MS;
+      const stopStagger = scatterGap > 0 ? 0 : paceMs(STOP_STAGGER_MS);
+      const windupMs = paceMs(SPIN_WINDUP_MS);
       const minStop =
-        col === 0 ? delay + SPIN_WINDUP_MS + linearMs : prevStop + stopStagger + waysGap + scatterGap;
-      const tFall = Math.max(80, minStop - delay - SPIN_WINDUP_MS);
+        col === 0 ? delay + windupMs + linearMs : prevStop + stopStagger + waysGap + scatterGap;
+      const tFall = Math.max(paceMs(80), minStop - delay - windupMs);
       let rest = velocity * tFall - SPIN_WINDUP_PX - gravityLead;
       rest = Math.max((rows + 10) * CELL, rest);
       let needed = Math.ceil(rest / CELL) - rows;
       needed = Math.max(10, needed);
       const restOffset = (rows + needed) * CELL;
       const actualFall = (restOffset + SPIN_WINDUP_PX + gravityLead) / velocity;
-      prevStop = delay + SPIN_WINDUP_MS + actualFall;
+      prevStop = delay + paceMs(SPIN_WINDUP_MS) + actualFall;
       plans.push({ delay, fillers: needed, velocity });
     }
     return plans;
@@ -432,7 +438,7 @@ export class BoardController {
     },
   ) {
     const names = visibleNames(board);
-    const extra = Array.from({ length: COLS }, (_, col) => (opts.anticipation?.[col] || 0) * 480);
+    const extra = Array.from({ length: COLS }, (_, col) => (opts.anticipation?.[col] || 0) * paceMs(480));
     const holds = (opts.holds ?? []).map(unpadPosition);
     const upcomingWins = (opts.upcomingWins ?? []).map(unpadPosition);
     this.landingBright.clear();
@@ -458,7 +464,7 @@ export class BoardController {
     if (typeof document !== "undefined") {
       document.body.dataset.wildStamp = `${pos.reel}:${pos.row}`;
     }
-    await this.tweenWildFromPlayer(flyer);
+    await this.tweenWildFromPlayer(flyer, paceMs(620));
     flyer.destroy({ children: true });
     if (cell) cell.alpha = 1;
     this.holdVisibleCells([pos]);
@@ -616,8 +622,8 @@ export class BoardController {
         startAt: now + plan.delay,
         restOffset,
         windupPx: SPIN_WINDUP_PX,
-        windupMs: SPIN_WINDUP_MS,
-        gravityMs: SPIN_GRAVITY_MS,
+        windupMs: paceMs(SPIN_WINDUP_MS),
+        gravityMs: paceMs(SPIN_GRAVITY_MS),
         velocity: plan.velocity * (0.97 + col * 0.012),
         bouncePx: LAND_BOUNCE_PX + (col % 3) - 1,
         bounceAt: 0,

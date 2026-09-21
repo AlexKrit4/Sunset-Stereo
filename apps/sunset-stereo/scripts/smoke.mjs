@@ -127,6 +127,39 @@ const readHud = async (id) => {
   return JSON.parse(res.result.value);
 };
 
+const controls = await send(9, "Runtime.evaluate", {
+  expression: `JSON.stringify({
+    turbo: Boolean(document.getElementById('turboBtn')),
+    autoplay: Boolean(document.getElementById('autoplayBtn')),
+    bonus: document.getElementById('bonusBtn')?.className || '',
+    mark: Boolean(document.querySelector('#bonusBtn img'))
+  })`,
+  returnByValue: true,
+});
+log("controls", controls.result.value);
+const controlState = JSON.parse(controls.result.value);
+if (!controlState.turbo) throw new Error("fast-play lightning must exist");
+if (!controlState.autoplay) throw new Error("autoplay play button must exist");
+if (!/provider/.test(controlState.bonus) || !controlState.mark) throw new Error("buy control must be the orange studio button");
+
+await click(10, "#autoplayBtn");
+await new Promise((r) => setTimeout(r, 200));
+const autoMenu = await send(11, "Runtime.evaluate", {
+  expression: `JSON.stringify({
+    open: Boolean(document.getElementById('autoplayPanel')),
+    counts: Array.from(document.querySelectorAll('#autoplayPanel .count')).map((el) => el.textContent.trim()).join(','),
+    confirm: document.getElementById('autoplayConfirmBtn')?.textContent.trim() || ''
+  })`,
+  returnByValue: true,
+});
+log("autoplay menu", autoMenu.result.value);
+const autoState = JSON.parse(autoMenu.result.value);
+if (!autoState.open) throw new Error("autoplay must open a rounds plaque");
+if (autoState.counts !== "5,10,25,50,75,100,200,500,1000") throw new Error(`unexpected autoplay counts: ${autoState.counts}`);
+if (!/^spin$/i.test(autoState.confirm)) throw new Error("autoplay confirm must be Spin");
+await click(12, "#autoplayBtn");
+await new Promise((r) => setTimeout(r, 120));
+
 await click(20, "#spinBtn");
 const spinStarted = Date.now();
 let lastHud;

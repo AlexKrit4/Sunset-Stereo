@@ -1,6 +1,6 @@
 <script lang="ts">
   import { BUY_SCATTER } from "../math/config.js";
-  import { moneyHud, labels, ui } from "../lib/ui.svelte";
+  import { AUTOPLAY_COUNTS, moneyHud, labels, startAutoplay, stopAutoplay, ui } from "../lib/ui.svelte";
   import { toggleMusicMute } from "../lib/music";
 
   let {
@@ -12,6 +12,7 @@
   } = $props();
 
   const locked = $derived(ui.busy || !ui.ready || ui.bootOpen);
+  const spinLocked = $derived(locked && !ui.autoplayOn);
   const showBuy = $derived(!ui.replay && !ui.disableBuyFeature);
   const showAutoplay = $derived(!ui.replay && !ui.disableAutoplay);
   const spinCost = $derived(Math.round(ui.betMicro * (ui.scatterBuyOn ? BUY_SCATTER.cost : 1)));
@@ -57,18 +58,50 @@
 
   function toggleTray() {
     ui.trayOpen = !ui.trayOpen;
-    if (ui.trayOpen) ui.buyMenuOpen = false;
+    if (ui.trayOpen) {
+      ui.buyMenuOpen = false;
+      ui.autoplayMenuOpen = false;
+    }
   }
 
   function toggleBuy() {
     ui.buyMenuOpen = !ui.buyMenuOpen;
     ui.trayOpen = false;
     ui.buyConfirm = "";
+    ui.autoplayMenuOpen = false;
   }
 
-  function toggleAutoplay() {
+  function toggleAutoplayMenu() {
     if (!showAutoplay || !ui.ready) return;
-    ui.autoplayOn = !ui.autoplayOn;
+    if (ui.autoplayOn) {
+      stopAutoplay();
+      return;
+    }
+    ui.autoplayMenuOpen = !ui.autoplayMenuOpen;
+    if (ui.autoplayMenuOpen) {
+      ui.buyMenuOpen = false;
+      ui.trayOpen = false;
+      if (!AUTOPLAY_COUNTS.includes(ui.autoplayPick)) ui.autoplayPick = 10;
+    }
+  }
+
+  function confirmAutoplay() {
+    if (!ui.autoplayPick) return;
+    startAutoplay(ui.autoplayPick);
+  }
+
+  function onSpinClick() {
+    if (ui.autoplayOn) {
+      stopAutoplay();
+      return;
+    }
+    ui.autoplayMenuOpen = false;
+    onSpin();
+  }
+
+  function toggleFastPlay() {
+    if (!ui.ready || ui.bootOpen) return;
+    ui.fastPlay = !ui.fastPlay;
   }
 </script>
 
@@ -129,68 +162,11 @@
     </div>
   {/if}
 
-  <button
-    id="spinBtn"
-    class="spin"
-    type="button"
-    disabled={locked}
-    aria-label={ui.replay && ui.winMicro ? "Play again" : labels.spin()}
-    onclick={onSpin}
-  >
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <path
-        d="M20 18a20 20 0 0 1 28 4l2-8 4 14-14-2 6-4a14 14 0 1 0 4 16"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-      <path
-        d="M44 46a20 20 0 0 1-28-4l-2 8-4-14 14 2-6 4a14 14 0 1 0-4-16"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    </svg>
-  </button>
-
-  <div class="side">
-    {#if showAutoplay}
-      <button
-        id="autoplayBtn"
-        class="circle"
-        class:on={ui.autoplayOn}
-        type="button"
-        disabled={!ui.ready}
-        aria-label="Autoplay"
-        aria-pressed={ui.autoplayOn}
-        onclick={toggleAutoplay}
-      >
-        <svg viewBox="0 0 32 32" aria-hidden="true">
-          <path
-            d="M10 10a8 8 0 0 1 12 2l1-4 2 7-7-1 3-2a5 5 0 1 0 1 6"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.6"
-            stroke-linecap="round"
-          />
-          <path
-            d="M22 22a8 8 0 0 1-12-2l-1 4-2-7 7 1-3 2a5 5 0 1 0-1-6"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.6"
-            stroke-linecap="round"
-          />
-        </svg>
-      </button>
-    {/if}
+  <div class="play">
     {#if showBuy}
       <button
         id="bonusBtn"
-        class="circle bolt"
+        class="provider"
         class:on={ui.buyMenuOpen}
         class:armed={ui.scatterBuyOn}
         type="button"
@@ -199,10 +175,106 @@
         aria-pressed={ui.buyMenuOpen || ui.scatterBuyOn}
         onclick={toggleBuy}
       >
-        <svg viewBox="0 0 32 32" aria-hidden="true">
-          <path d="M18 3 8 18h7l-2 11 12-16h-7z" fill="currentColor" />
-        </svg>
+        <img src="./big-fathers-mark.png" alt="" />
       </button>
+    {/if}
+
+    <button
+      id="spinBtn"
+      class="spin"
+      class:auto={ui.autoplayOn}
+      type="button"
+      disabled={spinLocked}
+      aria-label={ui.autoplayOn ? "Stop autoplay" : ui.replay && ui.winMicro ? "Play again" : labels.spin()}
+      onclick={onSpinClick}
+    >
+      {#if ui.autoplayOn}
+        <span id="spinRemain" class="remain" class:tight={ui.autoplayLeft >= 100}>{ui.autoplayLeft}</span>
+        <span class="stopx" aria-hidden="true">×</span>
+      {:else}
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M4.2 11.2A7.8 7.8 0 0 1 12 4.2c2.8 0 5.2 1.4 6.6 3.6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.4"
+            stroke-linecap="round"
+          />
+          <path d="M19.4 3.2v5.2h-5.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+          <path
+            d="M19.8 12.8A7.8 7.8 0 0 1 12 19.8c-2.8 0-5.2-1.4-6.6-3.6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.4"
+            stroke-linecap="round"
+          />
+          <path d="M4.6 20.8v-5.2h5.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      {/if}
+    </button>
+
+    <div class="side">
+      {#if showAutoplay}
+        <button
+          id="autoplayBtn"
+          class="circle"
+          class:on={ui.autoplayOn || ui.autoplayMenuOpen}
+          type="button"
+          disabled={!ui.ready}
+          aria-label={labels.autoplay()}
+          aria-pressed={ui.autoplayOn || ui.autoplayMenuOpen}
+          onclick={toggleAutoplayMenu}
+        >
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M11 7.2v17.6L25.2 16 11 7.2z" fill="currentColor" />
+          </svg>
+        </button>
+      {/if}
+      {#if !ui.replay}
+        <button
+          id="turboBtn"
+          class="circle bolt"
+          class:on={ui.fastPlay}
+          type="button"
+          disabled={!ui.ready || ui.bootOpen}
+          aria-label={labels.turbo()}
+          aria-pressed={ui.fastPlay}
+          onclick={toggleFastPlay}
+        >
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M18 3 8 18h7l-2 11 12-16h-7z" fill="currentColor" />
+          </svg>
+        </button>
+      {/if}
+    </div>
+
+    {#if ui.autoplayMenuOpen}
+      <div class="autoplay" id="autoplayPanel" role="dialog" aria-label={labels.autoplay()}>
+        <p class="auto-kicker">{labels.autoplay()}</p>
+        <p class="auto-title">{labels.rounds()}</p>
+        <div class="counts">
+          {#each AUTOPLAY_COUNTS as count}
+            <button
+              id={`autoplayCount-${count}`}
+              class="count"
+              class:on={ui.autoplayPick === count}
+              type="button"
+              onclick={() => (ui.autoplayPick = count)}
+            >
+              {count}
+            </button>
+          {/each}
+        </div>
+        <button
+          id="autoplayConfirmBtn"
+          class="go"
+          type="button"
+          disabled={!ui.autoplayPick}
+          onclick={confirmAutoplay}
+        >
+          {labels.spin()}
+        </button>
+      </div>
     {/if}
   </div>
 </div>
@@ -332,7 +404,42 @@
     opacity: 0.35;
     cursor: wait;
   }
+  .play {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+  .provider {
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 3px solid #16110c;
+    border-radius: 14px;
+    background: #ff7a18;
+    cursor: pointer;
+    box-shadow: 0 3px 0 #16110c;
+    flex: 0 0 52px;
+  }
+  .provider img {
+    width: 78%;
+    height: 78%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+  .provider.on,
+  .provider.armed {
+    box-shadow: 0 0 0 3px #ffd080, 0 3px 0 #16110c;
+  }
+  .provider:disabled {
+    opacity: 0.45;
+    cursor: wait;
+  }
   .spin {
+    position: relative;
     width: 86px;
     height: 86px;
     margin: -18px 0;
@@ -345,12 +452,46 @@
     flex: 0 0 86px;
   }
   .spin svg {
-    width: 46px;
-    height: 46px;
+    width: 42px;
+    height: 42px;
+  }
+  .spin .remain,
+  .spin .stopx {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .spin .remain {
+    font-size: 26px;
+    letter-spacing: -0.03em;
+  }
+  .spin .remain.tight {
+    font-size: 18px;
+  }
+  .spin .stopx {
+    font-size: 46px;
+    line-height: 1;
+    opacity: 0;
+  }
+  .spin.auto:hover .remain,
+  .spin.auto:focus-visible .remain {
+    opacity: 0;
+  }
+  .spin.auto:hover .stopx,
+  .spin.auto:focus-visible .stopx {
+    opacity: 1;
   }
   .spin:disabled {
     opacity: 0.45;
     cursor: wait;
+  }
+  .spin.auto:disabled {
+    opacity: 1;
+    cursor: pointer;
   }
   .side {
     display: grid;
@@ -368,8 +509,8 @@
     cursor: pointer;
   }
   .circle svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
   }
   .circle.on,
   .circle.armed {
@@ -378,6 +519,66 @@
   }
   .circle:disabled {
     opacity: 0.45;
+    cursor: wait;
+  }
+  .autoplay {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 12px);
+    z-index: 60;
+    width: min(280px, 78vw);
+    padding: 12px 12px 12px;
+    border-radius: 16px;
+    background: #140e0a;
+    color: #f4efe6;
+    box-shadow: 0 12px 28px rgba(8, 2, 16, 0.45);
+  }
+  .auto-kicker,
+  .auto-title {
+    margin: 0;
+    text-align: center;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .auto-kicker {
+    font-size: 10px;
+    color: #cbbba8;
+  }
+  .auto-title {
+    margin: 4px 0 10px;
+    font-size: 12px;
+  }
+  .counts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .count,
+  .autoplay .go {
+    min-height: 36px;
+    border: 0;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .count {
+    background: #2a2118;
+    color: #f4efe6;
+  }
+  .count.on {
+    background: #8b5cf6;
+    color: #fff;
+  }
+  .autoplay .go {
+    width: 100%;
+    margin-top: 10px;
+    background: #f4efe6;
+    color: #111;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .autoplay .go:disabled {
+    opacity: 0.4;
     cursor: wait;
   }
   @media (max-width: 720px) {
@@ -393,6 +594,11 @@
       height: 72px;
       margin: -12px 0;
       flex-basis: 72px;
+    }
+    .provider {
+      width: 44px;
+      height: 44px;
+      flex-basis: 44px;
     }
   }
 </style>

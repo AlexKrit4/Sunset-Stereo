@@ -1,7 +1,7 @@
 import { createActor, createMachine } from "xstate";
 import { playBookEvents } from "./playBook";
 import { runtime } from "./context";
-import { cancelBonusIntro, hideSpinWin, ui } from "../lib/ui.svelte";
+import { cancelBonusIntro, hideSpinWin, stopAutoplay, ui } from "../lib/ui.svelte";
 import { unlockMusic } from "../lib/music";
 import { createEngineHandle, fetchReplayBook, type EngineHandle, type BookState } from "../rgs/session";
 import { roundModeFlags, roundStakeAmount, stakeFromAuthenticate } from "../rgs/roundStake.js";
@@ -188,7 +188,7 @@ export async function playBet(mode = "base") {
     ui.banner = errorMessage(error, mode === "bonus" || mode === "wildbonus" ? "Buy failed." : "Spin failed.");
     ui.feature = false;
     ui.wildBonus = false;
-    ui.autoplayOn = false;
+    stopAutoplay();
     return false;
   } finally {
     ui.busy = false;
