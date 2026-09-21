@@ -23,13 +23,8 @@
 
   $effect(() => {
     if (ui.bigWinOpen) {
-      if (ui.bigWinFreezeHudMicro > 0) {
-        displayedWinHold = ui.bigWinFreezeHudMicro;
-        displayedWinMicro = ui.bigWinFreezeHudMicro;
-        return;
-      }
-      displayedWinHold = ui.bigWinDisplayMicro;
-      displayedWinMicro = ui.bigWinDisplayMicro;
+      displayedWinHold = ui.winMicro;
+      displayedWinMicro = ui.winMicro;
       return;
     }
     if (ui.bigWinIntro) {

@@ -24,6 +24,15 @@ export function stagesForWin(micro, betMicro) {
   });
 }
 
+/** Overlay counts the extra from 0; HUD WIN = already-paid total + overlay. */
+export function bigWinHudBase(spinMicro, roundWinMicro, currentHudMicro = 0) {
+  return Math.max(0, currentHudMicro, roundWinMicro - spinMicro);
+}
+
+export function hudWinFromBigWin(displayMicro, hudBaseMicro = 0) {
+  return Math.max(0, hudBaseMicro) + Math.max(0, displayMicro);
+}
+
 /** This extra play's clamped add toward the cap: 15000× − totalWin already paid. */
 export function wincapStageWin(totalMicro, spinWinMicro, hudMicro) {
   if (spinWinMicro > 0 && spinWinMicro < totalMicro) return spinWinMicro;
