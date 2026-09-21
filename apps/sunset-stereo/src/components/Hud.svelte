@@ -512,8 +512,7 @@
     width: 18px;
     height: 18px;
   }
-  .circle.on,
-  .circle.armed {
+  .circle.on {
     background: #ffd080;
     box-shadow: 0 0 12px rgba(255, 160, 40, 0.55);
   }
