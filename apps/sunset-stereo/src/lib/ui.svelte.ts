@@ -45,7 +45,7 @@ export const ui = $state({
   bigWinOutgoingKey: 0,
   bigWinExplode: false,
   bigWinIntro: false,
-  bigWinFreezeHudMicro: 0,
+  bigWinHudBaseMicro: 0,
   bootOpen: true,
   bootReady: false,
   bootProgress: 0,

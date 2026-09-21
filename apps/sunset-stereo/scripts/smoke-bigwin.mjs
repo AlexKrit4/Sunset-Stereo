@@ -1,4 +1,12 @@
-import { BIG_WIN_STAGES, followingWincap, isBigWin, stagesForWin, wincapStageWin } from "../src/lib/bigWinStages.js";
+import {
+  BIG_WIN_STAGES,
+  bigWinHudBase,
+  followingWincap,
+  hudWinFromBigWin,
+  isBigWin,
+  stagesForWin,
+  wincapStageWin,
+} from "../src/lib/bigWinStages.js";
 
 function assert(cond, message) {
   if (!cond) throw new Error(message);
@@ -78,5 +86,21 @@ const laterSpin = [
   { index: 3, type: "wincap", amount: 1_500_000 },
 ];
 assert(followingWincap(laterSpin, laterSpin[0]) == null, "a later extra play wincap does not attach to this setWin");
+
+const bonusPaid = 512 * bet;
+const bonusExtra = 1728 * bet;
+const bonusRound = 2240 * bet;
+assert(bigWinHudBase(bonusExtra, bonusRound, bonusPaid) === bonusPaid, "bonus HUD base is the already-paid total");
+assert(bigWinHudBase(bonusExtra, bonusExtra, bonusPaid) === bonusPaid, "HUD base still uses the dock WIN if setTotalWin is missing");
+assert(bigWinHudBase(50 * bet, 50 * bet, 0) === 0, "first Big Win still starts the HUD at 0");
+assert(hudWinFromBigWin(0, bonusPaid) === bonusPaid, "overlay at 0 leaves HUD on the current WIN");
+assert(hudWinFromBigWin(bonusExtra, bonusPaid) === bonusRound, "HUD adds the overlay onto the current WIN");
+assert(stagesForWin(bonusExtra, bet)[0].fromMicro === 0, "Big Win stages still count the extra from 0");
+
+const capPaid = 2307 * bet;
+const capRemain = 15000 * bet - capPaid;
+assert(bigWinHudBase(capRemain, 15000 * bet, capPaid) === capPaid, "wincap HUD base stays on the paid total");
+assert(hudWinFromBigWin(0, capPaid) === capPaid, "wincap overlay at 0 does not reset HUD WIN");
+assert(hudWinFromBigWin(capRemain, capPaid) === 15000 * bet, "wincap HUD ends at the capped total");
 
 console.log("bigwin stages ok");

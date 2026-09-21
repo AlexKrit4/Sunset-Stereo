@@ -5,11 +5,13 @@ import { waitForTimeout } from "../utils/waitForTimeout";
 import {
   BIG_WIN_MULT,
   BIG_WIN_STAGES,
+  bigWinHudBase,
+  hudWinFromBigWin,
   isBigWin as isBigWinAt,
   stagesForWin as stagesForWinAt,
 } from "./bigWinStages.js";
 
-export { BIG_WIN_MULT, BIG_WIN_STAGES };
+export { BIG_WIN_MULT, BIG_WIN_STAGES, bigWinHudBase, hudWinFromBigWin };
 
 export function isBigWin(micro: number, betMicro = ui.betMicro) {
   return isBigWinAt(micro, betMicro);
@@ -131,10 +133,14 @@ async function waitForClipEnd(
   });
 }
 
+function syncHud(displayMicro: number) {
+  ui.bigWinDisplayMicro = displayMicro;
+  ui.winMicro = hudWinFromBigWin(displayMicro, ui.bigWinHudBaseMicro);
+}
+
 function countStage(fromMicro: number, toMicro: number, ms: number) {
   if (toMicro === fromMicro) {
-    ui.bigWinDisplayMicro = fromMicro;
-    if (!ui.bigWinFreezeHudMicro) ui.winMicro = fromMicro;
+    syncHud(fromMicro);
     return waitForTimeout(ms);
   }
   return new Promise<void>((resolve) => {
@@ -145,18 +151,15 @@ function countStage(fromMicro: number, toMicro: number, ms: number) {
         return;
       }
       const progress = Math.min(1, (now - started) / ms);
-      ui.bigWinDisplayMicro = Math.round(fromMicro + (toMicro - fromMicro) * easeOutCount(progress));
-      if (!ui.bigWinFreezeHudMicro) ui.winMicro = ui.bigWinDisplayMicro;
+      syncHud(Math.round(fromMicro + (toMicro - fromMicro) * easeOutCount(progress)));
       if (progress < 1) {
         requestAnimationFrame(tick);
         return;
       }
-      ui.bigWinDisplayMicro = toMicro;
-      if (!ui.bigWinFreezeHudMicro) ui.winMicro = toMicro;
+      syncHud(toMicro);
       resolve();
     };
-    ui.bigWinDisplayMicro = fromMicro;
-    if (!ui.bigWinFreezeHudMicro) ui.winMicro = fromMicro;
+    syncHud(fromMicro);
     requestAnimationFrame(tick);
   });
 }
@@ -188,7 +191,7 @@ function resetOverlay() {
   ui.bigWinOutgoingLeft = "";
   ui.bigWinOutgoingRight = "";
   ui.bigWinDisplayMicro = 0;
-  ui.bigWinFreezeHudMicro = 0;
+  ui.bigWinHudBaseMicro = 0;
 }
 
 /** Mute the lounge bed and start bzzz as soon as winning symbols sheen. */
@@ -216,10 +219,12 @@ function finishBigWinAudio() {
   restoreMusicBed();
 }
 
-export async function playBigWin(micro: number, freezeHudMicro = 0) {
+export async function playBigWin(micro: number, hudBaseMicro = 0) {
+  const base = Math.max(0, hudBaseMicro);
+  ui.bigWinHudBaseMicro = base;
   const stages = stagesForWin(micro, ui.betMicro);
   if (!stages.length) {
-    ui.winMicro = freezeHudMicro || micro;
+    ui.winMicro = base + micro;
     return;
   }
 
@@ -229,11 +234,9 @@ export async function playBigWin(micro: number, freezeHudMicro = 0) {
     await startFinished;
     if (!introActive) return;
 
-    ui.bigWinFreezeHudMicro = Math.max(0, freezeHudMicro);
     const first = startArmed(stages[0].file);
     const startedAt = performance.now();
-    ui.bigWinDisplayMicro = stages[0].fromMicro;
-    if (!ui.bigWinFreezeHudMicro) ui.winMicro = stages[0].fromMicro;
+    syncHud(stages[0].fromMicro);
     ui.bigWinOpen = true;
     ui.bigWinExplode = false;
     ui.bigWinOutgoingLeft = "";
