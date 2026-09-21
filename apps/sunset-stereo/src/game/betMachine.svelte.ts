@@ -149,6 +149,7 @@ export async function playBet(mode = "base") {
   }
 
   ui.busy = true;
+  if (ui.autoplayOn) ui.autoplayLeft = Math.max(0, ui.autoplayLeft - 1);
   ui.banner = "";
   ui.feature = false;
   ui.wildBonus = mode === "wildbonus";

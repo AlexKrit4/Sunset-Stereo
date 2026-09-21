@@ -72,6 +72,9 @@ export function startAutoplay(count: number) {
   ui.autoplayLeft = next;
   ui.autoplayOn = true;
   ui.autoplayMenuOpen = false;
+  ui.buyMenuOpen = false;
+  ui.buyConfirm = "";
+  ui.trayOpen = false;
 }
 
 export function waitForBonusStart(totalFs: number) {
@@ -134,7 +137,7 @@ export function moneyPlain(micro: number) {
 }
 
 export function changeBet(delta: number) {
-  if (ui.busy || ui.replay || ui.bootOpen) return;
+  if (ui.busy || ui.replay || ui.bootOpen || ui.autoplayOn) return;
   const index = ui.betLevels.indexOf(ui.betMicro);
   const next = Math.max(0, Math.min(ui.betLevels.length - 1, (index < 0 ? 0 : index) + delta));
   ui.betMicro = ui.betLevels[next];

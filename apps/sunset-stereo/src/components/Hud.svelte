@@ -12,6 +12,7 @@
   } = $props();
 
   const locked = $derived(ui.busy || !ui.ready || ui.bootOpen);
+  const controlsLocked = $derived(locked || ui.autoplayOn);
   const spinLocked = $derived(locked && !ui.autoplayOn);
   const showBuy = $derived(!ui.replay && !ui.disableBuyFeature);
   const showAutoplay = $derived(!ui.replay && !ui.disableAutoplay);
@@ -65,6 +66,8 @@
   }
 
   function toggleBuy() {
+    if (ui.autoplayOn) return;
+    if (controlsLocked && !ui.buyMenuOpen) return;
     ui.buyMenuOpen = !ui.buyMenuOpen;
     ui.trayOpen = false;
     ui.buyConfirm = "";
@@ -155,10 +158,10 @@
         <strong id="betValue">{moneyHud(spinCost)}</strong>
       </div>
       <div class="chevrons">
-        <button id="betUp" type="button" disabled={locked} aria-label="Increase stake" onclick={() => onBet(1)}>
+        <button id="betUp" type="button" disabled={controlsLocked} aria-label="Increase stake" onclick={() => onBet(1)}>
           ▲
         </button>
-        <button id="betDown" type="button" disabled={locked} aria-label="Decrease stake" onclick={() => onBet(-1)}>
+        <button id="betDown" type="button" disabled={controlsLocked} aria-label="Decrease stake" onclick={() => onBet(-1)}>
           ▼
         </button>
       </div>
@@ -173,7 +176,7 @@
         class:on={ui.buyMenuOpen}
         class:armed={ui.scatterBuyOn}
         type="button"
-        disabled={locked && !ui.buyMenuOpen}
+        disabled={ui.autoplayOn || (controlsLocked && !ui.buyMenuOpen)}
         aria-label={labels.buy()}
         aria-pressed={ui.buyMenuOpen || ui.scatterBuyOn}
         onclick={toggleBuy}

@@ -56,12 +56,7 @@
     const timer = window.setTimeout(async () => {
       const ok = await spin();
       if (!ui.autoplayOn) return;
-      if (!ok) {
-        stopAutoplay();
-        return;
-      }
-      ui.autoplayLeft = Math.max(0, ui.autoplayLeft - 1);
-      if (ui.autoplayLeft <= 0) stopAutoplay();
+      if (!ok || ui.autoplayLeft <= 0) stopAutoplay();
     }, ui.fastPlay ? 90 : 280);
     return () => window.clearTimeout(timer);
   });

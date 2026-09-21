@@ -132,7 +132,8 @@ const controls = await send(9, "Runtime.evaluate", {
     turbo: Boolean(document.getElementById('turboBtn')),
     autoplay: Boolean(document.getElementById('autoplayBtn')),
     bonus: document.getElementById('bonusBtn')?.className || '',
-    mark: Boolean(document.querySelector('#bonusBtn img'))
+    mark: Boolean(document.querySelector('#bonusBtn img')),
+    select: getComputedStyle(document.body).userSelect
   })`,
   returnByValue: true,
 });
@@ -141,6 +142,7 @@ const controlState = JSON.parse(controls.result.value);
 if (!controlState.turbo) throw new Error("fast-play lightning must exist");
 if (!controlState.autoplay) throw new Error("autoplay play button must exist");
 if (!/provider/.test(controlState.bonus) || !controlState.mark) throw new Error("buy control must be the orange studio button");
+if (controlState.select !== "none") throw new Error(`slot text must not be selectable: ${controlState.select}`);
 
 await click(10, "#autoplayBtn");
 await new Promise((r) => setTimeout(r, 200));
@@ -173,6 +175,69 @@ for (let i = 0; i < 180; i += 1) {
 }
 if (lastHud?.busy) throw new Error(`spin still busy after ${Date.now() - spinStarted}ms`);
 assertWinMeter(lastHud);
+
+await click(700, "#autoplayBtn");
+await new Promise((r) => setTimeout(r, 200));
+await click(701, "#autoplayCount-5");
+await click(702, "#autoplayConfirmBtn");
+let autoHud;
+for (let i = 0; i < 40; i += 1) {
+  await new Promise((r) => setTimeout(r, 120));
+  const res = await send(710 + i, "Runtime.evaluate", {
+    expression: `JSON.stringify({
+      remain: document.getElementById('spinRemain')?.textContent || '',
+      betUp: Boolean(document.getElementById('betUp')?.disabled),
+      betDown: Boolean(document.getElementById('betDown')?.disabled),
+      bonus: Boolean(document.getElementById('bonusBtn')?.disabled),
+      busy: document.getElementById('spinBtn')?.classList.contains('auto') && Boolean(document.getElementById('spinRemain'))
+    })`,
+    returnByValue: true,
+  });
+  autoHud = JSON.parse(res.result.value);
+  if (autoHud.remain) break;
+}
+log("autoplay start", autoHud);
+if (!autoHud?.remain) throw new Error("autoplay must show remaining spins on the spin button");
+if (!autoHud.betUp || !autoHud.betDown) throw new Error("stake chevrons must stay locked during autoplay");
+if (!autoHud.bonus) throw new Error("feature shop must stay locked during autoplay");
+const firstRemain = Number(autoHud.remain);
+let sawDrop = firstRemain < 5;
+let sawLockBetween = autoHud.betUp && autoHud.bonus;
+for (let i = 0; i < 80; i += 1) {
+  await new Promise((r) => setTimeout(r, 150));
+  const res = await send(800 + i, "Runtime.evaluate", {
+    expression: `JSON.stringify({
+      remain: document.getElementById('spinRemain')?.textContent || '',
+      betUp: Boolean(document.getElementById('betUp')?.disabled),
+      bonus: Boolean(document.getElementById('bonusBtn')?.disabled),
+      spinBusy: Boolean(document.getElementById('spinBtn')?.disabled)
+    })`,
+    returnByValue: true,
+  });
+  const now = JSON.parse(res.result.value);
+  if (!now.betUp || !now.bonus) throw new Error(`stake/shop unlocked during autoplay: ${JSON.stringify(now)}`);
+  sawLockBetween = true;
+  if (Number(now.remain) < 5) sawDrop = true;
+  if (sawDrop) {
+    log("autoplay ticking", now);
+    break;
+  }
+}
+if (!sawDrop) throw new Error("autoplay counter must decrement when the spin starts");
+if (!sawLockBetween) throw new Error("stake/shop must stay disabled for the whole autoplay");
+await click(890, "#spinBtn");
+await new Promise((r) => setTimeout(r, 250));
+const autoStopped = await send(891, "Runtime.evaluate", {
+  expression: "Boolean(document.getElementById('spinRemain'))",
+  returnByValue: true,
+});
+if (autoStopped.result.value) throw new Error("clicking spin during autoplay must stop it");
+for (let i = 0; i < 180; i += 1) {
+  await new Promise((r) => setTimeout(r, 400));
+  lastHud = await readHud(900 + i);
+  if (!lastHud.busy) break;
+}
+if (lastHud?.busy) throw new Error("spin still busy after stopping autoplay");
 
 await click(60, "#betDown");
 await click(61, "#betDown");
@@ -246,6 +311,24 @@ if (scatterOnState.pressed !== "true" || !/^active$/i.test(scatterOnState.text.t
 if (scatterOnState.confirm) throw new Error("confirm must close after extra bet is armed");
 if (!/sun on reel 2/i.test(scatterOnState.stakeLabel)) {
   throw new Error("stake readout must show the extra bet");
+}
+
+const scatterLocks = await send(6425, "Runtime.evaluate", {
+  expression: `JSON.stringify({
+    bonusDisabled: Boolean(document.getElementById('buyScatterBtn')?.disabled),
+    wildDisabled: Boolean(document.getElementById('buyWildBonusBtn')?.disabled),
+    bonusBlocked: document.getElementById('buyBonusCard')?.className || '',
+    wildBlocked: document.getElementById('buyWildBonusCard')?.className || ''
+  })`,
+  returnByValue: true,
+});
+log("scatter locks buys", scatterLocks.result.value);
+const scatterLockState = JSON.parse(scatterLocks.result.value);
+if (!scatterLockState.bonusDisabled || !scatterLockState.wildDisabled) {
+  throw new Error("sun on reel 2 must disable 3-scatter and 4-scatter buys");
+}
+if (!/blocked/.test(scatterLockState.bonusBlocked) || !/blocked/.test(scatterLockState.wildBlocked)) {
+  throw new Error("sun on reel 2 must dim 3-scatter and 4-scatter cards");
 }
 
 await click(643, "#buyReel2Btn");

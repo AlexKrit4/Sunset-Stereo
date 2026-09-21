@@ -12,6 +12,9 @@ body {
   background-position: center 48%;
   background-repeat: no-repeat;
   background-attachment: fixed;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 html::before {
@@ -27,6 +30,13 @@ html::before {
 
 * {
   box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+img,
+canvas {
+  -webkit-user-drag: none;
 }
 
 #app {
