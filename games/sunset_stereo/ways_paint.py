@@ -329,6 +329,16 @@ def _blocked_starters(board: list[list[str]]) -> set[str]:
 
 def _break_three_oak(board: list[list[str]], locked: dict[tuple[int, int], str], rng) -> None:
     """Kill 3-oak ways by replacing reel-2 (or reel-1) cells that would complete a pay."""
+    if "W" in board[0]:
+        # A reel-0 wild starts every paying symbol. Reel 2 must not continue
+        # anything that reel 1 (or a reel-1 wild) already carries.
+        carried = set(PAYING_SET) if "W" in board[1] else _paying_names(board[1])
+        pool = [symbol for symbol in BONUS_PAYING if symbol not in carried]
+        if pool:
+            for row in _unlocked_rows(2, locked):
+                if board[2][row] in carried or board[2][row] == "W":
+                    board[2][row] = rng.choice(pool)
+            _cap_reel_stacks(board, 2, locked, rng, forbidden=carried)
     blocked = _blocked_starters(board)
     if "W" in board[2] and blocked:
         forbidden = set(PAYING_SET) if "W" in board[0] else _paying_names(board[0])

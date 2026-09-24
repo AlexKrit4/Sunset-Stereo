@@ -24,8 +24,29 @@ class GameState(GameStateOverride):
                     f"spin {sim} mode={self.betmode} criteria={self.criteria} "
                     f"stuck at win={self.final_win} after {self.repeat_count} retries"
                 )
+        self._apply_base_feature()
         self._apply_bonus_opening()
         self.imprint_wins()
+
+    def _apply_base_feature(self) -> None:
+        """4% main-spin feature on base/ante after the book is otherwise valid."""
+        from base_feature import apply_feature_to_book, should_feature
+
+        if self.betmode not in {"base", "scatter"}:
+            return
+        if not should_feature(int(getattr(self, "sim", 0))):
+            return
+        if self.tot_fs > 0 or any(event.get("type") == "freeSpinTrigger" for event in self.book.events):
+            return
+        blob = self.book.to_json()
+        blob["id"] = int(getattr(self, "sim", 0))
+        if not apply_feature_to_book(blob):
+            return
+        self.book.events = blob["events"]
+        self.book.payout_multiplier = blob.get("payoutMultiplier", 0) / 100.0
+        self.final_win = float(self.book.payout_multiplier)
+        self.book.basegame_wins = float(blob.get("baseGameWins") or self.final_win)
+        self.book.freegame_wins = 0.0
 
     def _apply_bonus_opening(self) -> None:
         from patch_bonus_opening import transform_book
@@ -37,6 +58,7 @@ class GameState(GameStateOverride):
 
     def run_freespin(self):
         self.reset_fs_spin()
+        self.bonus_wild = None
         while self.fs < self.tot_fs:
             if self.wincap_triggered:
                 break

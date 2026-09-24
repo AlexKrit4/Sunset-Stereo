@@ -473,10 +473,12 @@ def _mode_book(mode: str, criteria: str, sim: int):
 
 
 def test_zero_spins_are_not_cloned():
+    from base_feature import should_feature
     from ways_paint import is_stacked_column_board, visible_ways_win
 
     boards = []
-    for sim in range(12):
+    sims = [sim for sim in range(20) if not should_feature(sim)][:12]
+    for sim in sims:
         state, book = _mode_book("base", "0", sim)
         reveal = book["events"][0]
         visible = tuple(
@@ -566,9 +568,12 @@ def test_painted_basegame_hits_are_not_cloned_payouts():
 
     GameConfig._instance = None
     config = GameConfig()
+    from base_feature import should_feature
+
     payouts = []
     boards = []
-    for sim in range(80):
+    sims = [sim for sim in range(120) if not should_feature(sim)][:80]
+    for sim in sims:
         state = GameState(config)
         state.betmode = "base"
         state.criteria = "basegame"
@@ -629,16 +634,17 @@ def test_weighter_spreads_rtp_across_ranges():
     assert stats["hit_rate"] >= 1 / 50
 
 
-def _synth_bonus_freq_rows(mode: str):
+def _synth_bonus_freq_rows(mode: str, with_feature: bool = False):
     """Small pack that mirrors Stake 1/N bonus quotas plus empty-book RTP padding."""
-    from bonus_freq import BONUS_FREQ
+    from bonus_freq import BONUS_FREQ, FEATURE_RATE
 
     freq = BONUS_FREQ[mode]
     n = 20_000
     n3 = int(round(n * freq["fg3"]))
     n4 = int(round(n * freq["fg4"]))
+    n_feat = int(round(n * FEATURE_RATE)) if with_feature else 0
     n_zero = int(round(n * (0.70 if mode == "base" else 0.60)))
-    n_hit = n - n3 - n4 - n_zero
+    n_hit = n - n3 - n4 - n_zero - n_feat
     rows = []
     classes = {}
     book_id = 1
@@ -660,6 +666,9 @@ def _synth_bonus_freq_rows(mode: str):
     add("fg4", 25000, 1)
     add("fg4", 180000, 1)
     add("fg4", 1_500_000, 1)
+    if n_feat:
+        add("feature", 0, n_feat // 2)
+        add("feature", 40, n_feat - n_feat // 2)
     for cents in (20, 40, 80, 150, 300, 600, 1200, 3500) * ((n_hit // 8) + 1):
         if sum(1 for _, kind in classes.items() if kind == "hit") >= n_hit:
             break
@@ -694,10 +703,165 @@ def test_classify_book_uses_criteria_and_scatter_count():
     assert classify_book({"id": 3, "criteria": "wincap", "payoutMultiplier": 1_500_000, "events": []}) == "fg4"
     assert classify_book({"id": 4, "criteria": "0", "payoutMultiplier": 0, "events": []}) == "zero"
     assert classify_book({"id": 5, "criteria": "basegame", "payoutMultiplier": 80, "events": []}) == "hit"
+    assert (
+        classify_book(
+            {
+                "id": 25,
+                "criteria": "0",
+                "payoutMultiplier": 0,
+                "events": [{"type": "baseFeature", "kind": "syncReels", "reels": [0, 5]}],
+            }
+        )
+        == "feature"
+    )
     three = [{"type": "freeSpinTrigger", "positions": [{}, {}, {}]}]
     four = [{"type": "freeSpinTrigger", "positions": [{}, {}, {}, {}]}, {"type": "placeWild"}]
     assert classify_events(three, 1000) == "fg3"
     assert classify_events(four, 8000) == "fg4"
+
+
+def test_base_feature_mix_is_four_percent_then_fifty_fifty():
+    from base_feature import FEATURE_RATE, assert_feature_mix, feature_spec, should_feature
+
+    ids = list(range(25_000))
+    counts = assert_feature_mix(ids)
+    assert counts["feature"] == int(len(ids) * FEATURE_RATE)
+    assert counts["sync"] == counts["wilds"] == counts["feature"] // 2
+    assert counts["w1"] == 400
+    assert counts["w2"] == 75
+    assert counts["w3"] == 20
+    assert counts["w4"] == 5
+    assert should_feature(0) and should_feature(25) and not should_feature(1)
+    assert feature_spec(0)["kind"] == "syncReels"
+    assert feature_spec(0)["reels"] == [0, 5]
+    assert feature_spec(25)["kind"] == "placeWilds"
+    assert len(feature_spec(25)["positions"]) == 1
+
+
+def test_ways_detail_counts_reel_zero_wild_with_following_symbols():
+    from base_feature import ways_detail
+
+    pay, wins = ways_detail(
+        [
+            ["W", "L3", "L5", "H4"],
+            ["H1", "L2", "L4", "L3"],
+            ["H1", "L4", "H3", "L5"],
+            ["H4", "L1", "H3", "L2"],
+            ["L1", "L3", "H2", "L4"],
+            ["H2", "H3", "L2", "L5"],
+        ]
+    )
+    assert pay > 0
+    assert "H1" in {win["symbol"] for win in wins}
+    h1 = next(win for win in wins if win["symbol"] == "H1")
+    assert h1["kind"] == 3
+
+
+def test_apply_feature_to_book_writes_event_and_may_stay_zero():
+    from base_feature import apply_feature_to_book, feature_spec
+
+    spec = feature_spec(50)
+    assert spec["kind"] == "syncReels"
+    book = {
+        "id": 50,
+        "payoutMultiplier": 0,
+        "events": [
+            {
+                "index": 0,
+                "type": "reveal",
+                "gameType": "basegame",
+                "board": [
+                    [{"name": "L4"}] * 6,
+                    [{"name": "L3"}] * 6,
+                    [{"name": "L2"}] * 6,
+                    [{"name": "L5"}] * 6,
+                    [{"name": "H5"}] * 6,
+                    [{"name": "H4"}] * 6,
+                ],
+            },
+            {"index": 1, "type": "setTotalWin", "amount": 0},
+            {"index": 2, "type": "finalWin", "amount": 0},
+        ],
+    }
+    assert apply_feature_to_book(book) is True
+    types = [event["type"] for event in book["events"]]
+    assert types[0] == "baseFeature"
+    assert book["events"][0]["kind"] == "syncReels"
+    left, right = book["events"][0]["reels"]
+    reveal = next(event for event in book["events"] if event["type"] == "reveal")
+    assert reveal["board"][left] == reveal["board"][right]
+    assert book["events"][-1]["type"] == "finalWin"
+    assert int(book["events"][-1]["amount"]) == int(book["payoutMultiplier"])
+
+
+def test_patch_wild_ways_locks_camera_wild_with_following_symbols():
+    from patch_wild_ways_books import patch_book
+
+    book = {
+        "id": 9,
+        "payoutMultiplier": 0,
+        "events": [
+            {"index": 0, "type": "reveal", "gameType": "basegame", "board": [[{"name": "S"}] * 6] * 6},
+            {"index": 1, "type": "freeSpinTrigger", "totalFs": 10, "positions": []},
+            {"index": 2, "type": "placeWild", "reel": 0, "row": 1},
+            {"index": 3, "type": "updateFreeSpin", "amount": 0, "total": 10},
+            {
+                "index": 4,
+                "type": "reveal",
+                "gameType": "freegame",
+                "board": [
+                    [{"name": "L5"}, {"name": "L3"}, {"name": "L4"}, {"name": "H4"}, {"name": "L2"}, {"name": "L5"}],
+                    [{"name": "L2"}, {"name": "H1"}, {"name": "L4"}, {"name": "L3"}, {"name": "L5"}, {"name": "L2"}],
+                    [{"name": "L4"}, {"name": "H1"}, {"name": "H3"}, {"name": "L5"}, {"name": "L2"}, {"name": "L3"}],
+                    [{"name": "H4"}, {"name": "L1"}, {"name": "H3"}, {"name": "L2"}, {"name": "L5"}, {"name": "H2"}],
+                    [{"name": "L1"}, {"name": "L3"}, {"name": "H2"}, {"name": "L4"}, {"name": "L5"}, {"name": "H3"}],
+                    [{"name": "H2"}, {"name": "H3"}, {"name": "L2"}, {"name": "L5"}, {"name": "L4"}, {"name": "H1"}],
+                ],
+            },
+            {"index": 5, "type": "setTotalWin", "amount": 0},
+            {"index": 6, "type": "finalWin", "amount": 0},
+        ],
+    }
+    assert patch_book(book) is True
+    types = [event["type"] for event in book["events"]]
+    assert "winInfo" in types
+    assert "holdRespin" in types
+    reveal = next(event for event in book["events"] if event["type"] == "reveal" and event.get("gameType") == "freegame")
+    wild_cell = reveal["board"][0][1]
+    assert (wild_cell["name"] if isinstance(wild_cell, dict) else wild_cell) == "W"
+    assert book["payoutMultiplier"] > 0
+    assert book["events"][-1]["amount"] == book["payoutMultiplier"]
+
+
+def test_bonus_freq_weights_lock_feature_rate_and_rtp():
+    from bonus_freq import FEATURE_RATE, reweight_mode_rows
+
+    for mode in ("base", "scatter"):
+        rows, classes = _synth_bonus_freq_rows(mode, with_feature=True)
+        weighted, stats = reweight_mode_rows(rows, mode, classes)
+        freq = stats["bonus_freq"]["classes"]
+        assert abs(freq["feature"]["p"] - FEATURE_RATE) / FEATURE_RATE < 0.08
+        assert 0.93 <= stats["rtp"] <= 0.97
+
+
+def test_generated_base_and_ante_feature_books_emit_event():
+    from gamestate import GameState
+
+    for mode, sim in (("base", 50), ("scatter", 0)):
+        GameConfig._instance = None
+        state = GameState(GameConfig())
+        state.betmode = mode
+        state.criteria = "basegame"
+        state.run_spin(sim)
+        book = state.book.to_json()
+        assert book["events"][0]["type"] == "baseFeature"
+        assert book["events"][0]["kind"] in {"syncReels", "placeWilds"}
+        reveal = next(event for event in book["events"] if event["type"] == "reveal")
+        assert reveal["gameType"] == "basegame"
+        assert not any(event["type"] == "freeSpinTrigger" for event in book["events"])
+        if book["events"][0]["kind"] == "syncReels":
+            left, right = book["events"][0]["reels"]
+            assert reveal["board"][left] == reveal["board"][right]
 
 
 def test_natural_three_scatter_bonus_pays_at_least_10x():

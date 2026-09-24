@@ -205,7 +205,10 @@ export class BoardController {
   private onSettled: ((col: number) => void) | null = null;
   private teaseOverlay = new Graphics();
   private scatterOverlay = new Graphics();
+  private syncOverlay = new Graphics();
   private wildOverlay = new Container();
+  private armedSync: [number, number] | null = null;
+  private armedWilds: Array<{ reel: number; row: number }> = [];
   private sheenTick: (() => void) | null = null;
   private sheenResolve: (() => void) | null = null;
   private bonusDim = false;
@@ -272,8 +275,9 @@ export class BoardController {
 
     this.teaseOverlay.eventMode = "none";
     this.scatterOverlay.eventMode = "none";
+    this.syncOverlay.eventMode = "none";
     this.wildOverlay.eventMode = "none";
-    window.addChild(this.teaseOverlay, this.scatterOverlay, this.wildOverlay);
+    window.addChild(this.teaseOverlay, this.scatterOverlay, this.syncOverlay, this.wildOverlay);
     this.root.addChild(window);
     this.app.stage.addChild(this.root);
     this.app.ticker.add(this.idleTick);
@@ -342,6 +346,38 @@ export class BoardController {
     this.applyHeldCellVisibility();
   }
 
+  armSyncReels(left: number, right: number) {
+    this.armedSync = [left, right];
+    this.drawSyncLink(left, right);
+  }
+
+  armBaseWilds(positions: Array<{ reel: number; row: number }>) {
+    this.armedWilds = positions.map(unpadPosition);
+  }
+
+  async playArmedBaseFeature() {
+    if (this.armedWilds.length) {
+      const drops = [...this.armedWilds];
+      this.armedWilds = [];
+      for (const pos of drops) {
+        await this.placeWildFromCamera({ reel: pos.reel, row: pos.row + 1 });
+      }
+    }
+    this.armedSync = null;
+    this.syncOverlay.clear();
+  }
+
+  private drawSyncLink(left: number, right: number) {
+    const a = this.reels[left]?.parent;
+    const b = this.reels[right]?.parent;
+    this.syncOverlay.clear();
+    if (!a || !b) return;
+    const y = (a.y ?? 0) + (MAX_ROWS * CELL) / 2;
+    this.syncOverlay.rect(a.x - 4, a.y - 4, CELL + 8, MAX_ROWS * CELL + 8).stroke({ width: 3, color: 0xf0d8a0, alpha: 0.9 });
+    this.syncOverlay.rect(b.x - 4, b.y - 4, CELL + 8, MAX_ROWS * CELL + 8).stroke({ width: 3, color: 0xf0d8a0, alpha: 0.9 });
+    this.syncOverlay.moveTo(a.x + CELL / 2, y).lineTo(b.x + CELL / 2, y).stroke({ width: 2, color: 0xf0d8a0, alpha: 0.7 });
+  }
+
   private planSpin(waysGaps: number[], scatterGaps: number[], pace: "base" | "bonus" | "respin" = "base") {
     const linearMs = paceMs(pace === "base" ? LINEAR_MS : 640);
     const startStagger = paceMs(START_STAGGER_MS);
@@ -370,6 +406,12 @@ export class BoardController {
       const actualFall = (restOffset + SPIN_WINDUP_PX + gravityLead) / velocity;
       prevStop = delay + paceMs(SPIN_WINDUP_MS) + actualFall;
       plans.push({ delay, fillers: needed, velocity });
+    }
+    if (this.armedSync) {
+      const [src, dst] = this.armedSync;
+      if (plans[src] && plans[dst]) {
+        plans[dst] = { ...plans[src] };
+      }
     }
     return plans;
   }
@@ -567,10 +609,15 @@ export class BoardController {
 
   showBookScatters(_board: RawSymbol[][]) {}
 
-  clearBookVisuals() {
+  clearBookVisuals(opts: { keepFeature?: boolean } = {}) {
     this.bonusDim = false;
     this.brightCells.clear();
     this.landingBright.clear();
+    if (!opts.keepFeature) {
+      this.armedSync = null;
+      this.armedWilds = [];
+      this.syncOverlay.clear();
+    }
     this.wildOverlay.removeChildren().forEach((child) => child.destroy({ children: true }));
     this.clearHolds();
     this.clearWins();

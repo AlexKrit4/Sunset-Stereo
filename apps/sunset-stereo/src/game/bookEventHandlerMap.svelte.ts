@@ -88,7 +88,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       pendingHolds = [];
       lastSpinWinMicro = 0;
       clearLockedWilds();
-      board.clearBookVisuals();
+      board.clearBookVisuals({ keepFeature: true });
     }
     const upcoming = bookEvent.gameType === "freegame" ? nextBonusWin(context.bookEvents, bookEvent) : null;
     const holdCells = withLockedWilds(pendingHolds);
@@ -101,6 +101,10 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
       holds: holdCells,
       upcomingWins: fresh,
     });
+    if (bookEvent.gameType === "basegame") {
+      await board.playArmedBaseFeature();
+      if (ui.banner === "Stereo Reels" || ui.banner === "Wild Drop") ui.banner = "";
+    }
     if (holdCells.length && !upcoming?.beforeRespin) {
       board.applyBookHolds(bookEvent.board, holdCells);
     }
@@ -125,6 +129,22 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     lockedWilds = [{ reel: bookEvent.reel, row: bookEvent.row }];
     pendingHolds = withLockedWilds([]);
     await board.placeWildFromCamera({ reel: bookEvent.reel, row: bookEvent.row });
+  },
+
+  baseFeature: async (bookEvent) => {
+    const board = runtime.board;
+    if (!board) return;
+    if (bookEvent.kind === "syncReels" && bookEvent.reels?.length === 2) {
+      ui.banner = "Stereo Reels";
+      board.armSyncReels(bookEvent.reels[0], bookEvent.reels[1]);
+      await waitForTimeout(paceMs(280));
+      return;
+    }
+    if (bookEvent.kind === "placeWilds" && bookEvent.positions?.length) {
+      ui.banner = bookEvent.positions.length > 1 ? "Wild Drop" : "Wild Drop";
+      board.armBaseWilds(bookEvent.positions);
+      await waitForTimeout(paceMs(220));
+    }
   },
 
   winInfo: async (bookEvent, context) => {
