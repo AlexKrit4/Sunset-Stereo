@@ -242,9 +242,13 @@ def apply_feature_to_book(book: dict) -> bool:
 
 def classify_feature(book: dict) -> str | None:
     events = book.get("events") or []
-    if any(event.get("type") == "baseFeature" for event in events):
-        return "feature"
-    return None
+    feat = next((event for event in events if event.get("type") == "baseFeature"), None)
+    if not feat:
+        return None
+    if feat.get("kind") == "syncReels":
+        return "feature_sync"
+    count = max(1, min(4, len(feat.get("positions") or [])))
+    return f"feature_w{count}"
 
 
 def assert_feature_mix(book_ids: list[int]) -> dict[str, int]:

@@ -667,8 +667,14 @@ def _synth_bonus_freq_rows(mode: str, with_feature: bool = False):
     add("fg4", 180000, 1)
     add("fg4", 1_500_000, 1)
     if n_feat:
-        add("feature", 0, n_feat // 2)
-        add("feature", 40, n_feat - n_feat // 2)
+        n_sync = n_feat // 2
+        n_wild = n_feat - n_sync
+        add("feature_sync", 0, n_sync // 2)
+        add("feature_sync", 40, n_sync - n_sync // 2)
+        add("feature_w1", 0, max(1, int(round(n_wild * 0.80))))
+        add("feature_w2", 40, max(1, int(round(n_wild * 0.15))))
+        add("feature_w3", 80, max(1, int(round(n_wild * 0.04))))
+        add("feature_w4", 120, max(1, n_wild - sum(1 for kind in classes.values() if kind.startswith("feature_w"))))
     for cents in (20, 40, 80, 150, 300, 600, 1200, 3500) * ((n_hit // 8) + 1):
         if sum(1 for _, kind in classes.items() if kind == "hit") >= n_hit:
             break
@@ -712,7 +718,7 @@ def test_classify_book_uses_criteria_and_scatter_count():
                 "events": [{"type": "baseFeature", "kind": "syncReels", "reels": [0, 5]}],
             }
         )
-        == "feature"
+        == "feature_sync"
     )
     three = [{"type": "freeSpinTrigger", "positions": [{}, {}, {}]}]
     four = [{"type": "freeSpinTrigger", "positions": [{}, {}, {}, {}]}, {"type": "placeWild"}]
@@ -840,7 +846,9 @@ def test_bonus_freq_weights_lock_feature_rate_and_rtp():
         rows, classes = _synth_bonus_freq_rows(mode, with_feature=True)
         weighted, stats = reweight_mode_rows(rows, mode, classes)
         freq = stats["bonus_freq"]["classes"]
-        assert abs(freq["feature"]["p"] - FEATURE_RATE) / FEATURE_RATE < 0.08
+        p_feat = sum(freq.get(kind, {}).get("p", 0.0) for kind in ("feature_sync", "feature_w1", "feature_w2", "feature_w3", "feature_w4"))
+        assert abs(p_feat - FEATURE_RATE) / FEATURE_RATE < 0.08
+        assert abs(freq["feature_sync"]["p"] - 0.5 * FEATURE_RATE) / (0.5 * FEATURE_RATE) < 0.12
         assert 0.93 <= stats["rtp"] <= 0.97
 
 

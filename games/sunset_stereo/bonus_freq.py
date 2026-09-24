@@ -27,7 +27,23 @@ from weight_modes import (
     lut_stats,
     write_lut,
 )
-from base_feature import FEATURE_RATE, classify_feature
+from base_feature import FEATURE_RATE, WILD_COUNT_BANDS, classify_feature
+
+FEATURE_CLASSES = (
+    "feature_sync",
+    "feature_w1",
+    "feature_w2",
+    "feature_w3",
+    "feature_w4",
+)
+
+FEATURE_SHARE = {"feature_sync": 0.5}
+_acc = 0
+for _share, _count in WILD_COUNT_BANDS:
+    FEATURE_SHARE[f"feature_w{_count}"] = 0.5 * (_share / 100.0)
+    _acc += _share
+assert abs(_acc - 100) < 1e-9
+assert abs(sum(FEATURE_SHARE.values()) - 1.0) < 1e-9
 
 BONUS_FREQ = {
     "base": {"fg3": 1.0 / 200.0, "fg4": 1.0 / 1000.0},
@@ -59,8 +75,9 @@ def classify_book(book: dict) -> str:
         return "fg3"
     if criteria in {"freegame4", "wincap"}:
         return "fg4"
-    if classify_feature(book):
-        return "feature"
+    feature = classify_feature(book)
+    if feature:
+        return feature
     if criteria == "0":
         return "zero"
     if criteria == "basegame":
@@ -108,8 +125,19 @@ def assign_bonus_freq_weights(
     cost = MODE_COST[mode]
     p3 = float(freq["fg3"])
     p4 = float(freq["fg4"])
-    p_feat = FEATURE_RATE if any(kind == "feature" for kind in classes.values()) else 0.0
-    by_class: dict[str, list[tuple[int, int]]] = {"fg3": [], "fg4": [], "feature": [], "hit": [], "zero": []}
+    present_feat = {kind for kind in classes.values() if kind in FEATURE_SHARE}
+    p_feat = FEATURE_RATE if present_feat else 0.0
+    by_class: dict[str, list[tuple[int, int]]] = {
+        "fg3": [],
+        "fg4": [],
+        "feature_sync": [],
+        "feature_w1": [],
+        "feature_w2": [],
+        "feature_w3": [],
+        "feature_w4": [],
+        "hit": [],
+        "zero": [],
+    }
     payouts = {}
     for book_id, _weight, cents in rows:
         kind = classes.get(int(book_id), "hit" if cents > 0 else "zero")
@@ -119,8 +147,16 @@ def assign_bonus_freq_weights(
         payouts[int(book_id)] = int(cents)
     if not by_class["fg3"] or not by_class["fg4"] or not by_class["zero"]:
         raise ValueError(f"{mode} needs fg3, fg4, and zero books to lock bonus frequency")
-    if p_feat and not by_class["feature"]:
+    feat_groups = {kind: items for kind, items in by_class.items() if kind in FEATURE_SHARE and items}
+    if p_feat and not feat_groups:
         p_feat = 0.0
+    feat_mass = {
+        kind: p_feat * FEATURE_SHARE[kind]
+        for kind in feat_groups
+    }
+    if feat_mass:
+        scale = p_feat / sum(feat_mass.values())
+        feat_mass = {kind: mass * scale for kind, mass in feat_mass.items()}
 
     bonus_tilt = -6.0
     lo, hi = -12.0, 0.0
@@ -136,31 +172,35 @@ def assign_bonus_freq_weights(
     bonus_ev = p3 * _mu(by_class["fg3"], bonus_tilt) + p4 * _mu(by_class["fg4"], bonus_tilt)
     feat_tilt = -8.0
     feat_ev = 0.0
-    if by_class["feature"] and p_feat > 0:
-        # Feature books do not have to pay. Put the 4% mass on cheap/zero
-        # feature outcomes so bonus+feature EV still leaves room for 95% RTP.
+    if feat_groups and p_feat > 0:
+        # Feature books do not have to pay. Cheap/zero outcomes carry each
+        # subtype's locked share so 50/50 and 80/15/4/1 survive the RTP fit.
         feat_cap = max(0.0, TARGET_RTP * cost - bonus_ev - 0.08 * cost)
+
+        def _feat_ev(tilt: float) -> float:
+            return sum(feat_mass[kind] * _mu(items, tilt) for kind, items in feat_groups.items())
+
         lo, hi = -16.0, 0.0
         for _ in range(28):
             mid = (lo + hi) / 2.0
-            ev = p_feat * _mu(by_class["feature"], mid)
+            ev = _feat_ev(mid)
             if ev > feat_cap:
                 hi = mid
             else:
                 lo = mid
             feat_tilt = hi
-        feat_ev = p_feat * _mu(by_class["feature"], feat_tilt)
+        feat_ev = _feat_ev(feat_tilt)
         if feat_ev > feat_cap:
             feat_tilt = -16.0
-            feat_ev = p_feat * _mu(by_class["feature"], feat_tilt)
+            feat_ev = _feat_ev(feat_tilt)
     remain_mass = max(0.0, 1.0 - p3 - p4 - p_feat)
     remain_ev = TARGET_RTP * cost - bonus_ev - feat_ev
     if remain_ev < 0:
         bonus_tilt = -12.0
         bonus_ev = p3 * _mu(by_class["fg3"], bonus_tilt) + p4 * _mu(by_class["fg4"], bonus_tilt)
-        if by_class["feature"] and p_feat > 0:
+        if feat_groups and p_feat > 0:
             feat_tilt = -16.0
-            feat_ev = p_feat * _mu(by_class["feature"], feat_tilt)
+            feat_ev = sum(feat_mass[kind] * _mu(items, feat_tilt) for kind, items in feat_groups.items())
         remain_ev = TARGET_RTP * cost - bonus_ev - feat_ev
         remain_mass = max(0.0, 1.0 - p3 - p4 - p_feat)
 
@@ -184,8 +224,9 @@ def assign_bonus_freq_weights(
     weights: dict[int, int] = {int(book_id): 1 for book_id, _, _ in rows}
     weights.update(_mass_weights(by_class["fg3"], p3, bonus_tilt))
     weights.update(_mass_weights(by_class["fg4"], p4, bonus_tilt))
-    if by_class["feature"] and p_feat > 0:
-        weights.update(_mass_weights(by_class["feature"], p_feat, feat_tilt))
+    if feat_groups and p_feat > 0:
+        for kind, items in feat_groups.items():
+            weights.update(_mass_weights(items, feat_mass[kind], feat_tilt))
     if by_class["hit"] and p_hit > 0:
         weights.update(_mass_weights(by_class["hit"], p_hit, hit_tilt))
     if by_class["zero"] and p_zero > 0:
@@ -207,7 +248,11 @@ def _fit_remain_rtp(
 ) -> list[tuple[int, int, int]]:
     """Move mass between hits and zeros only. Bonus/feature weights stay fixed."""
     cost = MODE_COST[mode]
-    bonus_ids = {int(book_id) for book_id, kind in classes.items() if kind in {"fg3", "fg4", "feature"}}
+    bonus_ids = {
+        int(book_id)
+        for book_id, kind in classes.items()
+        if kind in {"fg3", "fg4", *FEATURE_CLASSES}
+    }
     hit_ids = [int(book_id) for book_id, kind in classes.items() if kind == "hit"]
     zero_ids = [int(book_id) for book_id, kind in classes.items() if kind == "zero"]
     by_id = {int(book_id): (weight, cents) for book_id, weight, cents in rows}
@@ -369,9 +414,12 @@ def reweight_mode_rows(
         raise ValueError(f"{mode} 3-scatter p={p3:.6f} want {want['fg3']}")
     if abs(p4 - want["fg4"]) / want["fg4"] > 0.08:
         raise ValueError(f"{mode} 4-scatter p={p4:.6f} want {want['fg4']}")
-    p_feat = freq["classes"].get("feature", {}).get("p", 0.0)
-    if freq["classes"].get("feature") and abs(p_feat - FEATURE_RATE) / FEATURE_RATE > 0.08:
+    p_feat = sum(freq["classes"].get(kind, {}).get("p", 0.0) for kind in FEATURE_CLASSES)
+    if p_feat and abs(p_feat - FEATURE_RATE) / FEATURE_RATE > 0.08:
         raise ValueError(f"{mode} feature p={p_feat:.6f} want {FEATURE_RATE}")
+    p_sync = freq["classes"].get("feature_sync", {}).get("p", 0.0)
+    if p_feat and abs(p_sync - 0.5 * FEATURE_RATE) / (0.5 * FEATURE_RATE) > 0.12:
+        raise ValueError(f"{mode} sync p={p_sync:.6f} want {0.5 * FEATURE_RATE}")
     if not (TARGET_RTP - RTP_TOL * 2 <= stats["rtp"] <= TARGET_RTP + RTP_TOL * 2):
         raise ValueError(f"{mode} RTP {stats['rtp']:.4f} outside {TARGET_RTP} window")
     return weighted, stats
@@ -409,7 +457,11 @@ def reweight_zip(src_zip: str, dst_zip: str | None = None) -> dict:
                 "hit_rate": stats["hit_rate"],
                 "fg3": stats["bonus_freq"]["classes"].get("fg3"),
                 "fg4": stats["bonus_freq"]["classes"].get("fg4"),
-                "feature": stats["bonus_freq"]["classes"].get("feature"),
+                "feature": {
+                    kind: stats["bonus_freq"]["classes"].get(kind)
+                    for kind in FEATURE_CLASSES
+                    if stats["bonus_freq"]["classes"].get(kind)
+                },
                 "zero": stats["bonus_freq"]["classes"].get("zero"),
             }
             print(f"{mode} {summary[mode]}", flush=True)
