@@ -45,7 +45,7 @@ def patch_books_file_stream(path: str) -> tuple[dict[str, int], dict[int, int]]:
     payouts: dict[int, int] = {}
     tmp = path + ".tmp"
     proc = subprocess.Popen(
-        ["zstd", "-19", "-T0", "-f", "-o", tmp],
+        ["zstd", "-3", "-T0", "-f", "-o", tmp],
         stdin=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
