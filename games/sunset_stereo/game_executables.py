@@ -446,9 +446,12 @@ class GameExecutables(GameCalculations):
         remaining = max(1, self.tot_fs - self.fs + 1)
         sticky = set()
         if self._conditions().get("place_bonus_wild"):
-            reel, row = self._place_random_wild()
-            place_wild_event(self, reel, row)
-            sticky.add((reel, row))
+            placed = getattr(self, "bonus_wild", None)
+            if placed is None:
+                placed = self._place_random_wild()
+                self.bonus_wild = placed
+                place_wild_event(self, placed[0], placed[1])
+            sticky.add(placed)
         aim = target if target is not None else floor
         if self.criteria == "dead":
             ceiling = BUY_WILD_COST if self.betmode == "wildbonus" else BUY_BONUS_COST

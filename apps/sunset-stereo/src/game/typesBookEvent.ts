@@ -100,6 +100,14 @@ export type BookEventPlaceWild = {
   row: number;
 };
 
+export type BookEventBaseFeature = {
+  index: number;
+  type: "baseFeature";
+  kind: "syncReels" | "placeWilds";
+  reels?: number[];
+  positions?: Position[];
+};
+
 export type BookEventFinalWin = {
   index: number;
   type: "finalWin";
@@ -123,6 +131,7 @@ export type BookEvent =
   | BookEventUpdateGlobalMult
   | BookEventHoldRespin
   | BookEventPlaceWild
+  | BookEventBaseFeature
   | BookEventFreeSpinEnd
   | BookEventWincap
   | BookEventFinalWin;

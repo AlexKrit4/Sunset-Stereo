@@ -24,3 +24,19 @@ def place_wild_event(gamestate, reel: int, row: int) -> None:
             "row": int(row) + 1,
         }
     )
+
+
+def base_feature_event(gamestate, spec: dict) -> None:
+    """Main-spin stereo feature. Positions are 0-based visible rows; books store padded rows."""
+    event = {
+        "index": len(gamestate.book.events),
+        "type": "baseFeature",
+        "kind": spec["kind"],
+    }
+    if spec["kind"] == "syncReels":
+        event["reels"] = [int(reel) for reel in spec["reels"]]
+    else:
+        event["positions"] = [
+            {"reel": int(pos["reel"]), "row": int(pos["row"]) + 1} for pos in spec["positions"]
+        ]
+    gamestate.book.add_event(event)
