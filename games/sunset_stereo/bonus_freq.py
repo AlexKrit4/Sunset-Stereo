@@ -134,13 +134,33 @@ def assign_bonus_freq_weights(
             lo = mid
         bonus_tilt = hi
     bonus_ev = p3 * _mu(by_class["fg3"], bonus_tilt) + p4 * _mu(by_class["fg4"], bonus_tilt)
-    feat_tilt = -2.0
-    feat_ev = p_feat * _mu(by_class["feature"], feat_tilt) if by_class["feature"] else 0.0
+    feat_tilt = -8.0
+    feat_ev = 0.0
+    if by_class["feature"] and p_feat > 0:
+        # Feature books do not have to pay. Put the 4% mass on cheap/zero
+        # feature outcomes so bonus+feature EV still leaves room for 95% RTP.
+        feat_cap = max(0.0, TARGET_RTP * cost - bonus_ev - 0.08 * cost)
+        lo, hi = -16.0, 0.0
+        for _ in range(28):
+            mid = (lo + hi) / 2.0
+            ev = p_feat * _mu(by_class["feature"], mid)
+            if ev > feat_cap:
+                hi = mid
+            else:
+                lo = mid
+            feat_tilt = hi
+        feat_ev = p_feat * _mu(by_class["feature"], feat_tilt)
+        if feat_ev > feat_cap:
+            feat_tilt = -16.0
+            feat_ev = p_feat * _mu(by_class["feature"], feat_tilt)
     remain_mass = max(0.0, 1.0 - p3 - p4 - p_feat)
     remain_ev = TARGET_RTP * cost - bonus_ev - feat_ev
     if remain_ev < 0:
         bonus_tilt = -12.0
         bonus_ev = p3 * _mu(by_class["fg3"], bonus_tilt) + p4 * _mu(by_class["fg4"], bonus_tilt)
+        if by_class["feature"] and p_feat > 0:
+            feat_tilt = -16.0
+            feat_ev = p_feat * _mu(by_class["feature"], feat_tilt)
         remain_ev = TARGET_RTP * cost - bonus_ev - feat_ev
         remain_mass = max(0.0, 1.0 - p3 - p4 - p_feat)
 
