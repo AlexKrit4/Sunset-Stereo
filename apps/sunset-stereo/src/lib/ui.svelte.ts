@@ -58,6 +58,7 @@ export const ui = $state({
   maxWinOpen: false,
   maxWinDisplayMicro: 0,
   maxWinReady: false,
+  maxWinClicked: false,
   maxWinPulse: false,
   maxWinLeaving: false,
 });

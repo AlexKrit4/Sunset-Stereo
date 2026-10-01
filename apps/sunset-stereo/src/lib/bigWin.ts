@@ -263,6 +263,7 @@ let maxWinContinueResolve: (() => void) | null = null;
 
 /** Continue button on the Max Win scene. */
 export function confirmMaxWin() {
+  ui.maxWinClicked = true;
   const resolve = maxWinContinueResolve;
   maxWinContinueResolve = null;
   resolve?.();
@@ -295,15 +296,17 @@ export async function playWincapBzzz(totalMicro: number) {
 
 export async function playMaxWin(totalMicro: number) {
   beginBigWinIntro();
-  if (bzzzClip) {
-    await waitForClipEnd(bzzzClip, bzzzPlaying, BZZZ_FALLBACK_MS);
-  }
 
   ui.maxWinOpen = true;
   ui.maxWinReady = false;
+  ui.maxWinClicked = false;
   ui.maxWinPulse = false;
   ui.maxWinLeaving = false;
   ui.maxWinDisplayMicro = 0;
+
+  if (bzzzClip) {
+    await waitForClipEnd(bzzzClip, bzzzPlaying, BZZZ_FALLBACK_MS);
+  }
 
   playClip("audio/maxwin/zmaxwin1.mp3");
   await countMaxWin(totalMicro, MAXWIN_COUNT_MS);
@@ -331,6 +334,7 @@ export async function playMaxWin(totalMicro: number) {
 
   ui.maxWinOpen = false;
   ui.maxWinReady = false;
+  ui.maxWinClicked = false;
   ui.maxWinPulse = false;
   ui.maxWinLeaving = false;
   ui.maxWinDisplayMicro = 0;

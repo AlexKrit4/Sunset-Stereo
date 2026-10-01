@@ -1,13 +1,8 @@
 <script lang="ts">
   import { confirmMaxWin } from "../lib/bigWin";
-  import { ui } from "../lib/ui.svelte";
+  import { moneyHud, ui } from "../lib/ui.svelte";
 
-  const displayX = $derived(
-    (ui.maxWinDisplayMicro / Math.max(1, ui.betMicro)).toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }),
-  );
+  const displayAmount = $derived(moneyHud(ui.maxWinDisplayMicro));
 </script>
 
 {#if ui.maxWinOpen}
@@ -21,10 +16,16 @@
   >
     <h2 class="title">MAX WIN</h2>
     <p id="maxWinValue" class="amount" class:pulse={ui.maxWinPulse} aria-live="polite">
-      {displayX}×
+      {displayAmount}
     </p>
     {#if ui.maxWinReady}
-      <button id="maxWinContinue" class="continue" type="button" onclick={() => confirmMaxWin()}>
+      <button
+        id="maxWinContinue"
+        class="continue"
+        class:confirmed={ui.maxWinClicked}
+        type="button"
+        onclick={() => confirmMaxWin()}
+      >
         Continue
       </button>
     {/if}
@@ -93,6 +94,11 @@
     font-size: 16px;
     cursor: pointer;
     animation: continue-in 0.4s ease both;
+    transition: opacity 0.6s ease;
+  }
+  .continue.confirmed {
+    opacity: 0;
+    pointer-events: none;
   }
   @keyframes explode {
     0% {
