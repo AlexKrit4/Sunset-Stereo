@@ -245,22 +245,20 @@
           </svg>
         </button>
       {/if}
-      {#if !ui.replay}
-        <button
-          id="turboBtn"
-          class="circle bolt"
-          class:on={ui.fastPlay}
-          type="button"
-          disabled={!ui.ready || ui.bootOpen}
-          aria-label={labels.turbo()}
-          aria-pressed={ui.fastPlay}
-          onclick={toggleFastPlay}
-        >
-          <svg viewBox="0 0 32 32" aria-hidden="true">
-            <path d="M18 3 8 18h7l-2 11 12-16h-7z" fill="currentColor" />
-          </svg>
-        </button>
-      {/if}
+      <button
+        id="turboBtn"
+        class="circle bolt"
+        class:on={ui.fastPlay}
+        type="button"
+        disabled={!ui.ready || ui.bootOpen}
+        aria-label={labels.turbo()}
+        aria-pressed={ui.fastPlay}
+        onclick={toggleFastPlay}
+      >
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M18 3 8 18h7l-2 11 12-16h-7z" fill="currentColor" />
+        </svg>
+      </button>
     </div>
 
     {#if ui.autoplayMenuOpen}

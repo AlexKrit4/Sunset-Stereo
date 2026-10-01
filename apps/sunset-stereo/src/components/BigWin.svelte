@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { skipBigWinStage } from "../lib/bigWin";
   import { moneyHud, ui } from "../lib/ui.svelte";
 </script>
 
@@ -12,6 +13,7 @@
     data-bigwin-left={ui.bigWinLeft}
     data-bigwin-right={ui.bigWinRight}
     data-bigwin-explode={ui.bigWinExplode ? "1" : "0"}
+    onclick={() => skipBigWinStage()}
   >
     <div class="titles">
       {#if ui.bigWinOutgoingLeft}

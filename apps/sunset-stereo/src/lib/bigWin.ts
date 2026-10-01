@@ -36,6 +36,35 @@ let startScheduled = false;
 let startFinished: Promise<void> = Promise.resolve();
 let bzzzClip: HTMLAudioElement | null = null;
 let bzzzPlaying: Promise<boolean> = Promise.resolve(false);
+let skipRequested = false;
+const skipWaiters = new Set<() => void>();
+
+/** Click during Big Win: snap the current stage to its sum and move on. */
+export function skipBigWinStage() {
+  skipRequested = true;
+  [...skipWaiters].forEach((done) => done());
+}
+
+function takeSkip() {
+  const was = skipRequested;
+  skipRequested = false;
+  return was;
+}
+
+function skippableTimeout(ms: number) {
+  return new Promise<void>((resolve) => {
+    const timer = window.setTimeout(() => {
+      skipWaiters.delete(done);
+      resolve();
+    }, ms);
+    const done = () => {
+      window.clearTimeout(timer);
+      skipWaiters.delete(done);
+      resolve();
+    };
+    skipWaiters.add(done);
+  });
+}
 
 function audioUrl(file: string) {
   return audioSrc(`audio/bigwin/${file}`);
@@ -127,9 +156,11 @@ async function waitForClipEnd(
     const done = () => {
       if (settled) return;
       settled = true;
+      skipWaiters.delete(done);
       window.clearTimeout(timer);
       resolve();
     };
+    skipWaiters.add(done);
     const timer = window.setTimeout(done, fallbackMs);
     clip.addEventListener("ended", done, { once: true });
     clip.addEventListener("error", done, { once: true });
@@ -143,6 +174,7 @@ function syncHud(displayMicro: number) {
 }
 
 function countStage(fromMicro: number, toMicro: number, ms: number) {
+  takeSkip();
   if (toMicro === fromMicro) {
     syncHud(fromMicro);
     return waitForTimeout(ms);
@@ -154,12 +186,13 @@ function countStage(fromMicro: number, toMicro: number, ms: number) {
         resolve();
         return;
       }
-      const progress = Math.min(1, (now - started) / ms);
+      const progress = skipRequested ? 1 : Math.min(1, (now - started) / ms);
       syncHud(Math.round(fromMicro + (toMicro - fromMicro) * easeOutCount(progress)));
       if (progress < 1) {
         requestAnimationFrame(tick);
         return;
       }
+      takeSkip();
       syncHud(toMicro);
       resolve();
     };
@@ -214,10 +247,11 @@ function scheduleStageStart() {
   if (startScheduled) return;
   startScheduled = true;
   startFinished = (async () => {
-    await waitForTimeout(BZZZ_TO_START_MS);
-    if (!introActive) return;
+    await skippableTimeout(BZZZ_TO_START_MS);
+    if (!introActive || takeSkip()) return;
     const start = playClip("start.mp3");
     await waitForClipEnd(start.clip, start.playing, START_FALLBACK_MS);
+    if (takeSkip()) start.clip.pause();
   })();
 }
 
@@ -238,6 +272,8 @@ function finishBigWinAudio() {
   startFinished = Promise.resolve();
   bzzzClip = null;
   bzzzPlaying = Promise.resolve(false);
+  skipRequested = false;
+  skipWaiters.clear();
   resetOverlay();
   restoreMusicBed();
 }
@@ -259,7 +295,6 @@ export async function playBigWin(micro: number, hudBaseMicro = 0) {
     if (!introActive) return;
 
     const first = startArmed(stages[0].file);
-    const startedAt = performance.now();
     syncHud(stages[0].fromMicro);
     ui.bigWinOpen = true;
     ui.bigWinExplode = false;
@@ -270,16 +305,13 @@ export async function playBigWin(micro: number, hudBaseMicro = 0) {
     for (let index = 0; index < stages.length; index += 1) {
       const stage = stages[index];
       if (index > 0) {
-        const wait = startedAt + index * STAGE_MS - performance.now();
-        if (wait > 0) await waitForTimeout(wait);
         if (!introActive) return;
         const next = startArmed(stage.file);
         current.pause();
         current = next;
       }
       showStageTitle(stage.left, stage.right);
-      const remain = startedAt + (index + 1) * STAGE_MS - performance.now();
-      await countStage(stage.fromMicro, stage.toMicro, Math.max(16, remain));
+      await countStage(stage.fromMicro, stage.toMicro, STAGE_MS);
     }
     current.pause();
 
