@@ -36,6 +36,7 @@ let startScheduled = false;
 let startFinished: Promise<void> = Promise.resolve();
 let bzzzClip: HTMLAudioElement | null = null;
 let bzzzPlaying: Promise<boolean> = Promise.resolve(false);
+let bzzzStartedAt = 0;
 let skipRequested = false;
 const skipWaiters = new Set<() => void>();
 
@@ -240,6 +241,7 @@ export function beginBigWinIntro() {
   const bzzz = playClip("bzzz.mp3");
   bzzzClip = bzzz.clip;
   bzzzPlaying = bzzz.playing;
+  bzzzStartedAt = performance.now();
   void warmStageClips();
 }
 
@@ -247,7 +249,7 @@ function scheduleStageStart() {
   if (startScheduled) return;
   startScheduled = true;
   startFinished = (async () => {
-    await skippableTimeout(BZZZ_TO_START_MS);
+    await skippableTimeout(Math.max(0, BZZZ_TO_START_MS - (performance.now() - bzzzStartedAt)));
     if (!introActive || takeSkip()) return;
     const start = playClip("start.mp3");
     await waitForClipEnd(start.clip, start.playing, START_FALLBACK_MS);
