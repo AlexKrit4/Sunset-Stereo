@@ -80,6 +80,8 @@ export async function bootEngine() {
 
   if (engine.query.replay) {
     replayBook = await fetchReplayBook(engine.query);
+    ui.replayMult = replayBook.payoutMultiplier / 100;
+    ui.replayWinMicro = Math.round(ui.betMicro * ui.replayMult);
     ui.ready = true;
     ui.banner = "";
     return;

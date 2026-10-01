@@ -27,11 +27,15 @@ const OUTGOING_MS = 720;
 const EXPLODE_MS = 720;
 const START_FALLBACK_MS = 20000;
 const END_FALLBACK_MS = 8000;
+const BZZZ_FALLBACK_MS = 6000;
 
 const clips: HTMLAudioElement[] = [];
 const armed = new Map<string, HTMLAudioElement>();
 let introActive = false;
+let startScheduled = false;
 let startFinished: Promise<void> = Promise.resolve();
+let bzzzClip: HTMLAudioElement | null = null;
+let bzzzPlaying: Promise<boolean> = Promise.resolve(false);
 
 function audioUrl(file: string) {
   return audioSrc(`audio/bigwin/${file}`);
@@ -200,8 +204,15 @@ export function beginBigWinIntro() {
   introActive = true;
   ui.bigWinIntro = true;
   duckMusicBed();
-  playClip("bzzz.mp3");
+  const bzzz = playClip("bzzz.mp3");
+  bzzzClip = bzzz.clip;
+  bzzzPlaying = bzzz.playing;
   void warmStageClips();
+}
+
+function scheduleStageStart() {
+  if (startScheduled) return;
+  startScheduled = true;
   startFinished = (async () => {
     await waitForTimeout(BZZZ_TO_START_MS);
     if (!introActive) return;
@@ -210,11 +221,23 @@ export function beginBigWinIntro() {
   })();
 }
 
+/** Wincap rounds keep only the bzzz + symbol win animation — no stage music or overlay. */
+export async function playWincapBzzz() {
+  beginBigWinIntro();
+  if (bzzzClip) {
+    await waitForClipEnd(bzzzClip, bzzzPlaying, BZZZ_FALLBACK_MS);
+  }
+  finishBigWinAudio();
+}
+
 function finishBigWinAudio() {
   stopClips();
   introActive = false;
   ui.bigWinIntro = false;
+  startScheduled = false;
   startFinished = Promise.resolve();
+  bzzzClip = null;
+  bzzzPlaying = Promise.resolve(false);
   resetOverlay();
   restoreMusicBed();
 }
@@ -229,6 +252,7 @@ export async function playBigWin(micro: number, hudBaseMicro = 0) {
   }
 
   beginBigWinIntro();
+  scheduleStageStart();
 
   try {
     await startFinished;

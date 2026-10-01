@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ui } from "../lib/ui.svelte";
+  import { labels, moneyHud, ui } from "../lib/ui.svelte";
 
   let {
     onContinue,
@@ -8,6 +8,7 @@
   } = $props();
 
   const percent = $derived(Math.max(0, Math.min(100, Math.round(ui.bootProgress * 100))));
+  const replayMult = $derived(Number(ui.replayMult.toFixed(2)));
 </script>
 
 {#if ui.bootOpen}
@@ -26,7 +27,14 @@
         <p id="bootProgress" class="pct">{percent}%</p>
       {:else}
         <p class="status">Ready</p>
-        <button id="bootContinueBtn" type="button" onclick={onContinue}>Continue</button>
+        {#if ui.replay}
+          <dl class="replay-info" data-replay-info="1">
+            <div><dt>{labels.stake()}</dt><dd id="replayBet">{moneyHud(ui.betMicro)}</dd></div>
+            <div><dt>Round</dt><dd id="replayMult">{replayMult}×</dd></div>
+            <div><dt>{labels.win()}</dt><dd id="replayWin">{moneyHud(ui.replayWinMicro)}</dd></div>
+          </dl>
+        {/if}
+        <button id="bootContinueBtn" type="button" onclick={onContinue}>{ui.replay ? "Replay" : "Continue"}</button>
       {/if}
     </div>
   </div>
@@ -92,6 +100,29 @@
     font-family: ui-sans-serif, system-ui, sans-serif;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.08em;
+    color: #f8ecd8;
+  }
+  .replay-info {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    margin: 0 0 20px;
+    padding: 0;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  .replay-info div {
+    text-align: center;
+  }
+  .replay-info dt {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #cbbba8;
+  }
+  .replay-info dd {
+    margin: 4px 0 0;
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
     color: #f8ecd8;
   }
   button {

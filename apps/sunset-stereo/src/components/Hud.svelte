@@ -149,6 +149,13 @@
     </div>
   {/if}
 
+  {#if ui.replay}
+    <div class="stat">
+      <span>{labels.stake()}</span>
+      <strong id="betValue">{moneyHud(ui.betMicro)}</strong>
+    </div>
+  {/if}
+
   <div class="spacer"></div>
 
   {#if !ui.replay}
