@@ -1,5 +1,6 @@
 <script lang="ts">
   import { confirmMaxWin } from "../lib/bigWin";
+  import { fade } from "svelte/transition";
   import { moneyHud, ui } from "../lib/ui.svelte";
 
   const displayAmount = $derived(moneyHud(ui.maxWinDisplayMicro));
@@ -8,6 +9,7 @@
 {#if ui.maxWinOpen}
   <div
     class="maxwin"
+    in:fade={{ duration: 700 }}
     class:leaving={ui.maxWinLeaving}
     role="dialog"
     aria-label="Max win"
@@ -94,11 +96,18 @@
     font-size: 16px;
     cursor: pointer;
     animation: continue-in 0.4s ease both;
-    transition: opacity 0.6s ease;
   }
   .continue.confirmed {
-    opacity: 0;
     pointer-events: none;
+    animation: continue-out 0.6s ease forwards;
+  }
+  @keyframes continue-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
   }
   @keyframes explode {
     0% {

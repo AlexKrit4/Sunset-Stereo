@@ -30,6 +30,8 @@ const END_FALLBACK_MS = 8000;
 const BZZZ_FALLBACK_MS = 6000;
 const MAXWIN_COUNT_MS = 16000;
 const MAXWIN_LEAVE_MS = 1500;
+const MAXWIN_UI_FADE_MS = 600;
+const MAXWIN_GAP_MS = 1000;
 
 const clips: HTMLAudioElement[] = [];
 const armed = new Map<string, HTMLAudioElement>();
@@ -296,17 +298,19 @@ export async function playWincapBzzz(totalMicro: number) {
 
 export async function playMaxWin(totalMicro: number) {
   beginBigWinIntro();
+  if (bzzzClip) {
+    await waitForClipEnd(bzzzClip, bzzzPlaying, BZZZ_FALLBACK_MS);
+  }
 
-  ui.maxWinOpen = true;
+  ui.maxWinUiHidden = true;
+  await waitForTimeout(MAXWIN_UI_FADE_MS + MAXWIN_GAP_MS);
+
   ui.maxWinReady = false;
   ui.maxWinClicked = false;
   ui.maxWinPulse = false;
   ui.maxWinLeaving = false;
   ui.maxWinDisplayMicro = 0;
-
-  if (bzzzClip) {
-    await waitForClipEnd(bzzzClip, bzzzPlaying, BZZZ_FALLBACK_MS);
-  }
+  ui.maxWinOpen = true;
 
   playClip("audio/maxwin/zmaxwin1.mp3");
   await countMaxWin(totalMicro, MAXWIN_COUNT_MS);
@@ -338,6 +342,8 @@ export async function playMaxWin(totalMicro: number) {
   ui.maxWinPulse = false;
   ui.maxWinLeaving = false;
   ui.maxWinDisplayMicro = 0;
+  ui.maxWinUiHidden = false;
+  await waitForTimeout(MAXWIN_UI_FADE_MS);
   finishBigWinAudio();
 }
 

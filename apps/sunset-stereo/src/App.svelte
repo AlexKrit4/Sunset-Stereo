@@ -142,7 +142,7 @@
 
 <Loader onContinue={continueBoot} />
 
-<div class="stage">
+<div class="stage" class:maxwin-hidden={ui.maxWinUiHidden}>
 <div class="cabinet" class:feature={ui.feature} class:booting={ui.bootOpen}>
   <header class="masthead">
     <h1>Sunset Stereo</h1>
@@ -166,11 +166,11 @@
 
   <Hud onSpin={() => spin()} onBet={changeBet} />
   <BigWin />
-  <MaxWin />
   <BuyMenu onBuyBonus={() => playBuyBonus()} onBuyWildBonus={() => playBuyWildBonus()} />
   <Rules />
 </div>
 </div>
+<MaxWin />
 {#if import.meta.env.VITE_VPS === "1"}
   {#await import("./vps/VpsStats.svelte") then mod}
     <mod.default />

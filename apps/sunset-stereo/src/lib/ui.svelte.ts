@@ -56,6 +56,7 @@ export const ui = $state({
   replayMult: 0,
   replayWinMicro: 0,
   maxWinOpen: false,
+  maxWinUiHidden: false,
   maxWinDisplayMicro: 0,
   maxWinReady: false,
   maxWinClicked: false,
