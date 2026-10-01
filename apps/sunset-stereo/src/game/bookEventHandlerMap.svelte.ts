@@ -230,7 +230,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
 
   wincap: async (bookEvent) => {
     const total = multiplierCentsToMicro(bookEvent.amount);
-    await playWincapBzzz();
+    await playWincapBzzz(total);
     ui.winMicro = total;
     ui.banner = "Max win";
     await waitForTimeout(paceMs(1800));

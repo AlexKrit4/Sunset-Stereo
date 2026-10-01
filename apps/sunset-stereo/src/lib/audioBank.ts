@@ -8,6 +8,8 @@ import win3Url from "../assets/audio/bigwin/win3.mp3?url";
 import win4Url from "../assets/audio/bigwin/win4.mp3?url";
 import win5Url from "../assets/audio/bigwin/win5.mp3?url";
 import endUrl from "../assets/audio/bigwin/end.mp3?url";
+import zmaxwin1Url from "../assets/audio/maxwin/zmaxwin1.mp3?url";
+import zmaxwin2Url from "../assets/audio/maxwin/zmaxwin2.mp3?url";
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -22,6 +24,8 @@ const AUDIO_URLS: Record<string, string> = {
   "audio/bigwin/win4.mp3": win4Url,
   "audio/bigwin/win5.mp3": win5Url,
   "audio/bigwin/end.mp3": endUrl,
+  "audio/maxwin/zmaxwin1.mp3": zmaxwin1Url,
+  "audio/maxwin/zmaxwin2.mp3": zmaxwin2Url,
 };
 
 export const AUDIO_PATHS = Object.keys(AUDIO_URLS);

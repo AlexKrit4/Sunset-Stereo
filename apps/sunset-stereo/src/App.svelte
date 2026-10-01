@@ -3,6 +3,7 @@
   import Game from "./components/Game.svelte";
   import Hud from "./components/Hud.svelte";
   import BigWin from "./components/BigWin.svelte";
+  import MaxWin from "./components/MaxWin.svelte";
   import Rules from "./components/Rules.svelte";
   import BonusIntro from "./components/BonusIntro.svelte";
   import BuyMenu from "./components/BuyMenu.svelte";
@@ -165,6 +166,7 @@
 
   <Hud onSpin={() => spin()} onBet={changeBet} />
   <BigWin />
+  <MaxWin />
   <BuyMenu onBuyBonus={() => playBuyBonus()} onBuyWildBonus={() => playBuyWildBonus()} />
   <Rules />
 </div>

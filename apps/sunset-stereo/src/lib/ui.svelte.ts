@@ -55,6 +55,11 @@ export const ui = $state({
   bootProgress: 0,
   replayMult: 0,
   replayWinMicro: 0,
+  maxWinOpen: false,
+  maxWinDisplayMicro: 0,
+  maxWinReady: false,
+  maxWinPulse: false,
+  maxWinLeaving: false,
 });
 
 let bonusIntroResolve: (() => void) | null = null;

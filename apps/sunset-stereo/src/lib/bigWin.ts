@@ -28,6 +28,8 @@ const EXPLODE_MS = 720;
 const START_FALLBACK_MS = 20000;
 const END_FALLBACK_MS = 8000;
 const BZZZ_FALLBACK_MS = 6000;
+const MAXWIN_COUNT_MS = 16000;
+const MAXWIN_LEAVE_MS = 1500;
 
 const clips: HTMLAudioElement[] = [];
 const armed = new Map<string, HTMLAudioElement>();
@@ -68,7 +70,7 @@ function skippableTimeout(ms: number) {
 }
 
 function audioUrl(file: string) {
-  return audioSrc(`audio/bigwin/${file}`);
+  return audioSrc(file.startsWith("audio/") ? file : `audio/bigwin/${file}`);
 }
 
 function easeOutCount(progress: number) {
@@ -257,12 +259,81 @@ function scheduleStageStart() {
   })();
 }
 
-/** Wincap rounds keep only the bzzz + symbol win animation — no stage music or overlay. */
-export async function playWincapBzzz() {
+let maxWinContinueResolve: (() => void) | null = null;
+
+/** Continue button on the Max Win scene. */
+export function confirmMaxWin() {
+  const resolve = maxWinContinueResolve;
+  maxWinContinueResolve = null;
+  resolve?.();
+}
+
+function countMaxWin(toMicro: number, ms: number) {
+  return new Promise<void>((resolve) => {
+    const started = performance.now();
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - started) / ms);
+      const shown = Math.round(toMicro * easeOutCount(progress));
+      ui.maxWinDisplayMicro = shown;
+      ui.winMicro = shown;
+      if (progress < 1) {
+        requestAnimationFrame(tick);
+        return;
+      }
+      ui.maxWinDisplayMicro = toMicro;
+      ui.winMicro = toMicro;
+      resolve();
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+/** Wincap: bzzz + sheen, then the fullscreen Max Win count scene. */
+export async function playWincapBzzz(totalMicro: number) {
+  await playMaxWin(totalMicro);
+}
+
+export async function playMaxWin(totalMicro: number) {
   beginBigWinIntro();
   if (bzzzClip) {
     await waitForClipEnd(bzzzClip, bzzzPlaying, BZZZ_FALLBACK_MS);
   }
+
+  ui.maxWinOpen = true;
+  ui.maxWinReady = false;
+  ui.maxWinPulse = false;
+  ui.maxWinLeaving = false;
+  ui.maxWinDisplayMicro = 0;
+
+  playClip("audio/maxwin/zmaxwin1.mp3");
+  await countMaxWin(totalMicro, MAXWIN_COUNT_MS);
+
+  const loop = makeClip("audio/maxwin/zmaxwin2.mp3");
+  loop.loop = true;
+  loop.volume = ui.musicMuted ? 0 : 1;
+  void loop.play().catch(() => {});
+  ui.maxWinReady = true;
+
+  await new Promise<void>((resolve) => {
+    maxWinContinueResolve = resolve;
+  });
+
+  stopClips();
+  ui.maxWinPulse = true;
+  const end = playClip("end.mp3");
+  await Promise.all([
+    waitForClipEnd(end.clip, end.playing, END_FALLBACK_MS),
+    waitForTimeout(EXPLODE_MS),
+  ]);
+
+  ui.maxWinLeaving = true;
+  await waitForTimeout(MAXWIN_LEAVE_MS);
+
+  ui.maxWinOpen = false;
+  ui.maxWinReady = false;
+  ui.maxWinPulse = false;
+  ui.maxWinLeaving = false;
+  ui.maxWinDisplayMicro = 0;
   finishBigWinAudio();
 }
 
