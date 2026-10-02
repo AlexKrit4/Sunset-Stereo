@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import introAnimation from "../assets/big-fathers-intro.webp";
   import introPoster from "../assets/big-fathers-poster.png";
   import { labels, moneyHud, ui } from "../lib/ui.svelte";
+
+  const INTRO_MS = 5000;
 
   let {
     onContinue,
@@ -10,9 +13,14 @@
   } = $props();
 
   let imageFailed = $state(false);
-  const ready = $derived(ui.bootReady && ui.bootImageReady);
+  let introTimer: ReturnType<typeof setTimeout> | undefined;
+  const ready = $derived(ui.bootReady && ui.bootIntroDone);
   const percent = $derived(ready ? 100 : Math.max(0, Math.min(99, Math.round(ui.bootProgress * 100))));
   const replayMult = $derived(Number(ui.replayMult.toFixed(2)));
+
+  onDestroy(() => {
+    if (introTimer !== undefined) clearTimeout(introTimer);
+  });
 </script>
 
 {#if ui.bootOpen}
@@ -22,13 +30,21 @@
         class="preview"
         src={imageFailed ? introPoster : introAnimation}
         alt="Big Fathers"
-        onload={() => (ui.bootImageReady = true)}
+        onload={() => {
+          introTimer = setTimeout(() => (ui.bootIntroDone = true), INTRO_MS);
+        }}
         onerror={() => {
-          if (imageFailed) ui.bootImageReady = true;
-          else imageFailed = true;
+          if (imageFailed) {
+            ui.bootIntroDone = true;
+            return;
+          }
+          imageFailed = true;
+          ui.bootIntroDone = true;
         }}
       />
-      <p id="bootProgress" class="pct" role="status" aria-live="polite">{percent}%</p>
+      {#if ui.bootIntroDone}
+        <p id="bootProgress" class="pct" role="status" aria-live="polite">{percent}%</p>
+      {/if}
       {#if ui.error}
         <p class="status">{ui.error}</p>
         {#if ready}

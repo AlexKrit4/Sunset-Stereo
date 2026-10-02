@@ -23,7 +23,7 @@
   }
 
   function continueBoot() {
-    if (!ui.bootReady || !ui.bootImageReady) return;
+    if (!ui.bootReady || !ui.bootIntroDone) return;
     bootMusic();
     unlockMusic();
     ui.bootOpen = false;
@@ -81,7 +81,7 @@
     })();
     const onKey = (event: KeyboardEvent) => {
       if (ui.bootOpen) {
-        if ((event.code === "Space" || event.code === "Enter") && ui.bootReady && ui.bootImageReady) {
+        if ((event.code === "Space" || event.code === "Enter") && ui.bootReady && ui.bootIntroDone) {
           event.preventDefault();
           continueBoot();
         }
