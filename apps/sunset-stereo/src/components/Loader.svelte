@@ -1,5 +1,5 @@
 <script lang="ts">
-  import introVideo from "../assets/big-fathers-intro.mp4";
+  import introAnimation from "../assets/big-fathers-intro.webp";
   import introPoster from "../assets/big-fathers-poster.png";
   import { labels, moneyHud, ui } from "../lib/ui.svelte";
 
@@ -9,8 +9,8 @@
     onContinue: () => void;
   } = $props();
 
-  let videoFailed = $state(false);
-  const ready = $derived(ui.bootReady && ui.bootVideoReady);
+  let imageFailed = $state(false);
+  const ready = $derived(ui.bootReady && ui.bootImageReady);
   const percent = $derived(ready ? 100 : Math.max(0, Math.min(99, Math.round(ui.bootProgress * 100))));
   const replayMult = $derived(Number(ui.replayMult.toFixed(2)));
 </script>
@@ -18,25 +18,16 @@
 {#if ui.bootOpen}
   <div class="boot" role="dialog" aria-label="Loading" aria-modal="true" data-boot="1" data-boot-ready={ready ? "1" : "0"}>
     <div class="card">
-      {#if videoFailed}
-        <img class="preview" src={introPoster} alt="Big Fathers" />
-      {:else}
-        <video
-          class="preview"
-          src={introVideo}
-          autoplay
-          muted
-          loop
-          playsinline
-          preload="auto"
-          aria-hidden="true"
-          oncanplay={() => (ui.bootVideoReady = true)}
-          onerror={() => {
-            videoFailed = true;
-            ui.bootVideoReady = true;
-          }}
-        ></video>
-      {/if}
+      <img
+        class="preview"
+        src={imageFailed ? introPoster : introAnimation}
+        alt="Big Fathers"
+        onload={() => (ui.bootImageReady = true)}
+        onerror={() => {
+          if (imageFailed) ui.bootImageReady = true;
+          else imageFailed = true;
+        }}
+      />
       <p id="bootProgress" class="pct" role="status" aria-live="polite">{percent}%</p>
       {#if ui.error}
         <p class="status">{ui.error}</p>
@@ -65,7 +56,7 @@
     display: grid;
     place-items: center;
     padding: clamp(12px, 2.5vh, 24px);
-    background: radial-gradient(ellipse 65% 70% at 55% 38%, #1a1213, #100d10 58%, #09080b);
+    background: #000;
     color: #f8ecd8;
   }
   .card {

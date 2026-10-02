@@ -52,7 +52,7 @@ export const ui = $state({
   bigWinHudBaseMicro: 0,
   bootOpen: true,
   bootReady: false,
-  bootVideoReady: false,
+  bootImageReady: false,
   bootProgress: 0,
   replayMult: 0,
   replayWinMicro: 0,
