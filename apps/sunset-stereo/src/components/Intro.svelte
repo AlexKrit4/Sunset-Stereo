@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import titleLogo from "../assets/sunset-stereo-logo.png";
+  import maxWinLogo from "../assets/max-win-logo.png";
+  import cardFrame from "../assets/intro-card-frame.svg";
   import { ui } from "../lib/ui.svelte";
   import { SYMBOL_PAY_ART } from "../pixi/symbols";
   import { playPendingRestore } from "../game/betMachine.svelte";
@@ -33,7 +35,7 @@
 </script>
 
 {#if ui.introOpen}
-  <div class="intro" class:closing role="button" tabindex="-1" aria-label="Press to continue" onclick={dismiss} data-intro="1">
+  <div class="intro" class:closing role="button" tabindex="0" aria-label="Press to continue" onclick={dismiss} onkeydown={onKey} data-intro="1" style={`--frame: url("${cardFrame}")`}>
     <img class="logo" src={titleLogo} alt="Sunset Stereo" />
     <div class="cards">
       <article class="card">
@@ -59,7 +61,7 @@
       </article>
       <article class="card">
         <p class="max">15 000×</p>
-        <h2>Max Win</h2>
+        <img class="max-logo" src={maxWinLogo} alt="Max Win" />
         <p>Выигрыш до 15 000× от ставки</p>
       </article>
     </div>
@@ -107,22 +109,16 @@
     position: relative;
     flex: 1 1 0;
     max-width: 330px;
+    min-height: clamp(230px, 42vh, 355px);
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     gap: 10px;
-    padding: clamp(14px, 3vh, 26px) clamp(12px, 2vw, 22px);
+    padding: clamp(32px, 4vh, 40px) clamp(26px, 2.6vw, 38px);
     text-align: center;
-    background: linear-gradient(180deg, #16204a 0%, #0d1430 100%);
-    border: 3px solid #d7ac70;
-    outline: 1px solid rgba(215, 172, 112, 0.45);
-    outline-offset: 5px;
-    border-radius: 10px;
-    box-shadow:
-      0 0 0 1px rgba(60, 32, 10, 0.9),
-      0 18px 40px rgba(6, 2, 14, 0.6),
-      inset 0 0 26px rgba(215, 172, 112, 0.1);
+    background: var(--frame) center / 100% 100% no-repeat;
+    filter: drop-shadow(0 14px 22px rgba(6, 2, 14, 0.8));
     animation: card-in 0.55s ease-out both;
   }
   .card:nth-child(2) {
@@ -132,29 +128,8 @@
     animation-delay: 0.24s;
   }
   .card.center {
-    transform: scale(1.06);
-    border-color: #f2ce8e;
-    box-shadow:
-      0 0 26px rgba(242, 206, 142, 0.35),
-      0 18px 40px rgba(6, 2, 14, 0.6),
-      inset 0 0 26px rgba(242, 206, 142, 0.12);
-  }
-  .card::before,
-  .card::after {
-    content: "";
-    position: absolute;
-    top: -9px;
-    width: 12px;
-    height: 12px;
-    background: #f2ce8e;
-    transform: rotate(45deg);
-    box-shadow: 0 0 8px rgba(242, 206, 142, 0.7);
-  }
-  .card::before {
-    left: -9px;
-  }
-  .card::after {
-    right: -9px;
+    scale: 1.06;
+    filter: drop-shadow(0 14px 24px rgba(6, 2, 14, 0.85)) drop-shadow(0 0 13px rgba(255, 154, 61, 0.45));
   }
   .icons {
     display: flex;
@@ -207,6 +182,12 @@
     color: transparent;
     filter: drop-shadow(0 3px 6px rgba(4, 2, 10, 0.85));
   }
+  .max-logo {
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 3px 7px rgba(4, 2, 10, 0.8));
+  }
   .cta {
     margin: 0;
     font-family: "Arial Narrow", "Franklin Gothic Medium", ui-sans-serif, system-ui, sans-serif;
@@ -249,17 +230,17 @@
     .cards {
       flex-direction: column;
       align-items: center;
-      gap: 14px;
+      gap: 8px;
     }
     .card {
       width: min(340px, 92vw);
       max-width: none;
-      padding-top: 14px;
-      padding-bottom: 14px;
+      min-height: 0;
+      padding: 22px 30px;
       gap: 6px;
     }
     .card.center {
-      transform: none;
+      scale: 1;
     }
     .icons {
       min-height: 40px;
@@ -270,6 +251,12 @@
     .max {
       min-height: 36px;
       font-size: 30px;
+    }
+    .max-logo {
+      max-width: 220px;
+    }
+    .logo {
+      width: min(46vw, 260px);
     }
   }
 </style>
