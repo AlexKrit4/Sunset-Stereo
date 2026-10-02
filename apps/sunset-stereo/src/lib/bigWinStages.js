@@ -1,11 +1,11 @@
 export const BIG_WIN_MULT = 20;
 
 export const BIG_WIN_STAGES = [
-  { id: "win1", from: 0, to: 40, left: "BIG", right: "WIN", file: "win1.mp3" },
-  { id: "win2", from: 40, to: 60, left: "SUPER", right: "WIN", file: "win2.mp3" },
-  { id: "win3", from: 60, to: 80, left: "MEGA", right: "WIN", file: "win3.mp3" },
-  { id: "win4", from: 80, to: 200, left: "EPIC", right: "WIN", file: "win4.mp3" },
-  { id: "win5", from: 200, to: Number.POSITIVE_INFINITY, left: "SUNSET", right: "WIN", file: "win5.mp3" },
+  { id: "win1", from: 0, to: 40, left: "BIG", right: "WIN", file: "win1.ogg" },
+  { id: "win2", from: 40, to: 60, left: "SUPER", right: "WIN", file: "win2.ogg" },
+  { id: "win3", from: 60, to: 80, left: "MEGA", right: "WIN", file: "win3.ogg" },
+  { id: "win4", from: 80, to: 200, left: "EPIC", right: "WIN", file: "win4.ogg" },
+  { id: "win5", from: 200, to: Number.POSITIVE_INFINITY, left: "SUNSET", right: "WIN", file: "win5.ogg" },
 ];
 
 export function isBigWin(micro, betMicro) {
