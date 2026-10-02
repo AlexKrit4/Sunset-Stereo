@@ -124,7 +124,7 @@ async function warmFile(file: string) {
 }
 
 function warmStageClips() {
-  return Promise.all([...BIG_WIN_STAGES.map((stage) => stage.file), "end.mp3"].map(warmFile)).then(
+  return Promise.all([...BIG_WIN_STAGES.map((stage) => stage.file), "end.ogg"].map(warmFile)).then(
     () => undefined,
   );
 }
@@ -242,7 +242,7 @@ export function beginBigWinIntro() {
   introActive = true;
   ui.bigWinIntro = true;
   duckMusicBed();
-  const bzzz = playClip("bzzz.mp3");
+  const bzzz = playClip("bzzz.ogg");
   bzzzClip = bzzz.clip;
   bzzzPlaying = bzzz.playing;
   bzzzStartedAt = performance.now();
@@ -255,7 +255,7 @@ function scheduleStageStart() {
   startFinished = (async () => {
     await skippableTimeout(Math.max(0, BZZZ_TO_START_MS - (performance.now() - bzzzStartedAt)));
     if (!introActive || takeSkip()) return;
-    const start = playClip("start.mp3");
+    const start = playClip("start.ogg");
     await waitForClipEnd(start.clip, start.playing, START_FALLBACK_MS);
     if (takeSkip()) start.clip.pause();
   })();
@@ -312,10 +312,10 @@ export async function playMaxWin(totalMicro: number) {
   ui.maxWinDisplayMicro = 0;
   ui.maxWinOpen = true;
 
-  playClip("audio/maxwin/zmaxwin1.mp3");
+  playClip("audio/maxwin/zmaxwin1.ogg");
   await countMaxWin(totalMicro, MAXWIN_COUNT_MS);
 
-  const loop = makeClip("audio/maxwin/zmaxwin2.mp3");
+  const loop = makeClip("audio/maxwin/zmaxwin2.ogg");
   loop.loop = true;
   loop.volume = ui.musicMuted ? 0 : 1;
   void loop.play().catch(() => {});
@@ -327,7 +327,7 @@ export async function playMaxWin(totalMicro: number) {
 
   stopClips();
   ui.maxWinPulse = true;
-  const end = playClip("end.mp3");
+  const end = playClip("end.ogg");
   await Promise.all([
     waitForClipEnd(end.clip, end.playing, END_FALLBACK_MS),
     waitForTimeout(EXPLODE_MS),
@@ -399,7 +399,7 @@ export async function playBigWin(micro: number, hudBaseMicro = 0) {
     current.pause();
 
     ui.bigWinExplode = true;
-    const end = startArmed("end.mp3");
+    const end = startArmed("end.ogg");
     await Promise.all([
       waitForClipEnd(end, Promise.resolve(!end.error), END_FALLBACK_MS),
       waitForTimeout(EXPLODE_MS),

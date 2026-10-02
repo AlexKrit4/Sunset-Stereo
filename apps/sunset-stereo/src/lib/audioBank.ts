@@ -1,31 +1,31 @@
-import loungeUrl from "../assets/audio/golden-hour-lounge.mp3?url";
-import bonusUrl from "../assets/audio/sunset-bonus-loop.mp3?url";
-import bzzzUrl from "../assets/audio/bigwin/bzzz.mp3?url";
-import startUrl from "../assets/audio/bigwin/start.mp3?url";
-import win1Url from "../assets/audio/bigwin/win1.mp3?url";
-import win2Url from "../assets/audio/bigwin/win2.mp3?url";
-import win3Url from "../assets/audio/bigwin/win3.mp3?url";
-import win4Url from "../assets/audio/bigwin/win4.mp3?url";
-import win5Url from "../assets/audio/bigwin/win5.mp3?url";
-import endUrl from "../assets/audio/bigwin/end.mp3?url";
-import zmaxwin1Url from "../assets/audio/maxwin/zmaxwin1.mp3?url";
-import zmaxwin2Url from "../assets/audio/maxwin/zmaxwin2.mp3?url";
+import loungeUrl from "../assets/audio/golden-hour-lounge.ogg?url";
+import bonusUrl from "../assets/audio/sunset-bonus-loop.ogg?url";
+import bzzzUrl from "../assets/audio/bigwin/bzzz.ogg?url";
+import startUrl from "../assets/audio/bigwin/start.ogg?url";
+import win1Url from "../assets/audio/bigwin/win1.ogg?url";
+import win2Url from "../assets/audio/bigwin/win2.ogg?url";
+import win3Url from "../assets/audio/bigwin/win3.ogg?url";
+import win4Url from "../assets/audio/bigwin/win4.ogg?url";
+import win5Url from "../assets/audio/bigwin/win5.ogg?url";
+import endUrl from "../assets/audio/bigwin/end.ogg?url";
+import zmaxwin1Url from "../assets/audio/maxwin/zmaxwin1.ogg?url";
+import zmaxwin2Url from "../assets/audio/maxwin/zmaxwin2.ogg?url";
 
 const BASE = import.meta.env.BASE_URL;
 
 const AUDIO_URLS: Record<string, string> = {
-  "audio/golden-hour-lounge.mp3": loungeUrl,
-  "audio/sunset-bonus-loop.mp3": bonusUrl,
-  "audio/bigwin/bzzz.mp3": bzzzUrl,
-  "audio/bigwin/start.mp3": startUrl,
-  "audio/bigwin/win1.mp3": win1Url,
-  "audio/bigwin/win2.mp3": win2Url,
-  "audio/bigwin/win3.mp3": win3Url,
-  "audio/bigwin/win4.mp3": win4Url,
-  "audio/bigwin/win5.mp3": win5Url,
-  "audio/bigwin/end.mp3": endUrl,
-  "audio/maxwin/zmaxwin1.mp3": zmaxwin1Url,
-  "audio/maxwin/zmaxwin2.mp3": zmaxwin2Url,
+  "audio/golden-hour-lounge.ogg": loungeUrl,
+  "audio/sunset-bonus-loop.ogg": bonusUrl,
+  "audio/bigwin/bzzz.ogg": bzzzUrl,
+  "audio/bigwin/start.ogg": startUrl,
+  "audio/bigwin/win1.ogg": win1Url,
+  "audio/bigwin/win2.ogg": win2Url,
+  "audio/bigwin/win3.ogg": win3Url,
+  "audio/bigwin/win4.ogg": win4Url,
+  "audio/bigwin/win5.ogg": win5Url,
+  "audio/bigwin/end.ogg": endUrl,
+  "audio/maxwin/zmaxwin1.ogg": zmaxwin1Url,
+  "audio/maxwin/zmaxwin2.ogg": zmaxwin2Url,
 };
 
 export const AUDIO_PATHS = Object.keys(AUDIO_URLS);

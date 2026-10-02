@@ -5,7 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_VPS?: string;
 }
 
-declare module "*.mp3?url" {
+declare module "*.ogg?url" {
   const src: string;
   export default src;
 }

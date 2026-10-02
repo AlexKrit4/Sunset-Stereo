@@ -109,8 +109,8 @@ function startBoth() {
 export function bootMusic() {
   if (base && bonus) return;
   ui.musicMuted = readMuted();
-  base = makeLoop("golden-hour-lounge.mp3");
-  bonus = makeLoop("sunset-bonus-loop.mp3");
+  base = makeLoop("golden-hour-lounge.ogg");
+  bonus = makeLoop("sunset-bonus-loop.ogg");
 }
 
 /** Call from a click/tap/key handler. play() stays in this turn. */
