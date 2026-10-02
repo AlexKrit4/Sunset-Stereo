@@ -58,11 +58,11 @@ class GameState(GameStateOverride):
 
     def run_freespin(self):
         self.reset_fs_spin()
-        self.bonus_wild = None
         while self.fs < self.tot_fs:
             if self.wincap_triggered:
                 break
             self.update_freespin()
+            self.bonus_wild = None
             self.play_hold_respin_spin()
             self.win_manager.update_gametype_wins(self.gametype)
             if self.wincap_triggered:

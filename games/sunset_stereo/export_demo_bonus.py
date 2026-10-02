@@ -29,6 +29,24 @@ def one_book(mode: str, criteria: str, sim: int, book_id: int) -> dict:
     return book
 
 
+def regenerate_natural_four() -> None:
+    with open(DEMO, encoding="utf-8") as handle:
+        pack = json.load(handle)
+    for key, mode in (("books", "base"), ("scatterBooks", "scatter")):
+        for index, book in enumerate(pack[key]):
+            trigger = next(
+                (event for event in book["events"] if event["type"] == "freeSpinTrigger"),
+                None,
+            )
+            if trigger is not None and len(trigger.get("positions") or []) == 4:
+                book_id = int(book["id"])
+                pack[key][index] = one_book(mode, "freegame4", book_id, book_id)
+                print(key, book_id, "4-scatter bonus regenerated")
+    with open(DEMO, "w", encoding="utf-8") as handle:
+        json.dump(pack, handle, separators=(",", ":"))
+        handle.write("\n")
+
+
 def main() -> None:
     with open(DEMO, encoding="utf-8") as handle:
         pack = json.load(handle)
@@ -64,4 +82,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:] == ["natural-four"]:
+        regenerate_natural_four()
+    else:
+        main()

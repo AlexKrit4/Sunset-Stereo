@@ -1,5 +1,6 @@
 """Smoke tests for the Sunset Stereo 6x4 ways math package."""
 
+from copy import deepcopy
 import os
 import sys
 
@@ -545,6 +546,55 @@ def test_four_scatter_buy_places_a_locked_wild():
     assert 1 <= wild["row"] <= 4
 
 
+def test_four_scatter_extras_have_only_their_own_wild():
+    from base_feature import visible_grid
+
+    for mode, criteria in (("base", "freegame4"), ("scatter", "freegame4"), ("wildbonus", "dead")):
+        _state, book = _mode_book(mode, criteria, 102)
+        wild = None
+        extras = 0
+        placed = 0
+        for event in book["events"]:
+            if event["type"] == "updateFreeSpin":
+                wild = None
+                extras += 1
+            elif event["type"] == "placeWild":
+                assert wild is None, (mode, extras)
+                wild = (event["reel"], event["row"] - 1)
+                placed += 1
+            elif event["type"] == "reveal" and event.get("gameType") == "freegame":
+                assert wild is not None, (mode, extras)
+                names = visible_grid(event["board"])
+                assert {(reel, row) for reel, col in enumerate(names) for row, name in enumerate(col) if name == "W"} == {wild}, (mode, extras)
+        assert extras == placed == 10
+
+
+def test_wild_repair_does_not_stamp_future_extra_wilds():
+    from base_feature import visible_grid
+    from patch_wild_ways_books import patch_book
+
+    board = [[{"name": symbol} for symbol in [name] * 6] for name in ("H1", "H2", "H3", "H4", "H5", "L1")]
+    book = {
+        "id": 4,
+        "payoutMultiplier": 0,
+        "events": [
+            {"type": "updateFreeSpin", "amount": 0, "total": 10},
+            {"type": "placeWild", "reel": 4, "row": 1},
+            {"type": "reveal", "gameType": "freegame", "board": deepcopy(board)},
+            {"type": "updateFreeSpin", "amount": 1, "total": 10},
+            {"type": "placeWild", "reel": 5, "row": 2},
+            {"type": "reveal", "gameType": "freegame", "board": deepcopy(board)},
+            {"type": "finalWin", "amount": 0},
+        ],
+    }
+    assert patch_book(book)
+    reveals = [event for event in book["events"] if event["type"] == "reveal"]
+    assert visible_grid(reveals[0]["board"])[4][0] == "W"
+    assert {(reel, row) for reel, col in enumerate(visible_grid(reveals[0]["board"])) for row, name in enumerate(col) if name == "W"} == {(4, 0)}
+    assert visible_grid(reveals[1]["board"])[5][1] == "W"
+    assert {(reel, row) for reel, col in enumerate(visible_grid(reveals[1]["board"])) for row, name in enumerate(col) if name == "W"} == {(5, 1)}
+
+
 def test_hit_fillers_are_not_the_winning_symbol():
     import random
 
@@ -883,5 +933,3 @@ def test_natural_three_scatter_bonus_pays_at_least_10x():
         for reveal in extra
     ]
     assert len(set(boards)) > 1
-
-
