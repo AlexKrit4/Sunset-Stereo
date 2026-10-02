@@ -148,23 +148,27 @@
 <Loader onContinue={continueBoot} />
 <Intro />
 
-<div class="stage" class:maxwin-hidden={ui.maxWinUiHidden}>
+<div class="stage" class:maxwin-hidden={ui.maxWinUiHidden} class:intro-hidden={ui.introOpen || ui.introTransitioning}>
 <div class="cabinet" class:feature={ui.feature} class:booting={ui.bootOpen}>
-  <header class="masthead">
-    <h1><img src={titleLogo} alt="Sunset Stereo" /></h1>
-  </header>
+  <div class="play-area">
+    <div class="play-row">
+      <header class="masthead">
+        <h1><img id="slotLogo" src={titleLogo} alt="Sunset Stereo" /></h1>
+      </header>
 
-  <div class="frame">
-    <Game />
-    <BonusIntro />
-    {#if !ui.ready && !ui.bootOpen}
-      <p class="loading">
-        {ui.replay ? "Loading replay…" : ui.source === "live" ? "Connecting to the game server…" : "Loading reels…"}
-      </p>
-    {/if}
-    {#if ui.error && !ui.bootOpen}
-      <p class="loading">{ui.error}</p>
-    {/if}
+      <div class="frame">
+        <Game />
+        <BonusIntro />
+        {#if !ui.ready && !ui.bootOpen}
+          <p class="loading">
+            {ui.replay ? "Loading replay…" : ui.source === "live" ? "Connecting to the game server…" : "Loading reels…"}
+          </p>
+        {/if}
+        {#if ui.error && !ui.bootOpen}
+          <p class="loading">{ui.error}</p>
+        {/if}
+      </div>
+    </div>
   </div>
 
   <p class="banner" class:show={Boolean(ui.banner)}>{ui.banner}</p>
@@ -178,7 +182,9 @@
 </div>
 <MaxWin />
 {#if import.meta.env.VITE_VPS === "1"}
-  {#await import("./vps/VpsStats.svelte") then mod}
-    <mod.default />
-  {/await}
+  <div class="stats-layer" class:intro-hidden={ui.introOpen || ui.introTransitioning}>
+    {#await import("./vps/VpsStats.svelte") then mod}
+      <mod.default />
+    {/await}
+  </div>
 {/if}

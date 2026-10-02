@@ -55,6 +55,7 @@ export const ui = $state({
   bootIntroDone: false,
   bootProgress: 0,
   introOpen: false,
+  introTransitioning: false,
   replayMult: 0,
   replayWinMicro: 0,
   maxWinOpen: false,

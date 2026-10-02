@@ -7,36 +7,89 @@
   import { SYMBOL_PAY_ART } from "../pixi/symbols";
   import { playPendingRestore } from "../game/betMachine.svelte";
 
-  const CLOSE_MS = 480;
+  const FLIGHT_MS = 900;
+  const REVEAL_MS = 600;
   let closing = $state(false);
-  let closeTimer: ReturnType<typeof setTimeout> | undefined;
+  let introLogo = $state<HTMLImageElement>();
+  let ghost: HTMLImageElement | undefined;
+  let flight: Animation | undefined;
+  let revealTimer: ReturnType<typeof setTimeout> | undefined;
+  let disposed = false;
 
-  function dismiss() {
-    if (closing) return;
+  async function dismiss() {
+    if (!ui.introOpen || closing || !introLogo) return;
+    const target = document.querySelector<HTMLImageElement>("#slotLogo");
+    const start = introLogo.getBoundingClientRect();
+    const end = target?.getBoundingClientRect();
     closing = true;
-    closeTimer = setTimeout(() => {
-      ui.introOpen = false;
+    ui.introTransitioning = true;
+
+    if (end && start.width && start.height) {
+      ghost = introLogo.cloneNode(true) as HTMLImageElement;
+      ghost.className = "";
+      ghost.setAttribute("aria-hidden", "true");
+      Object.assign(ghost.style, {
+        display: "block",
+        position: "fixed",
+        left: `${start.left}px`,
+        top: `${start.top}px`,
+        width: `${start.width}px`,
+        height: `${start.height}px`,
+        margin: "0",
+        maxWidth: "none",
+        zIndex: "300",
+        pointerEvents: "none",
+        transformOrigin: "top left",
+        filter: "drop-shadow(0 6px 24px rgba(10, 4, 16, 0.85))",
+      });
+      document.body.appendChild(ghost);
+      flight = ghost.animate(
+        [
+          { transform: "translate(0, 0) scale(1)" },
+          {
+            transform: `translate(${end.left - start.left}px, ${end.top - start.top}px) scale(${end.width / start.width}, ${end.height / start.height})`,
+          },
+        ],
+        { duration: FLIGHT_MS, easing: "cubic-bezier(.22, 1, .36, 1)", fill: "forwards" },
+      );
+      try {
+        await flight.finished;
+      } catch {
+        if (disposed) return;
+      }
+    }
+
+    if (disposed) return;
+    ui.introOpen = false;
+    ui.introTransitioning = false;
+    revealTimer = setTimeout(() => {
+      ghost?.remove();
+      ghost = undefined;
       void playPendingRestore();
-    }, CLOSE_MS);
+    }, REVEAL_MS);
   }
 
   function onKey(event: KeyboardEvent) {
+    if (!ui.introOpen) return;
     if (event.code === "Space" || event.code === "Enter" || event.code === "NumpadEnter" || event.code === "Escape") {
       event.preventDefault();
-      dismiss();
+      void dismiss();
     }
   }
 
   onMount(() => window.addEventListener("keydown", onKey));
   onDestroy(() => {
+    disposed = true;
     window.removeEventListener("keydown", onKey);
-    if (closeTimer !== undefined) clearTimeout(closeTimer);
+    if (revealTimer !== undefined) clearTimeout(revealTimer);
+    flight?.cancel();
+    ghost?.remove();
   });
 </script>
 
 {#if ui.introOpen}
-  <div class="intro" class:closing role="button" tabindex="0" aria-label="Press to continue" onclick={dismiss} onkeydown={onKey} data-intro="1" style={`--frame: url("${cardFrame}")`}>
-    <img class="logo" src={titleLogo} alt="Sunset Stereo" />
+  <div class="intro" class:closing role="button" tabindex="0" aria-label="Press to continue" onclick={() => void dismiss()} onkeydown={onKey} data-intro="1" style={`--frame: url("${cardFrame}")`}>
+    <img class="logo" bind:this={introLogo} src={titleLogo} alt="Sunset Stereo" />
     <div class="cards">
       <article class="card">
         <div class="icons">
@@ -90,6 +143,10 @@
   }
   .intro.closing {
     opacity: 0;
+    pointer-events: none;
+  }
+  .intro.closing .logo {
+    visibility: hidden;
   }
   .logo {
     width: min(46vh, 420px);

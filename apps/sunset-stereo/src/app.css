@@ -54,7 +54,17 @@ canvas {
   transition: opacity 0.6s ease;
 }
 
-.stage.maxwin-hidden {
+.stage.maxwin-hidden,
+.stage.intro-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.stats-layer {
+  transition: opacity 0.6s ease;
+}
+
+.stats-layer.intro-hidden {
   opacity: 0;
   pointer-events: none;
 }
@@ -77,30 +87,56 @@ canvas {
   pointer-events: none;
 }
 
+.play-area {
+  --logo-column: clamp(90px, 20vw, 280px);
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.play-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-height: 100%;
+}
+
 .masthead {
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: center;
+  width: var(--logo-column);
   flex: 0 0 auto;
-  margin-bottom: 8px;
+  padding-top: clamp(24px, 5vh, 48px);
 }
 
 .masthead h1 {
   margin: 0;
+  width: 100%;
   line-height: 0;
 }
 
 .masthead img {
   display: block;
-  height: clamp(38px, 6vh, 54px);
-  max-width: min(80vw, 330px);
+  width: 260px;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
   object-fit: contain;
 }
 
 .frame {
   position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  background: transparent;
+  flex: 0 1 auto;
+  width: min(calc(100% - var(--logo-column) - 8px), calc(140dvh - 196px));
+  aspect-ratio: 7 / 5;
+  max-height: 100%;
+  border: clamp(14px, 2vw, 24px) solid transparent;
+  border-image: url("./assets/intro-card-frame.svg") 45 / clamp(14px, 2vw, 24px) stretch;
+  background: #14172d;
+  box-shadow: 0 16px 35px rgba(6, 2, 14, 0.7);
 }
 
 .banner {
@@ -148,7 +184,7 @@ canvas {
     background-attachment: scroll;
   }
   .masthead {
-    place-items: center;
+    padding-top: 22px;
   }
 }
 
@@ -157,6 +193,6 @@ canvas {
     padding: 6px 0 8px;
   }
   .masthead {
-    margin-bottom: 4px;
+    padding-top: 18px;
   }
 }

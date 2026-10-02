@@ -230,7 +230,7 @@ export class BoardController {
     for (let col = 0; col < COLS; col += 1) {
       const rows = getReelRows(col);
       const glass = new Graphics();
-      glass.roundRect(0, 0, CELL, rows * CELL, 6).fill({ color: 0x14081c, alpha: 0.28 });
+      glass.roundRect(0, 0, CELL, rows * CELL, 6).fill(0x14172d);
       const mask = new Graphics();
       mask.rect(0, 0, CELL, rows * CELL).fill(0xffffff);
       const reelMask = new Graphics();
