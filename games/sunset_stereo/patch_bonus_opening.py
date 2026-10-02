@@ -24,6 +24,7 @@ from ways_paint import (  # noqa: E402
     growing_hold_stages,
     opening_respin_count,
     paint_hit_fillers,
+    paying_hold_cells,
     visible_ways_win,
 )
 
@@ -103,7 +104,7 @@ def _restage_body(body: list[dict], book_id: int, n_respins: int) -> list[dict] 
     last = reveals[-1]
     visible = _visible(last.get("board") or [])
     occupied = _occupied_from_wininfo(win, visible)
-    if len(occupied) < 3:
+    if len(occupied) < 3 or not paying_hold_cells(occupied):
         return None
     stages = growing_hold_stages(occupied, n_respins=n_respins)
     prefix: list[dict] = []

@@ -1,5 +1,11 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
+  import { fade } from "svelte/transition";
+  import introAnimation from "../assets/big-fathers-intro.webp";
+  import introPoster from "../assets/big-fathers-poster.png";
   import { labels, moneyHud, ui } from "../lib/ui.svelte";
+
+  const INTRO_MS = 5000;
 
   let {
     onContinue,
@@ -7,26 +13,45 @@
     onContinue: () => void;
   } = $props();
 
-  const percent = $derived(Math.max(0, Math.min(100, Math.round(ui.bootProgress * 100))));
+  let imageFailed = $state(false);
+  let introTimer: ReturnType<typeof setTimeout> | undefined;
+  const ready = $derived(ui.bootReady && ui.bootIntroDone);
+  const percent = $derived(ready ? 100 : Math.max(0, Math.min(99, Math.round(ui.bootProgress * 100))));
   const replayMult = $derived(Number(ui.replayMult.toFixed(2)));
+
+  onDestroy(() => {
+    if (introTimer !== undefined) clearTimeout(introTimer);
+  });
 </script>
 
 {#if ui.bootOpen}
-  <div class="boot" role="dialog" aria-label="Loading" aria-modal="true" data-boot="1" data-boot-ready={ui.bootReady ? "1" : "0"}>
+  <div class="boot" role="dialog" aria-label="Loading" aria-modal="true" data-boot="1" data-boot-ready={ready ? "1" : "0"} out:fade={{ duration: 400 }}>
     <div class="card">
-      <p class="kicker">Sunset Stereo</p>
-      <h1>Sunset Stereo</h1>
+      <img
+        class="preview"
+        src={imageFailed ? introPoster : introAnimation}
+        alt="Big Fathers"
+        onload={() => {
+          introTimer = setTimeout(() => (ui.bootIntroDone = true), INTRO_MS);
+        }}
+        onerror={() => {
+          if (imageFailed) {
+            ui.bootIntroDone = true;
+            return;
+          }
+          imageFailed = true;
+          ui.bootIntroDone = true;
+        }}
+      />
+      {#if ui.bootIntroDone}
+        <p id="bootProgress" class="pct" role="status" aria-live="polite">{percent}%</p>
+      {/if}
       {#if ui.error}
         <p class="status">{ui.error}</p>
-        <button id="bootContinueBtn" type="button" onclick={onContinue}>Continue</button>
-      {:else if !ui.bootReady}
-        <p class="status">Loading</p>
-        <div class="bar" aria-hidden="true">
-          <span style:width={`${percent}%`}></span>
-        </div>
-        <p id="bootProgress" class="pct">{percent}%</p>
-      {:else}
-        <p class="status">Ready</p>
+        {#if ready}
+          <button id="bootContinueBtn" type="button" onclick={onContinue}>Continue</button>
+        {/if}
+      {:else if ready}
         {#if ui.replay}
           <dl class="replay-info" data-replay-info="1">
             <div><dt>{labels.stake()}</dt><dd id="replayBet">{moneyHud(ui.betMicro)}</dd></div>
@@ -47,60 +72,37 @@
     z-index: 200;
     display: grid;
     place-items: center;
-    padding: 24px;
-    background:
-      radial-gradient(ellipse at 50% 42%, rgba(48, 18, 8, 0.2) 0%, rgba(8, 2, 16, 0.82) 72%);
-    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-    color: #ffd060;
+    padding: clamp(12px, 2.5vh, 24px);
+    background: #000;
+    color: #f8ecd8;
   }
   .card {
-    width: min(440px, 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-height: 100%;
     text-align: center;
   }
-  .kicker {
-    margin: 0 0 8px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    font-size: 11px;
-    font-family: ui-sans-serif, system-ui, sans-serif;
-    color: #e8c890;
-  }
-  h1 {
-    margin: 0 0 18px;
-    font-size: clamp(36px, 7vw, 56px);
-    font-weight: 600;
-    color: #f8ecd8;
-    text-shadow: 0 2px 16px rgba(10, 6, 2, 0.8);
+  .preview {
+    display: block;
+    width: min(100%, 1120px, 110dvh);
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
   }
   .status {
-    margin: 0 0 16px;
+    margin: 0 0 18px;
     font-family: ui-sans-serif, system-ui, sans-serif;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    font-size: 13px;
+    font-size: 14px;
     color: #f0d8a0;
   }
-  .bar {
-    width: 100%;
-    height: 8px;
-    overflow: hidden;
-    border-radius: 99px;
-    background: rgba(20, 10, 8, 0.65);
-    box-shadow: inset 0 0 0 1px rgba(196, 165, 116, 0.35);
-  }
-  .bar span {
-    display: block;
-    height: 100%;
-    border-radius: 99px;
-    background: linear-gradient(90deg, #c47a28, #ffd060);
-    transition: width 0.2s ease;
-  }
   .pct {
-    margin: 12px 0 0;
+    margin: 8px 0 18px;
     font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: clamp(18px, 3vh, 26px);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.08em;
-    color: #f8ecd8;
+    color: #f2dfbd;
   }
   .replay-info {
     display: flex;
@@ -127,13 +129,19 @@
   }
   button {
     min-width: 180px;
-    min-height: 54px;
-    border: 1px solid #c4a574;
-    background: #7a3218;
+    min-height: 50px;
+    border: 1px solid #d7ac70;
+    border-radius: 4px;
+    background: #755033;
     color: #f8ece0;
+    font-family: ui-sans-serif, system-ui, sans-serif;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     font-weight: 700;
     cursor: pointer;
+  }
+  button:hover,
+  button:focus-visible {
+    background: #9a6740;
   }
 </style>

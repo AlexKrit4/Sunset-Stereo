@@ -52,7 +52,10 @@ export const ui = $state({
   bigWinHudBaseMicro: 0,
   bootOpen: true,
   bootReady: false,
+  bootIntroDone: false,
   bootProgress: 0,
+  introOpen: false,
+  introTransitioning: false,
   replayMult: 0,
   replayWinMicro: 0,
   maxWinOpen: false,
@@ -146,7 +149,7 @@ export function moneyPlain(micro: number) {
 }
 
 export function changeBet(delta: number) {
-  if (ui.busy || ui.replay || ui.bootOpen || ui.autoplayOn) return;
+  if (ui.busy || ui.replay || ui.bootOpen || ui.introOpen || ui.autoplayOn) return;
   const index = ui.betLevels.indexOf(ui.betMicro);
   const next = Math.max(0, Math.min(ui.betLevels.length - 1, (index < 0 ? 0 : index) + delta));
   ui.betMicro = ui.betLevels[next];

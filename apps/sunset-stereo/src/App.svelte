@@ -7,27 +7,30 @@
   import Rules from "./components/Rules.svelte";
   import BonusIntro from "./components/BonusIntro.svelte";
   import BuyMenu from "./components/BuyMenu.svelte";
+  import Intro from "./components/Intro.svelte";
   import Loader from "./components/Loader.svelte";
   import { bootEngine, playBet, playBuyBonus, playBuyWildBonus, playPendingRestore } from "./game/betMachine.svelte";
   import { changeBet, confirmBonusStart, stopAutoplay, ui } from "./lib/ui.svelte";
   import { bindMusicUnlock, bootMusic, musicBedFromUi, setMusicBed, unlockMusic } from "./lib/music";
   import { preloadGame } from "./lib/preload";
+  import titleLogo from "./assets/sunset-stereo-stacked.png";
 
   let unbindMusic = () => {};
 
   async function spin() {
-    if (ui.bootOpen) return false;
+    if (ui.bootOpen || ui.introOpen) return false;
     unlockMusic();
     return playBet(ui.scatterBuyOn ? "scatter" : "base");
   }
 
   function continueBoot() {
-    if (!ui.bootReady && !ui.error) return;
+    if (!ui.bootReady || !ui.bootIntroDone) return;
     bootMusic();
     unlockMusic();
     ui.bootOpen = false;
+    if (!ui.replay) ui.introOpen = true;
     unbindMusic = bindMusicUnlock();
-    void playPendingRestore();
+    if (!ui.introOpen) void playPendingRestore();
   }
 
   $effect(() => {
@@ -38,6 +41,7 @@
   $effect(() => {
     if (
       ui.bootOpen ||
+      ui.introOpen ||
       !ui.autoplayOn ||
       ui.autoplayLeft <= 0 ||
       ui.autoplayMenuOpen ||
@@ -80,12 +84,13 @@
     })();
     const onKey = (event: KeyboardEvent) => {
       if (ui.bootOpen) {
-        if ((event.code === "Space" || event.code === "Enter") && (ui.bootReady || ui.error)) {
+        if ((event.code === "Space" || event.code === "Enter") && ui.bootReady && ui.bootIntroDone) {
           event.preventDefault();
           continueBoot();
         }
         return;
       }
+      if (ui.introOpen) return;
       if (event.code === "Escape") {
         if (ui.buyConfirm) {
           event.preventDefault();
@@ -141,24 +146,29 @@
 </script>
 
 <Loader onContinue={continueBoot} />
+<Intro />
 
-<div class="stage" class:maxwin-hidden={ui.maxWinUiHidden}>
+<div class="stage" class:maxwin-hidden={ui.maxWinUiHidden} class:intro-hidden={ui.introOpen || ui.introTransitioning}>
 <div class="cabinet" class:feature={ui.feature} class:booting={ui.bootOpen}>
-  <header class="masthead">
-    <h1>Sunset Stereo</h1>
-  </header>
+  <div class="play-area">
+    <div class="play-row">
+      <header class="masthead">
+        <h1><img id="slotLogo" src={titleLogo} alt="Sunset Stereo" /></h1>
+      </header>
 
-  <div class="frame">
-    <Game />
-    <BonusIntro />
-    {#if !ui.ready && !ui.bootOpen}
-      <p class="loading">
-        {ui.replay ? "Loading replay…" : ui.source === "live" ? "Connecting to the game server…" : "Loading reels…"}
-      </p>
-    {/if}
-    {#if ui.error && !ui.bootOpen}
-      <p class="loading">{ui.error}</p>
-    {/if}
+      <div class="frame">
+        <Game />
+        <BonusIntro />
+        {#if !ui.ready && !ui.bootOpen}
+          <p class="loading">
+            {ui.replay ? "Loading replay…" : ui.source === "live" ? "Connecting to the game server…" : "Loading reels…"}
+          </p>
+        {/if}
+        {#if ui.error && !ui.bootOpen}
+          <p class="loading">{ui.error}</p>
+        {/if}
+      </div>
+    </div>
   </div>
 
   <p class="banner" class:show={Boolean(ui.banner)}>{ui.banner}</p>
@@ -172,7 +182,9 @@
 </div>
 <MaxWin />
 {#if import.meta.env.VITE_VPS === "1"}
-  {#await import("./vps/VpsStats.svelte") then mod}
-    <mod.default />
-  {/await}
+  <div class="stats-layer" class:intro-hidden={ui.introOpen || ui.introTransitioning}>
+    {#await import("./vps/VpsStats.svelte") then mod}
+      <mod.default />
+    {/await}
+  </div>
 {/if}

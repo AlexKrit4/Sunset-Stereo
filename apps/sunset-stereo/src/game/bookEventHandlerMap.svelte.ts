@@ -4,7 +4,7 @@ import { bigWinHudBase, followingWincap } from "../lib/bigWinStages.js";
 import { waitForTimeout } from "../utils/waitForTimeout";
 import { paceMs } from "../lib/pace";
 import { runtime } from "./context";
-import { unpadPosition, winningWays } from "../rgs/bookView";
+import { unpadPosition, validBonusHolds, winningWays } from "../rgs/bookView";
 import { multiplierCentsToMicro } from "../rgs/money";
 import type { BookEvent, BookEventHandlerMap, Position, RawSymbol } from "./typesBookEvent";
 
@@ -92,7 +92,9 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
     }
     const upcoming = bookEvent.gameType === "freegame" ? nextBonusWin(context.bookEvents, bookEvent) : null;
     const holdCells = withLockedWilds(pendingHolds);
-    const upcomingPositions = upcoming ? withLockedWilds(upcoming.positions) : [];
+    const upcomingPositions = upcoming
+      ? withLockedWilds(upcoming.beforeRespin ? validBonusHolds(bookEvent.board, upcoming.positions) : upcoming.positions)
+      : [];
     const already = new Set(holdCells.map(cellKey));
     const fresh = upcomingPositions.filter((pos) => !already.has(cellKey(pos)));
     await board.playBookReveal(bookEvent.board, {
@@ -118,7 +120,7 @@ export const bookEventHandlerMap: BookEventHandlerMap = {
   },
 
   holdRespin: async (bookEvent) => {
-    pendingHolds = withLockedWilds(bookEvent.positions);
+    pendingHolds = withLockedWilds(validBonusHolds(lastBoard, bookEvent.positions));
     runtime.board?.lockBonusWinners(pendingHolds);
     await waitForTimeout(paceMs(80));
   },

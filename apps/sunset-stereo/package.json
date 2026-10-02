@@ -14,7 +14,8 @@
     "smoke:round-stake": "node scripts/smoke-round-stake.mjs",
     "smoke:round-stake-ui": "node scripts/smoke-round-stake-ui.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "smoke:wild": "node scripts/smoke-wildbonus.mjs"
+    "smoke:wild": "node scripts/smoke-wildbonus.mjs",
+    "smoke:bonus-holds": "node --experimental-strip-types scripts/smoke-bonus-holds.mjs"
   },
   "dependencies": {
     "pixi.js": "^8.8.1",

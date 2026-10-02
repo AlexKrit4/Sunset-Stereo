@@ -36,17 +36,6 @@ def _has_win_info(events: list, start: int, end: int) -> bool:
     return any(event.get("type") == "winInfo" for event in events[start + 1 : end])
 
 
-def _sticky_wilds(events: list) -> list[tuple[int, int]]:
-    seen: list[tuple[int, int]] = []
-    for event in events:
-        if event.get("type") != "placeWild":
-            continue
-        cell = (int(event["reel"]), int(event["row"]))
-        if cell not in seen:
-            seen.append(cell)
-    return seen
-
-
 def _visible_already_has_wild(names: list[list[str]], wilds: list[tuple[int, int]]) -> bool:
     if any(name == "W" for col in names for name in col):
         return True
@@ -154,14 +143,24 @@ def patch_book(book: dict) -> bool:
     if not any(event.get("type") == "placeWild" for event in events):
         return False
     original_pay = int(book.get("payoutMultiplier") or 0)
-    wilds = _sticky_wilds(events)
+    wilds: list[tuple[int, int]] = []
     changed = False
     inserts: list[tuple[int, list[dict]]] = []
     first_extra = True
+    revealed_extra = False
     salt = 0
     for index, event in enumerate(events):
+        if event.get("type") == "updateFreeSpin":
+            if revealed_extra:
+                wilds = []
+            revealed_extra = False
+        if event.get("type") == "placeWild":
+            cell = (int(event["reel"]), int(event["row"]))
+            if cell not in wilds:
+                wilds.append(cell)
         if event.get("type") != "reveal" or event.get("gameType") != "freegame":
             continue
+        revealed_extra = True
         names_before = visible_grid(event.get("board") or [])
         pay_before, wins_before = ways_detail(names_before)
         already_wild = _visible_already_has_wild(names_before, wilds)
