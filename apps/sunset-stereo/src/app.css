@@ -128,8 +128,8 @@ canvas {
   aspect-ratio: 620 / 434;
   max-height: 100%;
   padding: 3.9%;
-  background: url("./assets/reel-grid-frame.svg") center / contain no-repeat, #14172d;
-  box-shadow: 0 16px 35px rgba(6, 2, 14, 0.7);
+  background: url("./assets/reel-grid-frame.svg") center / contain no-repeat;
+  filter: drop-shadow(0 16px 35px rgba(6, 2, 14, 0.7));
 }
 
 .banner {
