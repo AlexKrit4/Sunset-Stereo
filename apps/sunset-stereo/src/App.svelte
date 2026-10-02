@@ -12,6 +12,7 @@
   import { changeBet, confirmBonusStart, stopAutoplay, ui } from "./lib/ui.svelte";
   import { bindMusicUnlock, bootMusic, musicBedFromUi, setMusicBed, unlockMusic } from "./lib/music";
   import { preloadGame } from "./lib/preload";
+  import titleLogo from "./assets/sunset-stereo-logo.png";
 
   let unbindMusic = () => {};
 
@@ -145,7 +146,7 @@
 <div class="stage" class:maxwin-hidden={ui.maxWinUiHidden}>
 <div class="cabinet" class:feature={ui.feature} class:booting={ui.bootOpen}>
   <header class="masthead">
-    <h1>Sunset Stereo</h1>
+    <h1><img src={titleLogo} alt="Sunset Stereo" /></h1>
   </header>
 
   <div class="frame">
