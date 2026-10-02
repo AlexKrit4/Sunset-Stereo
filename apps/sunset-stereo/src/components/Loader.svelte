@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
+  import { fade } from "svelte/transition";
   import introAnimation from "../assets/big-fathers-intro.webp";
   import introPoster from "../assets/big-fathers-poster.png";
   import { labels, moneyHud, ui } from "../lib/ui.svelte";
@@ -24,7 +25,7 @@
 </script>
 
 {#if ui.bootOpen}
-  <div class="boot" role="dialog" aria-label="Loading" aria-modal="true" data-boot="1" data-boot-ready={ready ? "1" : "0"}>
+  <div class="boot" role="dialog" aria-label="Loading" aria-modal="true" data-boot="1" data-boot-ready={ready ? "1" : "0"} out:fade={{ duration: 400 }}>
     <div class="card">
       <img
         class="preview"

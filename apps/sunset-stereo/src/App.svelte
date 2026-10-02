@@ -7,6 +7,7 @@
   import Rules from "./components/Rules.svelte";
   import BonusIntro from "./components/BonusIntro.svelte";
   import BuyMenu from "./components/BuyMenu.svelte";
+  import Intro from "./components/Intro.svelte";
   import Loader from "./components/Loader.svelte";
   import { bootEngine, playBet, playBuyBonus, playBuyWildBonus, playPendingRestore } from "./game/betMachine.svelte";
   import { changeBet, confirmBonusStart, stopAutoplay, ui } from "./lib/ui.svelte";
@@ -17,7 +18,7 @@
   let unbindMusic = () => {};
 
   async function spin() {
-    if (ui.bootOpen) return false;
+    if (ui.bootOpen || ui.introOpen) return false;
     unlockMusic();
     return playBet(ui.scatterBuyOn ? "scatter" : "base");
   }
@@ -27,8 +28,9 @@
     bootMusic();
     unlockMusic();
     ui.bootOpen = false;
+    if (!ui.replay) ui.introOpen = true;
     unbindMusic = bindMusicUnlock();
-    void playPendingRestore();
+    if (!ui.introOpen) void playPendingRestore();
   }
 
   $effect(() => {
@@ -39,6 +41,7 @@
   $effect(() => {
     if (
       ui.bootOpen ||
+      ui.introOpen ||
       !ui.autoplayOn ||
       ui.autoplayLeft <= 0 ||
       ui.autoplayMenuOpen ||
@@ -87,6 +90,7 @@
         }
         return;
       }
+      if (ui.introOpen) return;
       if (event.code === "Escape") {
         if (ui.buyConfirm) {
           event.preventDefault();
@@ -142,6 +146,7 @@
 </script>
 
 <Loader onContinue={continueBoot} />
+<Intro />
 
 <div class="stage" class:maxwin-hidden={ui.maxWinUiHidden}>
 <div class="cabinet" class:feature={ui.feature} class:booting={ui.bootOpen}>
