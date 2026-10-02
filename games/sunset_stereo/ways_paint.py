@@ -505,6 +505,24 @@ def opening_respin_count(seed: int) -> int:
     return 3 if int(seed) % 2 else 2
 
 
+def paying_hold_cells(occupied: dict[tuple[int, int], str]) -> set[tuple[int, int]]:
+    winning: set[tuple[int, int]] = set()
+    for symbol in BONUS_PAYING:
+        columns: list[set[tuple[int, int]]] = []
+        for reel in range(REELS):
+            cells = {
+                key for key, name in occupied.items()
+                if key[0] == reel and name in {symbol, "W"}
+            }
+            if not cells:
+                break
+            columns.append(cells)
+        if len(columns) >= 3:
+            for cells in columns:
+                winning.update(cells)
+    return winning
+
+
 def growing_hold_stages(
     occupied: dict[tuple[int, int], str],
     n_respins: int = 2,
@@ -512,39 +530,24 @@ def growing_hold_stages(
     """Build 2–3 respins that grow into the final occupied win.
 
     Returns n_respins+1 occupied maps. The last map is the full win. Sticky
-    wilds stay in every stage. Earlier stages are a valid 3-oak subset when
-    the final win has enough cells; otherwise the same lock is shown while
-    fillers change.
+    wilds stay in every stage; paying cells enter a hold only after a way
+    reaches at least three reels.
     """
     occupied = dict(occupied or {})
     n_respins = 2 if n_respins < 3 else 3
     sticky = {key: name for key, name in occupied.items() if name == "W"}
-    by_reel: list[list[tuple[int, int]]] = [[] for _ in range(REELS)]
-    for key in occupied:
-        by_reel[key[0]].append(key)
-    kind = 0
-    for reel in range(REELS):
-        if by_reel[reel]:
-            kind += 1
-        else:
-            break
-
-    def add_reel(dst: dict[tuple[int, int], str], reel: int, one: bool) -> None:
-        cells = by_reel[reel]
-        if not cells:
-            return
-        if one:
-            non_wild = [cell for cell in cells if occupied[cell] != "W"]
-            cell = (non_wild or cells)[0]
-            dst[cell] = occupied[cell]
-            return
-        for cell in cells:
-            dst[cell] = occupied[cell]
-
     core: dict[tuple[int, int], str] = dict(sticky)
-    for reel in range(min(3, kind)):
-        add_reel(core, reel, one=True)
-    if len(core) < 3 and occupied:
+    for symbol in BONUS_PAYING:
+        columns = [
+            sorted(key for key, name in occupied.items() if key[0] == reel and name in {symbol, "W"})
+            for reel in range(3)
+        ]
+        if all(columns):
+            for cells in columns:
+                key = next((key for key in cells if occupied[key] != "W"), cells[0])
+                core[key] = occupied[key]
+            break
+    if not paying_hold_cells(core):
         core = dict(occupied)
 
     rest = sorted(key for key in occupied if key not in core)
@@ -556,8 +559,11 @@ def growing_hold_stages(
         for index, key in enumerate(rest):
             grown[key] = occupied[key]
             last_in_part = (index + 1) % chunk == 0 or index == len(rest) - 1
-            if last_in_part and grown != stages[-1]:
-                stages.append(dict(grown))
+            if last_in_part:
+                winning = paying_hold_cells(grown) | sticky.keys()
+                stage = {cell: grown[cell] for cell in winning}
+                if stage != stages[-1]:
+                    stages.append(stage)
             if len(stages) >= n_respins:
                 break
     full = dict(occupied)

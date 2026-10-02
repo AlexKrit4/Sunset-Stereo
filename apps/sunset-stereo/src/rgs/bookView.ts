@@ -1,4 +1,5 @@
 import type { RawSymbol, Position } from "../game/typesBookEvent";
+import { PAYABLE } from "../math/config.js";
 
 const FROM_MATH: Record<string, string> = {
   H1: "high1",
@@ -43,4 +44,34 @@ export function winningWays(wins: Array<{ positions: Position[] }>) {
     for (const count of perReel.values()) ways *= count;
     return total + ways;
   }, 0);
+}
+
+export function payingBonusCells(board: RawSymbol[][]): Set<string> {
+  const names = visibleNames(board);
+  const cells = new Set<string>();
+  for (const symbol of PAYABLE) {
+    const matching: string[][] = [];
+    for (let reel = 0; reel < names.length; reel += 1) {
+      const positions = names[reel].flatMap((name, row) =>
+        name === symbol || name === "wild" ? [`${reel}:${row}`] : [],
+      );
+      if (!positions.length) break;
+      matching.push(positions);
+    }
+    if (matching.length >= 3) {
+      for (const column of matching) {
+        for (const position of column) cells.add(position);
+      }
+    }
+  }
+  return cells;
+}
+
+export function validBonusHolds(board: RawSymbol[][], positions: Position[]): Position[] {
+  const names = visibleNames(board);
+  const paying = payingBonusCells(board);
+  return positions.filter(({ reel, row }) => {
+    const cell = unpadPosition({ reel, row });
+    return names[cell.reel]?.[cell.row] === "wild" || paying.has(`${cell.reel}:${cell.row}`);
+  });
 }
