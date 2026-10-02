@@ -1497,9 +1497,9 @@ export class BoardController {
     const padX = 6;
     const padTop = 22;
     const padBottom = 6;
-    const scaleX = Math.max(0.35, (viewWidth - padX * 2) / w);
+    const scaleX = Math.max(0.18, (viewWidth - padX * 2) / w);
     const scaleY =
-      viewHeight > 0 ? Math.max(0.35, (viewHeight - padTop - padBottom) / h) : scaleX;
+      viewHeight > 0 ? Math.max(0.18, (viewHeight - padTop - padBottom) / h) : scaleX;
     const scale = Math.min(scaleX, scaleY);
     this.root.scale.set(scale);
     this.root.x = (viewWidth - w * scale) / 2;

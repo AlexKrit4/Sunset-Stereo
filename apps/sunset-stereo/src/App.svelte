@@ -13,7 +13,7 @@
   import { changeBet, confirmBonusStart, stopAutoplay, ui } from "./lib/ui.svelte";
   import { bindMusicUnlock, bootMusic, musicBedFromUi, setMusicBed, unlockMusic } from "./lib/music";
   import { preloadGame } from "./lib/preload";
-  import titleLogo from "./assets/sunset-stereo-logo.png";
+  import titleLogo from "./assets/sunset-stereo-stacked.png";
 
   let unbindMusic = () => {};
 

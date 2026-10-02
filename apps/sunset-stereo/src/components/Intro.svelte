@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import titleLogo from "../assets/sunset-stereo-logo.png";
+  import titleLogo from "../assets/sunset-stereo-stacked.png";
   import maxWinLogo from "../assets/max-win-logo.png";
   import cardFrame from "../assets/intro-card-frame.svg";
   import { ui } from "../lib/ui.svelte";
@@ -149,8 +149,8 @@
     visibility: hidden;
   }
   .logo {
-    width: min(46vh, 420px);
-    max-width: 82vw;
+    width: min(29vh, 250px);
+    max-width: 65vw;
     filter: drop-shadow(0 6px 24px rgba(10, 4, 16, 0.85));
     animation: card-in 0.6s ease-out both;
   }
@@ -313,7 +313,7 @@
       max-width: 220px;
     }
     .logo {
-      width: min(46vw, 260px);
+      width: min(38vw, 24vh, 150px);
     }
   }
 </style>

@@ -88,28 +88,25 @@ canvas {
 }
 
 .play-area {
-  --logo-column: clamp(90px, 20vw, 280px);
+  --logo-column: clamp(56px, 17vw, 270px);
   display: flex;
   align-items: center;
+  justify-content: center;
   flex: 1 1 auto;
   min-height: 0;
 }
 
 .play-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
+  position: relative;
+  width: min(calc(100% - var(--logo-column) - var(--logo-column) - 16px), calc(143dvh - 200px));
   max-height: 100%;
 }
 
 .masthead {
-  display: flex;
-  justify-content: center;
+  position: absolute;
+  right: calc(100% + 8px);
+  top: calc(5.5% + 22px);
   width: var(--logo-column);
-  flex: 0 0 auto;
-  padding-top: clamp(24px, 5vh, 48px);
 }
 
 .masthead h1 {
@@ -120,22 +117,18 @@ canvas {
 
 .masthead img {
   display: block;
-  width: 260px;
-  max-width: 100%;
+  width: 100%;
   height: auto;
-  margin: 0 auto;
   object-fit: contain;
 }
 
 .frame {
   position: relative;
-  flex: 0 1 auto;
-  width: min(calc(100% - var(--logo-column) - 8px), calc(140dvh - 196px));
-  aspect-ratio: 7 / 5;
+  width: 100%;
+  aspect-ratio: 620 / 434;
   max-height: 100%;
-  border: clamp(14px, 2vw, 24px) solid transparent;
-  border-image: url("./assets/intro-card-frame.svg") 45 / clamp(14px, 2vw, 24px) stretch;
-  background: #14172d;
+  padding: 3.9%;
+  background: url("./assets/reel-grid-frame.svg") center / contain no-repeat, #14172d;
   box-shadow: 0 16px 35px rgba(6, 2, 14, 0.7);
 }
 
@@ -183,16 +176,10 @@ canvas {
   body {
     background-attachment: scroll;
   }
-  .masthead {
-    padding-top: 22px;
-  }
 }
 
 @media (max-height: 640px) {
   .cabinet {
     padding: 6px 0 8px;
-  }
-  .masthead {
-    padding-top: 18px;
   }
 }
